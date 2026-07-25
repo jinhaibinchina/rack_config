@@ -1,0 +1,124 @@
+
+/* 设置窗口样式 */
+QMainWindow {
+    background-color: #FAFAFA;
+    color: #212121;
+}
+
+/* 设置按钮样式 */
+QPushButton {
+    background-color: rgb(134,183,200);
+    border: 2px solid #5F92B2;
+    border-radius: 5px;
+    color: white;
+}
+
+QPushButton:hover {
+    background-color: rgb(0,130,150);
+    border: 2px solid #5F92B2;
+    border-radius: 5px;
+    color: white;
+}
+
+QPushButton:hover:pressed {
+    background-color: rgb(85,170,255);
+    border: 2px solid #3C80B1;
+    border-radius: 5px;
+    color: white;
+}
+
+/* 设置标签样式 */
+QLabel {
+    color: #212121;
+}
+
+/* 鼠标悬停状态 */
+QLabel:hover {
+    color: #E91E63;
+    text-decoration: underline;
+}
+
+/* 设置输入框样式 */
+QLineEdit {
+    background-color: #FFFFFF;
+    color: #212121;
+    border: 1px solid #E0E0E0;
+    border-radius: 3px;
+    padding: 6px;
+}
+
+/* 鼠标悬停状态 */
+QLineEdit:hover {
+    background-color: #F5F5F5;
+}
+
+/* 鼠标按下状态 */
+QLineEdit:pressed {
+    background-color: #EEEEEE;
+}
+
+/* 设置滚动条样式 */
+QScrollBar:vertical {
+    background-color: transparent;
+    width: 10px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #FFCDD2;
+    border-radius: 5px;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background-color: transparent;
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background-color: transparent;
+}
+
+
+
+
+/* 设置表格样式 */
+QTableView {
+    background-color: #FFFFFF;
+    color: #212121;
+    gridline-color: #E0E0E0;
+}
+
+QTableView::item:selected {
+    background-color: #FFCDD2;
+    color: #212121;
+}
+
+/* 设置列表样式 */
+QListView {
+    background-color: #FFFFFF;
+    color: #212121;
+    border: none;
+    font-size: 14px;
+}
+
+QListView::item {
+    height: 16px;  /* 设置行高 */
+    padding: 1px;
+}
+
+QListView::item:selected {
+    background-color: #FFCDD2;
+    color: #212121;
+}
+
+QListView::item:hover {
+    background-color: #F5F5F5;
+}
+
+QListView::item:selected:hover {
+    background-color: #EF9A9A;  /* 选中悬停时更深 */
+}
+
+

@@ -1,0 +1,1614 @@
+
+from threading import Lock
+from PyQt6.QtCore import QRectF, QPointF
+
+from .my_common import SceneMode
+from .myGraphicsScene import myGraphicsScene
+
+from PyQt6.QtWidgets import QMainWindow, QApplication
+
+from PyQt6.QtWidgets import QMenu,QDialog,QSizePolicy
+from PyQt6.QtWidgets import ( QToolTip)
+from PyQt6.QtCore import Qt, QPointF, QRectF,pyqtSignal,QSize,QObject,QRect,QPoint,QTimer,QSizeF
+from PyQt6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack
+
+import json,sys,os
+from .my_elements import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element
+from PyQt6.QtGui import QRegularExpressionValidator
+from PyQt6.QtCore import QRegularExpression
+
+# from rect_params_ui import Ui_Dialog
+# from group_params_ui import Ui_Dialog as Group_params_Ui
+# from agv_test_ui import Ui_Dialog as agv_test_Ui
+# from property_set_ui import Ui_Dialog as property_set_Ui
+from .mySnapSystem import SnapSystem
+import copy
+
+# class property_set(QDialog):
+#     # clean_timer =Signal()
+#     def __init__(self,parent=None,rect_params=None):
+#         super().__init__(parent)
+#         self.ui = property_set_Ui()
+#         self.ui.setupUi(self)
+
+        
+#         self.rect_params_ref=rect_params
+    
+#     def accept(self):
+#         print("accept")
+#         self.rect_params_ref["line_width"] = self.ui.spinBox_lineWidth.value()
+#         self.rect_params_ref["font_size"]   = self.ui.spinBox_fontSize.value()
+#         self.rect_params_ref["fill"]   = self.ui.checkBox_fill.isChecked()
+#         if self.ui.radioButton_black.isChecked():
+#             self.rect_params_ref["color"]   = QColor(0,0,0)
+#         elif self.ui.radioButton_blue.isChecked():
+#             self.rect_params_ref["color"]   = QColor(0,0,255)
+#         elif self.ui.radioButton_green.isChecked():
+#             self.rect_params_ref["color"]   = QColor(0,255,0)
+#         elif self.ui.radioButton_yellow.isChecked():
+#             self.rect_params_ref["color"]   = QColor(255,255,0)
+#         elif self.ui.radioButton_red.isChecked():
+#             self.rect_params_ref["color"]   = QColor(255,0,0)
+        
+        
+#         return super().accept()
+    
+#     def reject(self):
+       
+#         return super().reject()
+#     def closeEvent(self, arg__1):
+        
+#         return super().closeEvent(arg__1)
+
+# class rect_params_setup(QDialog):
+#     # clean_timer =Signal()
+#     def __init__(self,parent=None,rect_params=None):
+#         super().__init__(parent)
+#         self.ui = Ui_Dialog()
+#         self.ui.setupUi(self)
+
+#         regex = QRegularExpression("^[1-9]\\d*$")
+#         validator = QRegularExpressionValidator(regex, self.ui.lineEdit_width)
+#         self.ui.lineEdit_width.setValidator(validator)
+#         self.ui.lineEdit_height.setValidator(validator)
+#         self.ui.lineEdit_width.setText("200")
+#         self.ui.lineEdit_height.setText("200")
+       
+   
+
+#         self.rect_params_ref=rect_params
+    
+#     def accept(self):
+#         print("accept")
+       
+#         self.rect_params_ref["height"] = int(self.ui.lineEdit_width.text())
+#         self.rect_params_ref["width"] = int(self.ui.lineEdit_height.text())
+        
+#         return super().accept()
+#     def reject(self):
+#         self.rect_params_ref = None
+#         return super().reject()
+#     def closeEvent(self, arg__1):
+#         self.rect_params_ref = None
+#         return super().closeEvent(arg__1)
+
+# class group_params_setup(QDialog):
+#     # clean_timer =Signal()
+#     def __init__(self,parent=None,rect_params=None):
+#         super().__init__(parent)
+#         self.ui = Group_params_Ui()
+#         self.ui.setupUi(self)
+
+#         regex = QRegularExpression("^[1-9]\\d*$")
+#         validator = QRegularExpressionValidator(regex, self.ui.lineEdit_group_id)
+#         self.ui.lineEdit_group_id.setValidator(validator)
+#         self.ui.lineEdit_group_id.setText("1")
+#         self.rect_params_ref=rect_params
+    
+#     def accept(self):
+#         print("accept")
+#         self.rect_params_ref["group_id"] = int(self.ui.lineEdit_group_id.text())
+#         self.rect_params_ref["group_name"]   = self.ui.lineEdit_group_name.text()
+#         return super().accept()
+    
+#     def reject(self):
+#         self.rect_params_ref = None
+#         return super().reject()
+#     def closeEvent(self, arg__1):
+#         self.rect_params_ref = None
+#         return super().closeEvent(arg__1)
+
+
+# class agv_test(QDialog):
+    
+#     def __init__(self,parent=None,manager =None):
+#         super().__init__(parent)
+#         self.ui = agv_test_Ui()
+#         self.ui.setupUi(self)
+#         self.parent =parent
+#         self.ui.Slider_x.valueChanged.connect(self.update_data)
+#         self.ui.Slider_y.valueChanged.connect(self.update_data)
+#         self.ui.Slider_a.valueChanged.connect(self.update_data)
+#         self.ui.Slider_angle_F.valueChanged.connect(self.update_data)
+#         self.ui.Slider_angle_B.valueChanged.connect(self.update_data)
+       
+#         self.scene_manager = manager
+#         # self.rect_params_ref=rect_params
+
+#     def update_data(self):
+#         id =self.ui.spinBox_group_id.value()
+#         x = self.ui.Slider_x.value()
+#         y = self.ui.Slider_y.value()
+#         a = self.ui.Slider_a.value()
+#         angle_F =self.ui.Slider_angle_F.value()
+#         angle_B =self.ui.Slider_angle_B.value()
+
+#         if self.parent or True:
+           
+#             element =   self.scene_manager.m_items[id]
+#             element.move_to_pos(x,y)
+#             element.rotate_to_ang(a)
+
+
+# class circle_params_setup(QDialog):
+#     # clean_timer =Signal()
+#     def __init__(self,parent=None,rect_params=None):
+#         super().__init__(parent)
+#         self.ui = Ui_Dialog()
+#         self.ui.setupUi(self)
+
+#         regex = QRegularExpression("^[1-9]\\d*$")
+#         validator = QRegularExpressionValidator(regex, self.ui.lineEdit_width)
+#         self.ui.lineEdit_width.setValidator(validator)
+#         self.ui.lineEdit_height.setValidator(validator)
+#         self.ui.lineEdit_width.setText("200")
+#         self.ui.lineEdit_height.setText("200")
+#         self.ui.combo_color.addItems(["黑","绿","蓝"])
+#         # self.ui.lineEdit_width.editingFinished.connect()
+
+#         self.rect_params_ref=rect_params
+    
+#     def accept(self):
+#         print("accept")
+       
+#         self.rect_params_ref["height"] = int(self.ui.lineEdit_width.text())
+#         self.rect_params_ref["width"] = int(self.ui.lineEdit_height.text())
+#         self.rect_params_ref["info"]   = self.ui.lineEdit_info.text()
+#         self.rect_params_ref["color"]   =self.ui.combo_color.currentIndex()
+#         self.rect_params_ref["fill"]   = self.ui.checkBox_isFill.isChecked()
+
+
+
+class QuadtreeNode:
+    def __init__(self, boundary: QRectF, capacity=4):
+        self.boundary = boundary  # 节点边界（矩形区域）
+        
+        self.capacity = capacity  # 节点最大容量
+        self.items = []           # 存储的图形项
+        self.divided = False      # 是否已分裂
+        # 四个子节点
+        self.nw = None  # 西北
+        self.ne = None  # 东北
+        self.sw = None  # 西南
+        self.se = None  # 东南
+
+
+        self.scene_ref=None
+
+    def set_scene_ref(self,scene):
+        self.scene_ref=scene
+
+    def subdivide(self):
+        """ 分裂当前节点为4个子节点 """
+        x, y = self.boundary.x(), self.boundary.y()
+        w, h = self.boundary.width() / 2, self.boundary.height() / 2
+
+        # 创建四个子区域
+        nw_rect = QRectF(x, y, w, h)
+        ne_rect = QRectF(x + w, y, w, h)
+        sw_rect = QRectF(x, y + h, w, h)
+        se_rect = QRectF(x + w, y + h, w, h)
+
+        self.nw = QuadtreeNode(nw_rect, self.capacity)
+        self.ne = QuadtreeNode(ne_rect, self.capacity)
+        self.sw = QuadtreeNode(sw_rect, self.capacity)
+        self.se = QuadtreeNode(se_rect, self.capacity)
+        self.divided = True
+
+    # def insert(self, item: base_element) -> bool:
+    #     """ 插入图形项 """
+    #     # 检查是否在边界内
+    #     if not self.boundary.intersects(item.sceneBoundingRect()):
+    #         return False
+
+    #     # 如果未超容量或未分裂，直接存储
+    #     if len(self.items) < self.capacity and not self.divided:
+    #         self.items.append(item)
+           
+    #         return True
+    #     elif len(self.items) < self.capacity and  self.divided:
+    #         self.items.append(item)
+
+    #     # 如果未分裂，先分裂
+    #     if not self.divided:
+    #         self.subdivide()
+
+    #     # 尝试插入到子节点
+    #     return (self.nw.insert(item) or self.ne.insert(item) or
+    #             self.sw.insert(item) or self.se.insert(item))
+
+    def insert(self, item: base_element) -> bool:
+        # 检查是否与节点边界相交
+        if not self.boundary.intersects(item.sceneBoundingRect()):
+            
+                
+            return False
+
+        # 未分裂时直接存储相交项
+        if not self.divided:
+            self.items.append(item)
+            # 超容量时分裂，但不迁移父节点数据
+            if len(self.items) > self.capacity:
+                self.subdivide()
+            return True
+
+        # 已分裂时，尝试插入到子节点
+        inserted = False
+        if self.nw.insert(item): inserted = True
+        if self.ne.insert(item): inserted = True
+        if self.sw.insert(item): inserted = True
+        if self.se.insert(item): inserted = True
+
+        # 若子节点无法完全容纳，保留在父节点
+        if not inserted:
+            self.items.append(item)
+        return True
+
+    
+    def query(self, area: QRectF, found_items: set):  # 使用集合而非列表
+        if not self.boundary.intersects(area):
+            return
+
+        for item in self.items:
+            if area.intersects(item.sceneBoundingRect()):
+                found_items.add(item)  # 集合自动去重
+
+        if self.divided:
+            self.nw.query(area, found_items)
+            self.ne.query(area, found_items)
+            self.sw.query(area, found_items)
+            self.se.query(area, found_items)
+    # def remove(self, item: base_element) -> bool:
+    #     """ 从节点中删除图形项 """
+    #     removed = False
+        
+    #     # 从当前节点删除
+    #     if item in self.items:
+    #         self.items.remove(item)
+            
+    #         removed = True
+            
+    #     # 从子节点递归删除
+    #     if self.divided:
+    #         if self.nw.remove(item): removed = True
+    #         if self.ne.remove(item): removed = True
+    #         if self.sw.remove(item): removed = True
+    #         if self.se.remove(item): removed = True
+        
+    #     return removed
+    def remove_all(self):
+        removed = False
+        
+        # 从当前节点删除
+        for item in self.items:
+            self.items.remove(item)
+            removed = True
+            
+        # 从子节点递归删除
+        if self.divided:
+            if self.nw.remove_all(): removed = True
+            if self.ne.remove_all(): removed = True
+            if self.sw.remove_all(): removed = True
+            if self.se.remove_all(): removed = True
+            
+            # 检查所有子节点是否为空
+            if (len(self.nw.items) == 0 and not self.nw.divided and
+                len(self.ne.items) == 0 and not self.ne.divided and
+                len(self.sw.items) == 0 and not self.sw.divided and
+                len(self.se.items) == 0 and not self.se.divided):
+                # 重置子节点和分裂状态
+                self.nw = self.ne = self.sw = self.se = None
+                self.divided = False
+        
+        return removed
+
+    def remove(self, item: base_element) -> bool:
+        removed = False
+        
+        # 从当前节点删除
+        if item in self.items:
+            self.items.remove(item)
+            removed = True
+            
+        # 从子节点递归删除
+        if self.divided:
+            if self.nw.remove(item): removed = True
+            if self.ne.remove(item): removed = True
+            if self.sw.remove(item): removed = True
+            if self.se.remove(item): removed = True
+            
+            # 检查所有子节点是否为空
+            if (len(self.nw.items) == 0 and not self.nw.divided and
+                len(self.ne.items) == 0 and not self.ne.divided and
+                len(self.sw.items) == 0 and not self.sw.divided and
+                len(self.se.items) == 0 and not self.se.divided):
+                # 重置子节点和分裂状态
+                self.nw = self.ne = self.sw = self.se = None
+                self.divided = False
+        
+        return removed
+    def visualize(self, painter: QPainter, max_depth=None, current_depth=0):
+        """
+        递归绘制四叉树结构
+        :param painter: QPainter绘图对象
+        :param max_depth: 最大绘制深度
+        :param current_depth: 当前节点深度
+        """
+        # 深度限制检查
+        if max_depth is not None and current_depth > max_depth:
+            return
+        # print("可视化")
+        if self.scene_ref is None:
+            return
+        sceneToView = self.scene_ref.sceneToView
+        pen = QPen(Qt.blue)
+        pen.setWidth(1)
+        font = QFont("Arial", 50, QFont.Bold)
+        painter.setFont(font)
+        painter.setPen(pen)
+
+        # r=   QRect(  sceneToView(self.boundary.topLeft()) ,sceneToView(self.boundary.bottomRight()))
+        # painter.drawRect(r)
+        
+        # 标记节点深度和元素数量
+        info = f"D:{current_depth} N:{len(self.items)}"
+        if self.scene_ref:
+            p = sceneToView(self.boundary.center() )
+           
+            painter.drawText(p+ QPointF(5, 15), info)
+
+        # 绘制子节点连接线（若有子节点）
+        if self.divided:
+            center = sceneToView(self.boundary.center())
+            for child in [self.nw, self.ne, self.sw, self.se]:
+                child_center = sceneToView(child.boundary.center())
+                painter.drawLine(center, child_center)
+                
+                # 递归绘制子节点
+                child.visualize(painter, max_depth, current_depth+1)
+
+class SceneSerializer:
+    @staticmethod
+    def get_json_path():
+        if getattr(sys, 'frozen', False):
+            
+            from pathlib import Path
+            # 打包后的可执行文件路径（如 PyInstaller）
+            # app_dir = os.path.dirname(sys.executable)
+            app_dir = Path(sys._MEIPASS)
+            return os.path.join(app_dir, "myDesigner\data.json")
+        else:
+            # 脚本文件所在路径
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+
+            return os.path.join(app_dir, "data.json")
+    
+    @staticmethod
+    def serialize_scene(scene: myGraphicsScene, filename: str):
+        """将场景序列化为JSON文件"""
+        scene_data = {
+            "sceneRect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0
+            },
+            "items": []
+        }
+        for item in scene.findChildren(base_element):
+
+            # item_data = {}
+
+            # 处理不同类型的图元
+            if isinstance(item, base_element) :
+                scene_data["items"].append(item.to_dict()) 
+            # elif isinstance(item, group_element):
+            #     scene_data["items"].append(item.to_dict()) 
+            # 可以继续添加其他图元类型的处理...
+
+        
+        with open(filename, 'w') as f:
+            json.dump(scene_data, f, indent=4)
+
+
+   
+        json_path=SceneSerializer.get_json_path()
+        # 写入 JSON 文件
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(scene_data, f, ensure_ascii=False, indent=4)  # 格式化输出
+
+        print(f"JSON 文件已保存至: {json_path}")
+
+    @staticmethod
+    def deserialize_scene(scene: myGraphicsScene, filename: str):
+        """从JSON文件反序列化场景"""
+        def restore_relationship(id_item_map):
+            # print(id_item_map)
+            for  id,item in  id_item_map.items():
+                if item.m_parent_id>0 and item.m_parent is None:
+                    item.setParentItem(id_item_map[item.m_parent_id])
+                    # if isinstance(id_item_map[item.m_parent_id],group_element):
+                    #     item.set_group_id(item.m_parent_id)
+
+
+        json_path=SceneSerializer.get_json_path()
+        with open(json_path, "r", encoding="utf-8") as f:
+            scene_data = json.load(f)  # 解析为 Python 字典或列表
+            print("提取的数据:", scene_data)
+        
+        # for item in scene.findChildren(base_element):
+        #     item.deleteLater()
+        #     scene.quadtree.remove(item)
+        #     scene.scene_manager.m_items.clear()
+        #     scene.update()
+
+
+
+        # # 设置场景尺寸
+        # rect_data = scene_data["sceneRect"]
+        # scene.setSceneRect(QRectF(
+        #     rect_data["x"], rect_data["y"],
+        #     rect_data["width"], rect_data["height"]
+        # ))
+        max_id =0
+        # 反序列化图元
+        for item_data in scene_data["items"]:
+            item = None
+
+            if  item_data["type"] == "line":
+                item = line_element.from_dict(item_data)
+            elif item_data["type"] == "rect":
+                item = rect_element.from_dict(item_data)
+                # print(f"rect{item._topLeft}")
+                # print(f"rect{item.get_scene_topLeft()}")
+            elif item_data["type"] == "circle":
+                item = circle_element.from_dict(item_data)
+            elif item_data["type"] == "text":
+                item = text_element.from_dict(item_data)
+
+            elif item_data["type"] == "image":
+                item = image_element.from_dict(item_data)
+               
+            elif item_data["type"] == "group":
+                item = group_element.from_dict(item_data)
+       
+
+            if item:
+                item.set_scene_ref(scene)
+                item.set_scene_manager_ref(scene.scene_manager)
+                id =item.id()
+                item.completed(True)
+                if id>max_id:
+                    max_id = id
+
+        scene.scene_manager.m_idGenerator.updateAfterLoad(max_id)
+        restore_relationship(scene.scene_manager.m_items)
+        # for  id,item in      scene.scene_manager.m_items:
+        #     if item.m_parent_id>0:
+    
+
+
+class QuadTreeScene(myGraphicsScene):
+    action_begin_draw_line   =pyqtSignal()
+    action_begin_draw_rect   =pyqtSignal()
+    action_begin_draw_circle =pyqtSignal()
+    action_begin_new_rect    =pyqtSignal(dict)
+    action_begin_new_text    =pyqtSignal()
+    action_begin_new_image   =pyqtSignal()
+    action_set_parent        =pyqtSignal()
+    action_set_group         =pyqtSignal(list)# 图元编辑成组
+    scene_updated            =pyqtSignal()
+    quadtree_updated         =pyqtSignal()
+    
+    item_GeometryChange      =pyqtSignal(base_element)
+    item_DirtyChange         =pyqtSignal(base_element)
+
+    hover_sta_change = pyqtSignal(base_element)
+
+    run_mode_station_change = pyqtSignal(str)#切换子站点显示
+
+    
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        
+        # self.setMinimumSize(300,300)
+        # self.setWindowFlags(Qt.FramelessWindowHint)
+        # self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding,  # 水平策略：可扩展
+            QSizePolicy.Policy.Expanding   # 垂直策略：可扩展
+            )
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 允许接收事件
+
+        self.quadtree = None
+        self.boundingRect_old = {}
+        self.dirtyBoundingRect_old = {}
+        # self.dirtyRegion = QRegion()#脏区域集
+        
+        
+        self.setSceneRect(QRectF(QPointF(-50000.0,-50000.0),QPointF(50000.0,50000.0)))
+        # self.statusBar = parent.status_bar
+
+        self.copied_items = []  # 存储复制的图元
+        self.all_copied_items = []  # 存储复制的图元
+        self.paste_offset = QPointF(100, 100)  # 粘贴偏移量
+        self.paste_count = 0     # 粘贴计数器
+
+        self.snapSys = SnapSystem(self,self.scene_units_per_grid_x/self.grid_size*self.scale_factor*10,self.map_scene_to_screen)
+        self.snapSys.move_item_to_snap_pos.connect(self.move_item_to_snap_pos)
+        self.mouse_not_move_signal.connect(lambda:self.snapSys.move_cursor_to_snaped_pos_V2(self.snapSys.current_snap_pos,not self.menu_opened and self.cursor_inside_flag and self.is_show_grid()))
+
+        self.set_snap_sys_ref(self.snapSys)
+
+
+        self.item_GeometryChange.connect(self.prepareItemGeometryChange)
+        self.item_DirtyChange.connect(self.prepareItemDirtyChange)
+        self.scene_updated.connect(self.handle_scene_update)
+        self.quadtree_updated.connect(self.handle_quadtree_update)
+        self.hover_sta_change.connect(self.handle_hover_sta_change)
+
+        self.menu_opened =False
+        self.update_callback         = None
+        self.__load_done = False
+
+        # 提高渲染频率，减少拖影
+     
+        self.render_timer.timeout.connect(self.on_render_frame)
+        # # 确保拖动时也能及时更新
+        # self.setRenderHint(QPainter.Antialiasing | QPainter.SmoothPixmapTransform | QPainter.TextAntialiasing)
+        self.frame_count =0
+        # 使用高精度定时器
+        self.frame_count_timer = QTimer()
+        self.frame_count_timer.setTimerType(Qt.TimerType.PreciseTimer)  # 高精度模式
+        self.frame_count_timer.timeout.connect(self.handle_frame_count)
+        self.frame_count_timer.start(1000)
+
+        self.set_scene_mode(SceneMode.Run)
+
+    def loadDone(self):
+        return self.__load_done
+    
+    def mode(self)->SceneMode:
+        return self._mode
+    def set_scene_mode(self,mode:SceneMode):
+        if mode == SceneMode.Run:
+            self.show_grid(False)
+            self.show_coordinate(False)
+        else:
+            self.show_grid(True)
+            self.show_coordinate(True)
+        self._mode =mode
+
+    def toggle_sence_mode(self):
+        if self._mode==SceneMode.Design:
+            self.set_scene_mode(SceneMode.Run)
+        else:
+            self.set_scene_mode(SceneMode.Design)
+
+    def handle_frame_count(self):
+        # print(f"当前帧率{self.frame_count}fps")
+        self.frame_count= 0
+
+    def prepareItemGeometryChange(self,item:base_element):
+        self.boundingRect_old[item] = item.sceneBoundingRect()
+    
+    def prepareItemDirtyChange(self,item:base_element):
+        w_factor,h_factor =  self.screenToScene_factor()
+        rect = item.sceneBoundingRect()
+        dirty_rect = QRectF(rect.left()-10*w_factor,rect.top()-10*h_factor,rect.width()+20*w_factor,rect.height()+20*h_factor)
+        self.dirtyBoundingRect_old[item] = dirty_rect
+    
+    def handle_hover_sta_change(self,item:base_element):
+        state = item.get_hover()
+        if isinstance(item,group_element):
+            for i in item.m_children:
+                if i.is_in_group() and i.get_group_id()==item.id():
+                    i.set_group_in_hover(state)
+        else:
+            item.m_parent.set_group_in_hover(state)
+            for i in item.m_parent.m_children:
+                if i.is_in_group() and i.get_group_id()==item.m_parent.id():
+                    i.set_group_in_hover(state)
+        # for id,Item in self.scene_manager.self.m_items.items:
+        #     if 
+            
+   
+    def processOverlappingAreas(self,oldRect:QRectF,newRect:QRectF):
+        """重叠区域处理"""
+        changedRegion = QRegion()
+        # 合并新旧区域确保完全覆盖变化区域
+        if not oldRect.isEmpty():
+            changedRegion += QRegion(oldRect.toRect())
+        if not newRect.isEmpty():
+            changedRegion += QRegion(newRect.toRect())
+        return changedRegion     
+
+
+    def handle_quadtree_update(self):
+        if len(self.boundingRect_old):
+     
+            for item,rect in self.boundingRect_old.items():
+                # self.dirtyRegion_manager.markDirty(self.processOverlappingAreas( self.rect_viewToWindow( self.rect_sceneToView(rect)) ,item.windowBoundingRect()))
+                self.scene_manager.m_scene.quadtree.remove(item)
+                self.scene_manager.m_scene.quadtree.insert(item)
+            self.boundingRect_old.clear()
+
+    def handle_scene_update(self):
+        
+        if len(self.dirtyBoundingRect_old):
+
+            for item,rect in self.dirtyBoundingRect_old.items():
+                self.dirtyRegion_manager.markDirty(self.processOverlappingAreas( self.rect_viewToWindow( self.rect_sceneToView(rect)) ,item.windowBoundingRect()))
+            self.dirtyBoundingRect_old.clear()  
+            
+    def on_render_frame(self):
+        self._ready_for_update = False
+
+        if self.update_callback and callable(self.update_callback):
+            self.update_callback()
+            
+        if self.needs_redraw:
+            self.needs_redraw = False
+        self.frame_count+=1
+        # for child in  self.findChildren(base_element):
+        #     child.check_hover(self.sence_pos_mouse)
+          
+        self.quadtree_updated.emit()
+        # 只在鼠标静止时更新and self.isActiveWindow()
+        if not self.CTRL_pressed_flag and (self.mouse_moving_flag  or self.mouse_wheeling_flag) :
+            return
+        
+        # 触发场景更新信号
+        self.scene_updated.emit()
+        
+        # 所有屏幕内脏区域
+        dirty_region = self.dirtyRegion_manager.region().intersected(self.rect())
+
+        self.dirtyRegion_manager.set(dirty_region)
+        # print(dirty_region)
+        # 只更新有变化的区域
+        if not dirty_region.isEmpty():
+            self.update(dirty_region)
+        else:
+            for child in  self.findChildren(base_element):
+                child.check_moving()
+        # 重置脏区域记录
+        self.dirtyRegion_manager.reset()
+
+        
+
+    def setSceneRect(self, rect: QRectF):
+        """ 初始化四叉树根节点 """
+        super().setSceneRect(rect)
+        self.quadtree = QuadtreeNode(rect)
+        self.quadtree.set_scene_ref(super())
+
+    def addItem(self, item: base_element)->bool:
+        """ 添加项到场景和四叉树 """
+        super().addItem(item)
+        if self.quadtree:
+            if not self.quadtree.boundary.intersects(item.sceneBoundingRect()):
+                print(f"超出边界了，因此没有添加进树{item.sceneBoundingRect()}")
+            return self.quadtree.insert(item)
+        return True
+    
+    def removeItem(self, item: base_element):
+        super().removeItem(item)
+        if self.quadtree:
+             self.quadtree.remove(item)
+
+    def deleteItem(self, item: base_element):
+        if self.quadtree:
+             self.quadtree.remove(item)
+        super().deleteItem(item)
+        self.selectionChanged.emit()
+
+    def items_in_area(self, area: QRectF) -> list:
+        """ 使用四叉树快速查询区域内的项 """
+        found_items = set()
+        if self.quadtree:
+            self.quadtree.query(area, found_items)
+        return found_items
+
+    def on_mouse_move(self,pos):
+        
+        """pos:鼠标场景坐标"""
+
+        # 创建查询区域（以鼠标为中心，100x100矩形）
+        view_center_pos = self.sceneToView(pos)
+        a= 50/self.scale_factor
+        view_area = QRectF(view_center_pos.x()-a,view_center_pos.y()-a,a*2,a*2)
+        scene_area = QRectF(self.viewToScene(view_area.topLeft()),self.viewToScene(view_area.bottomRight()))
+    
+        if not hasattr(self,"area"):
+            setattr(self,"area",view_area)
+        self.area =view_area
+        items = self.items_in_area(scene_area)
+
+        end_points = []
+        center_points = []
+
+        for child in self.findChildren(base_element):
+            if  child in items:
+                child.check_hover(self.sence_pos_mouse)
+            else:
+                if child.is_in_group() or isinstance(child,group_element):
+                    self.hover_sta_change.emit(child)
+                child.set_hover(False)
+
+
+        for item in items:
+            # for child in  self.findChildren(base_element):
+            # item.check_hover(self.sence_pos_mouse)
+            if not( item.get_selected() and  self.CTRL_pressed_flag ): 
+                if isinstance(item,line_element):
+                    head_pos = item.get_scene_head_pos()
+                    end_pos =  item.get_scene_end_pos()
+                    center_pos = item.get_scene_center_pos()
+                    end_points.append(head_pos)
+                    end_points.append(end_pos)
+                    center_points.append(center_pos)
+                if isinstance(item,rect_element) or isinstance(item,text_element) or isinstance(item,image_element):
+                    head_pos = item.get_scene_head_pos()
+                    end_pos =  item.get_scene_end_pos()
+                    center_pos = item.get_scene_center_pos()
+                    topRight   = item.get_scene_topRight()
+                    bottomLeft = item.get_scene_bottomLeft()
+                
+                    end_points.append(head_pos)
+                    end_points.append(end_pos)
+                    end_points.append(topRight)
+                    end_points.append(bottomLeft)
+                    center_points.append(center_pos)
+                if isinstance(item,circle_element):
+                    center_pos = item.get_scene_center_pos()
+                    center_points.append(center_pos)
+
+        
+
+        
+        # self.statusBar.showMessage(f"区域内有 {len(items)} 个图形项")
+      
+
+        self.snapSys.update_grid(scene_area)
+        self.snapSys.update_endpoints(end_points)
+        self.snapSys.update_midpoints(center_points)
+        self.snapSys.snap_to_point(pos)
+
+      
+
+
+
+
+    def wheelEvent(self, event):
+        super().wheelEvent( event)
+        self.snapSys.set_snap_threshold(self.scene_units_per_grid_x/self.grid_size/self.scale_factor*10)
+        
+
+    def mouseMoveEvent(self, event):
+
+        self.on_mouse_move(self.sence_pos_mouse)
+        super().mouseMoveEvent( event)
+       
+    
+    def mousePressEvent(self, event):
+        super().mousePressEvent( event)
+        
+        if event.button() == Qt.MouseButton.RightButton:
+            if self.is_setting_father or self.is_setting_base_pos:
+                event.ignore()  # 明确忽略事件，阻止传递到contextMenuEvent
+                self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)  # 完全禁用默认右键菜单
+                
+                # self.is_setting_group_pos = False
+                self.is_setting_father = False
+                self.is_setting_base_pos =False
+                print("不打开右键菜单")
+              
+                return  # 直接返回，确保不会继续处理
+            else:
+                print("------------")
+                self.setContextMenuPolicy(Qt.ContextMenuPolicy.DefaultContextMenu)
+        elif event.button() == Qt.MouseButton.MiddleButton:
+            area = QRectF(QPointF(-50000.0,-50000.0),QPointF(50000.0,50000.0))
+            items = self.items_in_area(area)
+            print(items)
+
+      
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent( event)
+        
+
+
+
+
+
+    def on_menu_closed(self):
+        self.menu_opened = False
+    def contextMenuEvent(self, event):
+        """鼠标右键按下时（默认行为）：
+            当用户按下并释放鼠标右键后，若未在 mousePressEvent 或 mouseReleaseEvent 中拦截事件，系统会自动触发 contextMenuEvent。
+            显式请求上下文菜单时：
+            通过代码调用 QWidget::customContextMenuRequested() 信号或 QMenu::exec() 手动触发。"""
+
+        if self._mode == SceneMode.Run:
+            return
+
+        def set_group_zValue(item:base_element,val):
+            if item.is_has_child():
+                item.set_zValue(val)
+                for child in item.childItems():
+                    set_group_zValue(child,val)
+            else:
+                item.set_zValue(val)
+        #     return
+        self.menu_opened = True
+        menu                   = QMenu(self)
+        arrange_menu               = QMenu(self)
+        action_go_top          = arrange_menu.addAction("移到最前")
+        action_go_up           = arrange_menu.addAction("上移一层")
+        action_go_down         = arrange_menu.addAction("下移一层")
+        action_go_bottom       = arrange_menu.addAction("移到最后")
+
+        # 方法1：监听关闭信号
+        menu.aboutToHide.connect(self.on_menu_closed)
+        action_line           = menu.addAction("绘制直线")
+        action_rect           = menu.addAction("绘制矩形")
+        action_circle         = menu.addAction("绘制圆")
+        action_new_image       = menu.addAction("新建图片")
+        action_new_text       = menu.addAction("新建标签")
+        action_fill_unfill    = menu.addAction("填充/不填充")
+        action_copy    = menu.addAction("复制")
+        action_paste   = menu.addAction("粘贴")
+
+
+        action_delete         = menu.addAction("删除")
+        action_delete_all     = menu.addAction("删除所有")
+        action_save           = menu.addAction("保存元素")
+        action_load           = menu.addAction("载入元素")
+        action_set_group      = menu.addAction("设置成组")
+        action_free_group     = menu.addAction("拆解组")
+        action_select_all     = menu.addAction("全选/全不选")
+
+        action_set_father     = menu.addAction("设置父图元")
+        action_remove_father  = menu.addAction("解除父子关系")
+        action_set_base_pos   = menu.addAction("设置图元的旋转中心")
+ 
+        action_arrange        = menu.addAction("排列")
+        action_arrange.setMenu(arrange_menu)
+       
+        action_save_widget    = menu.addAction("保存控件")
+        action_agv_test       = menu.addAction("agv test")
+        selected_action       = menu.exec(event.globalPos())
+        
+        if selected_action == action_line:
+            print("绘制直线")
+            self.action_begin_draw_line.emit()
+        elif selected_action == action_rect:
+            print("绘制矩形")
+            self.action_begin_draw_rect.emit()
+        elif   selected_action == action_circle:
+            print("绘制圆")
+            self.action_begin_draw_circle.emit()
+        elif   selected_action == action_new_image:
+            print("新建图片")
+            self.action_begin_new_image.emit()
+        elif   selected_action == action_new_text:
+            print("新建文本")
+            self.action_begin_new_text.emit()
+        
+        elif   selected_action == action_fill_unfill:
+            for child in self.findChildren(QObject):
+                if isinstance(child, rect_element) or isinstance(child, circle_element):
+                    if child.get_selected():
+                        child.set_fill(not child.get_fill())
+        
+        elif   selected_action == action_copy:         
+            if not hasattr(self,"has_selected_flag"):
+                setattr(self,"has_selected_flag",False)
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element):
+                    if child.get_selected():
+                        self.has_selected_flag =True
+                        break
+            if not self.has_selected_flag:
+               
+                print("未选择需要复制的项")
+                return
+            del self.has_selected_flag
+            
+            
+            
+            self.copy_selected()
+            
+        elif selected_action == action_paste: 
+            self.paste()
+
+        elif selected_action == action_delete:
+            print("delete")
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element) :
+                    if child.get_selected():
+                        child.Delete()
+                       
+                
+        elif selected_action == action_delete_all:
+            print("delete all")
+            self.delete_all_elements()
+        elif selected_action == action_save:
+            print("save")
+            self.save_element_info()
+        elif selected_action == action_load:
+            print("load")
+            self.load_element_info()
+        elif selected_action == action_set_group:
+            """编辑成组"""
+            if not hasattr(self,"has_selected_flag"):
+                setattr(self,"has_selected_flag",False)
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element) :
+                    if child.get_selected() and not child.is_has_parent():
+                        self.has_selected_flag =True
+                        break
+            if not self.has_selected_flag:
+                print("未选择需要组合的元素")
+                return
+            del self.has_selected_flag
+            # self.rect_params={}
+            # top_window=group_params_setup(rect_params=self.rect_params)
+            # top_window.exec()
+            # if bool(self.rect_params) ==False:
+            #     return
+
+            items_lst = []
+            for child in self.findChildren(QObject):
+                # if isinstance(child, rect_element) or isinstance(child, circle_element) or isinstance(child, line_element):
+                #     if child.get_selected() and not child.is_in_group():
+                #         items_lst.append(child)
+                if isinstance(child, base_element) :
+                    if child.get_selected() and not child.is_in_group() and not child.is_has_parent():
+                        items_lst.append(child)
+            self.action_set_group.emit(items_lst)
+      
+       
+        elif selected_action == action_set_base_pos:
+            if not hasattr(self,"has_selected_flag"):
+                setattr(self,"has_selected_flag",False)
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element) :
+                    if child.get_selected():
+                        self.has_selected_flag =True
+                        break
+            if not self.has_selected_flag:
+               
+                print("未选择需要设置旋转中心的元素")
+                return
+            del self.has_selected_flag
+            self.is_setting_base_pos = True
+            self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)  # 完全禁用默认右键菜单
+        
+        elif selected_action == action_set_father:
+            """设置父图元"""
+            if not hasattr(self,"has_selected_flag"):
+                setattr(self,"has_selected_flag",False)
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element) :
+                    if child.get_selected():
+                        self.has_selected_flag =True
+                        break
+            if not self.has_selected_flag:
+               
+                print("未选择需要父图元的元素")
+                return
+            del self.has_selected_flag
+            self.is_setting_father = True
+            self.selected_items = []
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element):
+                    if child.get_selected() and not child.is_in_group():
+                        self.selected_items.append(child)
+                        
+        elif selected_action == action_remove_father:
+            """解除父图元"""
+            if not hasattr(self,"has_selected_flag"):
+                setattr(self,"has_selected_flag",False)
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element) :
+                    if child.get_selected():
+                        self.has_selected_flag =True
+                        break
+            if not self.has_selected_flag:
+                print("未选择需要解除父图元的元素")
+                return
+            del self.has_selected_flag
+
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element) :
+                    if child.get_selected():
+                        child.removeParentItem()
+
+        elif selected_action == action_select_all:
+            if not hasattr(self,"select_all_flag"):
+                setattr(self,"select_all_flag",False)  
+            else:
+                self.select_all_flag = not self.select_all_flag
+            for child in self.findChildren(base_element):
+                child.set_selected(self.select_all_flag)
+       
+        elif selected_action == action_free_group:
+            """拆解组"""
+            for child in self.findChildren(QObject):
+                if isinstance(child, group_element)  and child.get_selected():
+                    if child.is_has_parent()==False:
+                        child.free_group()
+
+        elif selected_action == action_go_top:
+            print("上移到顶")
+            max= -1
+            for child in self.findChildren(base_element):
+                if child.zValue()>max:
+                    max = child.zValue()
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    if isinstance(child,group_element):
+                        set_group_zValue(child,max+ 1 )
+                    else:
+                        child.set_zValue(max+1 )
+
+        elif selected_action == action_go_up:
+            print("上移")
+            
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    if isinstance(child,group_element):
+                        set_group_zValue(child,child.zValue() + 1)
+                    else:
+                        child.set_zValue(child.zValue() + 1)
+        
+        elif selected_action == action_go_down:
+            print("下沉")
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    if isinstance(child,group_element):
+                        set_group_zValue(child,child.zValue() - 1)
+                    else:
+                        child.set_zValue(child.zValue() - 1)
+        
+        elif selected_action == action_go_bottom:
+            print("移到最底")
+            min= 999
+            for child in self.findChildren(base_element):
+                if child.zValue()<min:
+                    min = child.zValue()
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    if isinstance(child,group_element):
+                        set_group_zValue(child,min-1)
+                    else:
+                        child.set_zValue(min-1)
+           
+           
+
+        elif selected_action == action_save_widget:
+            if not hasattr(self,"has_selected_flag"):
+                setattr(self,"has_selected_flag",False)
+            for child in self.findChildren(QObject):
+                if isinstance(child, base_element) :
+                    if child.get_selected():
+                        self.has_selected_flag =True
+                        break
+            if not self.has_selected_flag:
+                print("未选择需要设置旋转中心的元素")
+                return
+            del self.has_selected_flag
+
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    if isinstance(child,text_element):
+                        self.current_widget_to_save = child
+
+        elif selected_action == action_agv_test:
+            return
+            # top_window=agv_test(self,self.scene_manager)
+            # top_window.exec()
+
+
+    def save_current_widget(self,item:text_element):
+        rect = self.rect_viewToWindow(self.rect_sceneToView(item.sceneBoundingRect()))
+        
+        pixmap = QPixmap(rect.size().toSize())
+
+
+
+    # def delete_all_elements(self):
+    #     for child in self.findChildren(QObject):
+    #         if isinstance(child, base_element) :
+
+    #             child.deleteLater()
+    #             self.quadtree.remove(child)
+    #             self.scene_manager.m_items.clear()
+    #             self.update()
+    def copy_selected(self):
+        """复制选中图元（自动处理父子关系）"""
+        self.selected_items = []
+        for child in self.findChildren(base_element):
+            if child.get_selected() :
+                self.selected_items.append(child)
+
+        selected = self.selected_items
+        if not selected: 
+            return
+        
+        # 过滤出顶层图元（无父图元或父图元未被选中）
+        top_level_items = []
+        for item in selected:
+            parent = item.parentItem()
+            while parent:
+                if parent in selected:
+                    break  # 如果父级也被选中，跳过子级
+                parent = parent.parentItem()
+            else:
+                top_level_items.append(item)
+        
+        # 克隆图元并存储
+        self.copied_items = [item.clone() for item in top_level_items]
+
+
+        print(f"顶层复制项：{self.copied_items}")
+        # self.paste_count = 0  # 重置粘贴计数器
+
+    def paste(self):
+        """粘贴复制的图元"""
+        def add_child_item(item:base_element):
+            """该图元下的所有子项加入""" 
+            if item.is_has_child():
+                for child in item.childItems():
+                    self.all_copied_items.append(child)
+                    add_child_item(child)
+            else:
+                return
+        if not self.copied_items:
+            return
+        
+       
+        offset = self.paste_offset 
+        self.all_copied_items = []
+
+        # 添加克隆图元到场景
+        for item in self.copied_items:
+            item.setPos(item.pos() + offset)
+            self.all_copied_items.append(item)
+            add_child_item(item)
+
+        for  item in self.all_copied_items:   
+            item.set_scene_ref(self)
+            item.set_scene_manager_ref(self.scene_manager)
+            new_id = self.scene_manager.m_idGenerator.generateID()
+            item.setID(new_id)
+
+            if  isinstance(item,group_element)  :
+                name = "组_"
+                while item.set_name(name + str(group_element.count))==False:
+                    # name += str(group_element.count)+"_"
+                    group_element.count+=1
+            elif isinstance(item,rect_element)  :
+                name = "矩形_"
+                while item.set_name(name + str(rect_element.count))==False:
+                    # name += str(rect_element.count)+"_"
+                    rect_element.count+=1
+            elif isinstance(item,line_element):
+                name = "直线_"
+                while item.set_name(name + str(line_element.count))==False:
+                    # name += str(line_element.count)+"_"
+                    line_element.count+=1
+            elif isinstance(item,circle_element):
+                name = "圆_"
+                while item.set_name(name + str(circle_element.count))==False:
+                    # name += str(circle_element.count)+"_"
+                    circle_element.count+=1
+            elif isinstance(item,text_element):
+                name = "文本_"
+                while item.set_name(name + str(text_element.count))==False:
+                    # name += str(text_element.count)+"_"
+                    text_element.count+=1
+            elif isinstance(item,image_element):
+                name = "图片_"
+                while item.set_name(name + str(image_element.count))==False:
+                    # name += str(text_element.count)+"_"
+                    image_element.count+=1
+
+            item.completed(True)
+
+        for item in self.scene_manager.m_items.values():
+            if item in self.all_copied_items:
+                item.set_selected(True)
+                # self.selected_items.append(item)
+            else:
+                item.set_selected(False)
+       
+        self.copy_selected()
+     
+
+    def delete_all_elements(self):
+
+        # def free_all_groups(item:base_element):
+        #     if isinstance(group_element):
+                
+        #         self.free_group
+
+        #         free_all_groups()
+
+        def remove_parent_item(item:base_element):
+            """移除该图元下的所有父项"""
+            if item.m_parent:
+                
+                parent_item = item.m_parent
+                item.removeParentItem(True)
+                remove_parent_item(parent_item)
+            else:
+                return
+
+
+        for child in self.findChildren(base_element):
+            child.set_selected(True)
+        #移除父项
+        for child in self.findChildren(base_element):
+            
+            remove_parent_item(child)
+        
+        # for child in self.findChildren(base_element):
+        #     if isinstance(child,group_element):
+        #         child.free_group()
+        #     child.removeChildsItem() if child.is_has_child() else None
+
+        for child in self.findChildren(base_element):
+            child.Delete()
+        self.quadtree.remove_all()
+        self.update()
+    def save_element_info(self):
+        SceneSerializer.serialize_scene(self, "data.json")
+
+
+    def load_element_info(self):
+        self.delete_all_elements()
+        SceneSerializer.deserialize_scene(self, "data.json")
+        self.update()
+        self.__load_done = True
+    
+    def right_alignment_for_selected(self):
+        """右对齐"""
+        min_y = 500000.0
+        self.selected_items = []
+        for child in self.findChildren(base_element):
+            if child.get_selected() and not child.is_has_parent() :
+                self.selected_items.append(child)
+                if child.get_scene_topLeft().y() < min_y:
+                    min_y = child.get_scene_topLeft().y()
+        selected = self.selected_items
+        if not selected: 
+            return
+        for item in selected:
+            pos = QPointF(item.get_scene_topLeft().x(),min_y)
+            item.change_position(pos)
+
+    def left_alignment_for_selected(self):
+        """左对齐"""
+        max_y = -500000.0
+        self.selected_items = []
+        for child in self.findChildren(base_element):
+            if child.get_selected() and not child.is_has_parent() :
+                self.selected_items.append(child)
+                if child.get_scene_bottomRight().y() > max_y:
+                    max_y = child.get_scene_bottomRight().y()
+        selected = self.selected_items
+        if not selected: 
+            return
+        for item in selected:
+            pos = QPointF(item.get_scene_topLeft().x(),max_y-item.getSize().height())
+            item.change_position(pos)
+
+    def bottom_alignment_for_selected(self):
+        """下对齐"""
+        min_x = 500000.0
+        self.selected_items = []
+        for child in self.findChildren(base_element):
+            if child.get_selected() and not child.is_has_parent() :
+                self.selected_items.append(child)
+                if child.get_scene_topLeft().x() < min_x:
+                    min_x = child.get_scene_topLeft().x()
+        selected = self.selected_items
+        if not selected: 
+            return
+        for item in selected:
+            pos = QPointF(min_x,item.get_scene_topLeft().y())
+            item.change_position(pos)
+
+    def top_alignment_for_selected(self):
+        """上对齐"""
+        max_x = -500000.0
+        self.selected_items = []
+        for child in self.findChildren(base_element):
+            if child.get_selected() and not child.is_has_parent() :
+                self.selected_items.append(child)
+                if child.get_scene_bottomRight().x() > max_x:
+                    max_x = child.get_scene_bottomRight().x()
+        selected = self.selected_items
+        if not selected: 
+            return
+        for item in selected:
+            pos = QPointF(max_x-item.getSize().width(),item.get_scene_topLeft().y())
+            item.change_position(pos)
+        
+        
+    def set_same_horizontal_distance(self):
+        
+        min_y =  500000.0
+        max_y = -500000.0
+        self.selected_items = []
+        for child in self.findChildren(base_element):
+            if child.get_selected() and not child.is_has_parent() :
+                self.selected_items.append(child)
+                if child.get_scene_topLeft().y() < min_y:
+                    min_y = child.get_scene_topLeft().y()
+                if child.get_scene_topLeft().y() > max_y:
+                    max_y = child.get_scene_topLeft().y()
+        selected = self.selected_items
+        if not selected or len(selected)==1: 
+            return
+        distance = (max_y-min_y)/(len(selected)-1)
+   
+        sorted_items = sorted(selected, key = lambda item: item.get_scene_topLeft().y())
+        y_init =  sorted_items[0].get_scene_topLeft().y()
+        print(sorted_items)
+        for i, item in enumerate(sorted_items):
+            pos = QPointF(item.get_scene_topLeft().x(), y_init + distance*i)
+            item.change_position(pos)
+
+    def set_same_vertical_distance(self):
+        
+        min_x =  500000.0
+        max_x = -500000.0
+        self.selected_items = []
+        for child in self.findChildren(base_element):
+            if child.get_selected() and not child.is_has_parent() :
+                self.selected_items.append(child)
+                if child.get_scene_topLeft().x() < min_x:
+                    min_x = child.get_scene_topLeft().x()
+                if child.get_scene_topLeft().x() > max_x:
+                    max_x = child.get_scene_topLeft().x()
+        selected = self.selected_items
+        if not selected or len(selected)==1: 
+            return
+        distance = (max_x-min_x)/(len(selected)-1)
+        sorted_items = sorted(selected, key = lambda item: item.get_scene_topLeft().x())
+        x_init =  sorted_items[0].get_scene_topLeft().x()
+        for i, item in enumerate(sorted_items):
+            pos = QPointF(x_init + distance*i,item.get_scene_topLeft().y())
+            item.change_position(pos)
+
+
+    # def get_json_path(self):
+    #     if getattr(sys, 'frozen', False):
+    #         # 打包后的可执行文件路径（如 PyInstaller）
+    #         app_dir = os.path.dirname(sys.executable)
+    #     else:
+    #         # 脚本文件所在路径
+    #         app_dir = os.path.dirname(os.path.abspath(__file__))
+    #     return os.path.join(app_dir, "data.json")
+
+
+
+
+
+class IDGenerator:
+    def __init__(self):
+        self._lock = Lock()  # 线程安全锁
+        self.m_nextID = 1    # 起始ID值
+
+    def generateID(self):
+        with self._lock:
+            current_id = self.m_nextID
+            self.m_nextID += 1
+            return current_id
+
+    def reset(self, start=1):
+        with self._lock:
+            self.m_nextID = start
+
+    def updateAfterLoad(self, maxLoadedID):
+        with self._lock:
+            self.m_nextID = maxLoadedID + 1
+
+
+class SceneManager(QObject):
+    delete_item_signal = pyqtSignal(base_element)
+    completed_item_signal =pyqtSignal(base_element,bool)
+
+    def __init__(self, scene:QuadTreeScene, undo_stack=None, parent=None):
+        super().__init__(parent)
+        self.m_items = {}           # ID->图元  映射字典
+        self.m_name_items = {}      # name->id  映射字典
+        self.m_sorted_items = []  #根据Z值排序
+        self.m_idGenerator = IDGenerator()
+        self.m_scene = scene        # QuadTreeScene实例
+        self.m_undoStack = undo_stack  # QUndoStack实例
+        self.delete_item_signal.connect(self.deleteItem,Qt.ConnectionType.UniqueConnection)
+        self.completed_item_signal.connect(self.addItem,Qt.ConnectionType.UniqueConnection)
+
+    # # 创建图元
+    # def createItem(self, item_class, *args, **kwargs):
+    #     item = item_class(*args, **kwargs)  # 动态创建图元
+    #     item.set_scene_ref(self.m_scene)
+    #     item.set_scene_manager_ref(self)
+    #     # print(item.get_actived())
+    #     # 分配ID
+    #     new_id = self.m_idGenerator.generateID()
+    #     item.setID(new_id)
+        
+
+    # 创建图元
+    def createItem(self, item_class, *args, **kwargs):
+        item = item_class(*args, **kwargs)  # 动态创建图元
+        item.set_scene_ref(self.m_scene)
+        item.set_scene_manager_ref(self)
+        # print(item.get_actived())
+        # 分配ID
+        new_id = self.m_idGenerator.generateID()
+        item.setID(new_id)
+        
+        if  isinstance(item,group_element)  :
+            name = "组_"
+            while item.set_name(name + str(group_element.count))==False:
+                # name += str(group_element.count)+"_"
+                group_element.count+=1
+            
+            item.initialize()
+        elif isinstance(item,rect_element)  :
+            name = "矩形_"
+            while item.set_name(name + str(rect_element.count))==False:
+                # name += str(rect_element.count)+"_"
+                rect_element.count+=1
+
+        elif isinstance(item,line_element):
+            name = "直线_"
+            while item.set_name(name + str(line_element.count))==False:
+                # name += str(line_element.count)+"_"
+                line_element.count+=1
+           
+        elif isinstance(item,circle_element):
+            name = "圆_"
+            while item.set_name(name + str(circle_element.count))==False:
+                # name += str(circle_element.count)+"_"
+                circle_element.count+=1
+           
+        elif isinstance(item,text_element):
+            name = "文本_"
+            while item.set_name(name + str(text_element.count))==False:
+                # name += str(text_element.count)+"_"
+                text_element.count+=1
+        
+        elif isinstance(item,image_element):
+            name = "图片_"
+            while item.set_name(name + str(image_element.count))==False:
+                # name += str(text_element.count)+"_"
+                image_element.count+=1
+        
+
+
+
+        self.m_scene.current_element_id = new_id
+        self.m_scene.current_element    = item
+     
+        # item.completed_signal.connect(self.addItem)
+        # item.bounding_change_signal.connect(self.re_addItem_to_tree)
+        # item.delete_signal.connect(self.deleteItem)
+        
+        
+
+        # if isinstance(item,group_element):
+        #     item.initialize()
+
+        
+
+
+        # self.m_scene.addItem(item)
+        
+        # 记录创建命令（需实现CreateCommand）
+        # self.m_undoStack.push(CreateCommand(item, self))
+        return item
+    
+    def sort_items_by_zValue(self):
+        """根据Z值从小到大排序"""
+        items = [value for value in self.m_items.values()]
+        self.m_sorted_items = sorted(items, key=lambda item: item.zValue())
+    
+    # def sort_items_by_zValue_reverse(self):
+
+    #     items = [value for value in self.m_items.values()]
+    #     self.m_sorted_items = sorted(items, key=lambda item: item.zValue(),reverse=True)
+
+    def addItem(self,*arg):
+       
+        item = arg[0]
+        construct_from_dict = arg[1]
+        # 注册到管理容器
+        self.m_items[item.id()] = item
+        print(self.m_items.keys())
+       
+        self.m_scene.addItem(item)
+
+        item.set_zValue(item.id())     if not construct_from_dict else None
+        item.construct_name_items()    if  construct_from_dict else None
+        self.sort_items_by_zValue()
+        
+        
+        print(f"加入id:{item.id()}type:{item.type}到了场景")
+
+    def re_addItem_to_tree(self,id):
+        
+        if id in self.m_items.keys():
+            item = self.findItem(id)
+            self.m_scene.quadtree.remove(item)
+            self.m_scene.quadtree.insert(item)
+            # print(f'更新图元{id}在树的位置')
+    # 删除图元
+    def deleteItem(self, item:base_element):
+        print(f"准备删除id{item.id()}")
+        self.m_items[item.id()] =None
+        del self.m_items[item.id()]
+        self.m_scene.deleteItem(item)
+        self.m_scene.current_element = None
+        dic = copy.copy(self.m_name_items)
+        for item_name,item_id in  dic.items():
+            if item_id==item.id():
+                del self.m_name_items[item_name]
+        self.sort_items_by_zValue()
+        print(self.m_items.keys() , self.m_name_items)
+    
+        
+
+    # 查找图元
+    def findItem(self, id):
+        return self.m_items.get(id, None)
+
+
+
+
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("test")
+        self.resize(1200, 800)
+        self.test_window = QuadTreeScene()
+        
+        self.setCentralWidget(self.test_window)
+
+
+if __name__ == "__main__":
+    app = QApplication([])
+    window = MainWindow()
+    window.show()
+    window.move(100, 100)  # 确保窗口显示在可见位置
+    app.exec()
