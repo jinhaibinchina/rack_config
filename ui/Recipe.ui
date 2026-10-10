@@ -17,7 +17,7 @@
    <item>
     <widget class="QGroupBox" name="groupBox_LY">
      <property name="title">
-      <string>冷压参数</string>
+      <string>收卷参数</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
@@ -25,7 +25,7 @@
         <item>
          <widget class="QLabel" name="label">
           <property name="text">
-           <string>卷筒类型</string>
+           <string>从机台下料卷筒类型</string>
           </property>
          </widget>
         </item>
@@ -44,7 +44,7 @@
    <item>
     <widget class="QGroupBox" name="groupBox_MQ">
      <property name="title">
-      <string>模切参数</string>
+      <string>收放卷参数</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
@@ -52,7 +52,7 @@
         <item>
          <widget class="QLabel" name="label_2">
           <property name="text">
-           <string>上料卷筒类型</string>
+           <string>向机台上料卷筒类型</string>
           </property>
          </widget>
         </item>
@@ -70,7 +70,7 @@
         <item>
          <widget class="QLabel" name="label_3">
           <property name="text">
-           <string>下料卷筒类型</string>
+           <string>从机台下料卷筒类型</string>
           </property>
          </widget>
         </item>

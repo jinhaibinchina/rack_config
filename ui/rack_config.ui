@@ -333,12 +333,12 @@
           </item>
           <item>
            <property name="text">
-            <string>阴极冷压</string>
+            <string>阴极冷压(全收卷）</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>阳极冷压</string>
+            <string>阳极冷压(全收卷）</string>
            </property>
           </item>
           <item>
@@ -349,6 +349,26 @@
           <item>
            <property name="text">
             <string>阳极模切</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>阴极预分切</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>阳极预分切</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>阴极冷压3+3</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>阳极冷压3+3</string>
            </property>
           </item>
          </widget>

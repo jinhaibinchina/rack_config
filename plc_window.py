@@ -419,7 +419,7 @@ class ConfigWindow(LoadWidget):
 
 
     def handle_rack_status(self,host_type,host_start_No,host_count:int,rack_counts:List[int]):
-        type_map =('未配置','阴极冷压','阳极冷压','阴极模切','阳极模切')
+        type_map =('未配置','阴极冷压','阳极冷压','阴极模切','阳极模切','阴极预分切','阳极预分切','阴极冷压3+3','阳极冷压3+3')
         for i in range(10):
             for j in range(8):
                 if i<=host_count-1 and j<rack_counts[i]:
@@ -487,10 +487,14 @@ class ConfigWindow(LoadWidget):
 
         spinBox_host_No_start :QSpinBox = self.ui.spinBox_host_No_start
         if   index ==1 or index ==2:#冷压
-            spinBox_host_No_start.setRange(1,14)
+            spinBox_host_No_start.setRange(1,50)
         elif index ==3  or index ==4:
             # spinBox_host_No_start.setRange(1,40)
-            spinBox_host_No_start.setRange(1,70)
+            spinBox_host_No_start.setRange(1,50)
+        elif index ==5  or index ==6:
+            spinBox_host_No_start.setRange(1,50)
+        elif index ==7  or index ==8:
+            spinBox_host_No_start.setRange(1,50)
 
             
 
@@ -754,14 +758,14 @@ class ConfigWindow(LoadWidget):
                     msg.exec()# 显示信息框
                     return
         if host_type ==1:#阴极冷压
-            if host_start_No + host_count-1>40:#  or workType>0:
+            if host_start_No + host_count-1>50 or workType>0:
                 msg = QMessageBox()
                 msg.setWindowTitle("failure")
                 msg.setText('参数验证失败')
                 msg.exec()# 显示信息框
                 return
         elif host_type ==2:#阳极冷压
-            if host_start_No + host_count-1>40:# or workType>0:
+            if host_start_No + host_count-1>50 or workType>0:
                 msg = QMessageBox()
                 msg.setWindowTitle("failure")
                 msg.setText('参数验证失败')
@@ -769,20 +773,6 @@ class ConfigWindow(LoadWidget):
                 return
 
         elif host_type ==3:
-            # if self.soft_major_ver<5:
-            #     if host_start_No + host_count-1>40 :
-            #         msg = QMessageBox()
-            #         msg.setWindowTitle("failure")
-            #         msg.setText('参数验证失败')
-            #         msg.exec()# 显示信息框
-            #         return   
-            # else:
-            #     if host_start_No + host_count-1>70 :
-            #         msg = QMessageBox()
-            #         msg.setWindowTitle("failure")
-            #         msg.setText('参数验证失败')
-            #         msg.exec()# 显示信息框
-            #         return   
             if host_start_No + host_count-1>50 :
                                 msg = QMessageBox()
                                 msg.setWindowTitle("failure")
@@ -790,26 +780,44 @@ class ConfigWindow(LoadWidget):
                                 msg.exec()# 显示信息框
                                 return   
         elif host_type ==4:
-            # if self.soft_major_ver<5:
-            #     if host_start_No + host_count-1>40 :
-            #         msg = QMessageBox()
-            #         msg.setWindowTitle("failure")
-            #         msg.setText('参数验证失败')
-            #         msg.exec()# 显示信息框
-            #         return
-            # else:
-            #     if host_start_No + host_count-1>70 :
-            #         msg = QMessageBox()
-            #         msg.setWindowTitle("failure")
-            #         msg.setText('参数验证失败')
-            #         msg.exec()# 显示信息框
-            #         return   
             if host_start_No + host_count-1>50 :
                                 msg = QMessageBox()
                                 msg.setWindowTitle("failure")
                                 msg.setText('参数验证失败')
                                 msg.exec()# 显示信息框
                                 return   
+
+        elif host_type ==5:
+            if host_start_No + host_count-1>50 :
+                                msg = QMessageBox()
+                                msg.setWindowTitle("failure")
+                                msg.setText('参数验证失败')
+                                msg.exec()# 显示信息框
+                                return   
+        elif host_type ==6:
+            if host_start_No + host_count-1>50 :
+                                msg = QMessageBox()
+                                msg.setWindowTitle("failure")
+                                msg.setText('参数验证失败')
+                                msg.exec()# 显示信息框
+                                return   
+
+        elif host_type ==7:
+            if host_start_No + host_count-1>50 :
+                                msg = QMessageBox()
+                                msg.setWindowTitle("failure")
+                                msg.setText('参数验证失败')
+                                msg.exec()# 显示信息框
+                                return   
+        elif host_type ==8:
+            if host_start_No + host_count-1>50 :
+                                msg = QMessageBox()
+                                msg.setWindowTitle("failure")
+                                msg.setText('参数验证失败')
+                                msg.exec()# 显示信息框
+                                return   
+
+        
         else:
             msg = QMessageBox()
             msg.setWindowTitle("failure")
@@ -1054,7 +1062,7 @@ class Recipe(LoadWidget):
         if get_int(datas,0) ==1 or get_int(datas,0) ==2:
             groupBox_LY.setVisible(True)
             groupBox_MQ.setVisible(False)
-        elif get_int(datas,0) ==3 or get_int(datas,0) ==4:
+        elif get_int(datas,0) ==3 or get_int(datas,0) ==4 or get_int(datas,0) >=5 and get_int(datas,0) <=8:
             groupBox_LY.setVisible(False)
             groupBox_MQ.setVisible(True)
 
