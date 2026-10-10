@@ -754,14 +754,14 @@ class ConfigWindow(LoadWidget):
                     msg.exec()# 显示信息框
                     return
         if host_type ==1:#阴极冷压
-            if host_start_No + host_count-1>14  or workType>0:
+            if host_start_No + host_count-1>40:#  or workType>0:
                 msg = QMessageBox()
                 msg.setWindowTitle("failure")
                 msg.setText('参数验证失败')
                 msg.exec()# 显示信息框
                 return
         elif host_type ==2:#阳极冷压
-            if host_start_No + host_count-1>12 or workType>0:
+            if host_start_No + host_count-1>40:# or workType>0:
                 msg = QMessageBox()
                 msg.setWindowTitle("failure")
                 msg.setText('参数验证失败')
@@ -769,37 +769,47 @@ class ConfigWindow(LoadWidget):
                 return
 
         elif host_type ==3:
-            if self.soft_major_ver<5:
-                if host_start_No + host_count-1>38 :
-                    msg = QMessageBox()
-                    msg.setWindowTitle("failure")
-                    msg.setText('参数验证失败')
-                    msg.exec()# 显示信息框
-                    return   
-            else:
-                if host_start_No + host_count-1>70 :
-                    msg = QMessageBox()
-                    msg.setWindowTitle("failure")
-                    msg.setText('参数验证失败')
-                    msg.exec()# 显示信息框
-                    return   
-
+            # if self.soft_major_ver<5:
+            #     if host_start_No + host_count-1>40 :
+            #         msg = QMessageBox()
+            #         msg.setWindowTitle("failure")
+            #         msg.setText('参数验证失败')
+            #         msg.exec()# 显示信息框
+            #         return   
+            # else:
+            #     if host_start_No + host_count-1>70 :
+            #         msg = QMessageBox()
+            #         msg.setWindowTitle("failure")
+            #         msg.setText('参数验证失败')
+            #         msg.exec()# 显示信息框
+            #         return   
+            if host_start_No + host_count-1>50 :
+                                msg = QMessageBox()
+                                msg.setWindowTitle("failure")
+                                msg.setText('参数验证失败')
+                                msg.exec()# 显示信息框
+                                return   
         elif host_type ==4:
-            if self.soft_major_ver<5:
-                if host_start_No + host_count-1>40 :
-                    msg = QMessageBox()
-                    msg.setWindowTitle("failure")
-                    msg.setText('参数验证失败')
-                    msg.exec()# 显示信息框
-                    return
-            else:
-                if host_start_No + host_count-1>70 :
-                    msg = QMessageBox()
-                    msg.setWindowTitle("failure")
-                    msg.setText('参数验证失败')
-                    msg.exec()# 显示信息框
-                    return   
-
+            # if self.soft_major_ver<5:
+            #     if host_start_No + host_count-1>40 :
+            #         msg = QMessageBox()
+            #         msg.setWindowTitle("failure")
+            #         msg.setText('参数验证失败')
+            #         msg.exec()# 显示信息框
+            #         return
+            # else:
+            #     if host_start_No + host_count-1>70 :
+            #         msg = QMessageBox()
+            #         msg.setWindowTitle("failure")
+            #         msg.setText('参数验证失败')
+            #         msg.exec()# 显示信息框
+            #         return   
+            if host_start_No + host_count-1>50 :
+                                msg = QMessageBox()
+                                msg.setWindowTitle("failure")
+                                msg.setText('参数验证失败')
+                                msg.exec()# 显示信息框
+                                return   
         else:
             msg = QMessageBox()
             msg.setWindowTitle("failure")

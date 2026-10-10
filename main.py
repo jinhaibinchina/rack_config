@@ -17,8 +17,8 @@ from global_config import global_cfg
 
 from rcd_window import RcdWindow
 
-VERSION = "V3.3.2"
-VERSION_INFO = f"版本:{VERSION}\n1、初版"
+VERSION = "V3.3.3"
+VERSION_INFO = f"版本:{VERSION}\n1,初版\n2,支持冷压1-40，模切1-50"
 
 
 class Panel(QFrame):
