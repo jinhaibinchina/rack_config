@@ -58,6 +58,8 @@ class Panel(QFrame):
         main_layout.addLayout(h_layout)
         main_layout.addWidget( self.listWidget)
 
+        self.listWidget.addItem('192.168.1.100')
+        self.ip_SerialNumber ={'192.168.1.100': b'SerialNumber'}
 
         self.setLayout(main_layout)
 

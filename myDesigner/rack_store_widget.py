@@ -28,6 +28,7 @@ class RackStoreWindow(QWidget):
         self.setLayout(layout)
 
     def update_rack_store_display(self,datas):
+        
         status=[]
         for data in datas:
             status.append(data)

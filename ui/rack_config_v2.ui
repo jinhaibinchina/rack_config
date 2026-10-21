@@ -6,17 +6,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>851</width>
-    <height>988</height>
+    <width>1104</width>
+    <height>1026</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,2,6,7">
-   <property name="spacing">
-    <number>0</number>
-   </property>
+  <layout class="QVBoxLayout" name="verticalLayout_2">
    <item>
     <widget class="QFrame" name="frame_time">
      <property name="frameShape">
@@ -333,12 +330,12 @@
           </item>
           <item>
            <property name="text">
-            <string>阴极冷压</string>
+            <string>阴极冷压(全收卷）</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>阳极冷压</string>
+            <string>阳极冷压(全收卷）</string>
            </property>
           </item>
           <item>
@@ -349,6 +346,75 @@
           <item>
            <property name="text">
             <string>阳极模切</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>阴极预分切</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>阳极预分切</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>阴极冷压3+3</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>阳极冷压3+3</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="comboBox_workType">
+          <item>
+           <property name="text">
+            <string>全是收卷工位</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>仓位1是放卷工位</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>仓位1-2是放卷工位</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>仓位1-3是放卷工位</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>仓位1-4是放卷工位</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>仓位1-5是放卷工位</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>仓位1-6是放卷工位</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>仓位1-7是放卷工位</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>全是放卷工位</string>
            </property>
           </item>
          </widget>
@@ -561,6 +627,38 @@
               </item>
              </widget>
             </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement1">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>0</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
+               </property>
+              </item>
+             </widget>
+            </item>
            </layout>
           </item>
           <item>
@@ -617,6 +715,32 @@
               <item>
                <property name="text">
                 <string>8</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement2">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
                </property>
               </item>
              </widget>
@@ -681,6 +805,32 @@
               </item>
              </widget>
             </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement3">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
+               </property>
+              </item>
+             </widget>
+            </item>
            </layout>
           </item>
           <item>
@@ -741,6 +891,32 @@
               </item>
              </widget>
             </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement4">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
+               </property>
+              </item>
+             </widget>
+            </item>
            </layout>
           </item>
           <item>
@@ -797,6 +973,32 @@
               <item>
                <property name="text">
                 <string>8</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement5">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
                </property>
               </item>
              </widget>
@@ -884,6 +1086,32 @@
               </item>
              </widget>
             </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement6">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
+               </property>
+              </item>
+             </widget>
+            </item>
            </layout>
           </item>
           <item>
@@ -940,6 +1168,32 @@
               <item>
                <property name="text">
                 <string>8</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement7">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
                </property>
               </item>
              </widget>
@@ -1004,6 +1258,32 @@
               </item>
              </widget>
             </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement8">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
+               </property>
+              </item>
+             </widget>
+            </item>
            </layout>
           </item>
           <item>
@@ -1060,6 +1340,32 @@
               <item>
                <property name="text">
                 <string>8</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement9">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
                </property>
               </item>
              </widget>
@@ -1124,6 +1430,32 @@
               </item>
              </widget>
             </item>
+            <item>
+             <widget class="QComboBox" name="comboBox_arrangement10">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>50</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <item>
+               <property name="text">
+                <string>正序</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>逆序</string>
+               </property>
+              </item>
+             </widget>
+            </item>
            </layout>
           </item>
          </layout>
@@ -1139,20 +1471,11 @@
          </widget>
         </item>
         <item>
-         <spacer name="horizontalSpacer_6">
-          <property name="orientation">
-           <enum>Qt::Orientation::Horizontal</enum>
+         <widget class="QPushButton" name="pushButton_hmi_config">
+          <property name="text">
+           <string>触摸屏配置</string>
           </property>
-          <property name="sizeType">
-           <enum>QSizePolicy::Policy::Fixed</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
+         </widget>
         </item>
         <item>
          <widget class="QFrame" name="frame_10">
@@ -1255,22 +1578,6 @@
           </property>
          </widget>
         </item>
-        <item>
-         <spacer name="horizontalSpacer_12">
-          <property name="orientation">
-           <enum>Qt::Orientation::Horizontal</enum>
-          </property>
-          <property name="sizeType">
-           <enum>QSizePolicy::Policy::Preferred</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
        </layout>
       </item>
       <item>
@@ -1287,9 +1594,9 @@
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_68" stretch="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_68" stretch="3">
      <item>
-      <widget class="QGroupBox" name="groupBox_2">
+      <widget class="QGroupBox" name="groupBox_rack_status">
        <property name="title">
         <string>料架状态总览</string>
        </property>
@@ -2665,7 +2972,7 @@
           <item>
            <widget class="QGroupBox" name="groupBox_single_rack">
             <property name="title">
-             <string>选中的料架</string>
+             <string>选中的料仓</string>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_18">
              <property name="spacing">
@@ -3261,7 +3568,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>启用/禁用</string>
+                      <string>复位按钮</string>
                      </property>
                      <property name="alignment">
                       <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -3313,7 +3620,7 @@
                       </font>
                      </property>
                      <property name="text">
-                      <string>复位按钮</string>
+                      <string>启用/禁用</string>
                      </property>
                      <property name="alignment">
                       <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -4501,7 +4808,7 @@
                 </layout>
                </item>
                <item>
-                <layout class="QHBoxLayout" name="horizontalLayout_67">
+                <layout class="QHBoxLayout" name="horizontalLayout_71">
                  <item>
                   <widget class="QLabel" name="label_44">
                    <property name="sizePolicy">
@@ -4568,6 +4875,16 @@
       </widget>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame_scene">
+     <property name="frameShape">
+      <enum>QFrame::Shape::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Shadow::Raised</enum>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>

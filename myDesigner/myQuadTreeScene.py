@@ -3,7 +3,7 @@ from threading import Lock
 from PyQt6.QtCore import QRectF, QPointF
 
 from .my_common import SceneMode
-from .myGraphicsScene import myGraphicsScene
+from .myGraphicsScene import myGraphicsScene, DEFAULT_BACKGROUND_COLOR
 
 from PyQt6.QtWidgets import QMainWindow, QApplication
 
@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt, QPointF, QRectF,pyqtSignal,QSize,QObject,QRect,QPoi
 from PyQt6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack
 
 import json,sys,os
-from .my_elements import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element
+from .my_elements import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
 from PyQt6.QtGui import QRegularExpressionValidator
 from PyQt6.QtCore import QRegularExpression
 
@@ -389,30 +389,44 @@ class QuadtreeNode:
 
 class SceneSerializer:
     @staticmethod
-    def get_json_path():
+    def get_json_path(filename: str):
         if getattr(sys, 'frozen', False):
             
             from pathlib import Path
             # 打包后的可执行文件路径（如 PyInstaller）
             # app_dir = os.path.dirname(sys.executable)
             app_dir = Path(sys._MEIPASS)
-            return os.path.join(app_dir, "myDesigner\data.json")
+            return os.path.join(app_dir, "myDesigner", "data.json")
         else:
             # 脚本文件所在路径
             app_dir = os.path.dirname(os.path.abspath(__file__))
 
-            return os.path.join(app_dir, "data.json")
+            return os.path.join(app_dir,filename)
     
     @staticmethod
     def serialize_scene(scene: myGraphicsScene, filename: str):
         """将场景序列化为JSON文件"""
+        # ``sceneRect`` stores the scene-coordinate rectangle that is currently
+        # visible.  Run mode can then reopen the page at the same view range.
+        # Empty/uninitialised scenes keep the all-zero placeholder.
+        view_rect = scene.get_view_scene_rect()
+        # Keep the in-memory record in sync with the file: "调整视图" must
+        # restore the range that ends up in ``sceneRect`` below, even after the
+        # user saved a new view range in this session.
+        if view_rect.width() > 0 and view_rect.height() > 0:
+            scene.set_saved_view_scene_rect(view_rect)
+        background_color = scene.get_bg_color()
+        if not isinstance(background_color, QColor) or not background_color.isValid():
+            background_color = QColor(DEFAULT_BACKGROUND_COLOR)
         scene_data = {
             "sceneRect": {
-                "x": 0,
-                "y": 0,
-                "width": 0,
-                "height": 0
+                "x": view_rect.x(),
+                "y": view_rect.y(),
+                "width": view_rect.width(),
+                "height": view_rect.height()
             },
+            # Page background colour, written as ``#aarrggbb``.
+            "backgroundColor": background_color.name(QColor.NameFormat.HexArgb),
             "items": []
         }
         for item in scene.findChildren(base_element):
@@ -427,12 +441,11 @@ class SceneSerializer:
             # 可以继续添加其他图元类型的处理...
 
         
-        with open(filename, 'w') as f:
-            json.dump(scene_data, f, indent=4)
+        # 统一写到 get_json_path() 解析出的文件，避免额外产生一个工作目录副本
 
 
    
-        json_path=SceneSerializer.get_json_path()
+        json_path=SceneSerializer.get_json_path(filename)
         # 写入 JSON 文件
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(scene_data, f, ensure_ascii=False, indent=4)  # 格式化输出
@@ -451,7 +464,7 @@ class SceneSerializer:
                     #     item.set_group_id(item.m_parent_id)
 
 
-        json_path=SceneSerializer.get_json_path()
+        json_path=SceneSerializer.get_json_path(filename)
         with open(json_path, "r", encoding="utf-8") as f:
             scene_data = json.load(f)  # 解析为 Python 字典或列表
             print("提取的数据:", scene_data)
@@ -470,6 +483,33 @@ class SceneSerializer:
         #     rect_data["x"], rect_data["y"],
         #     rect_data["width"], rect_data["height"]
         # ))
+        # The serialized sceneRect is the design/run view range, not the
+        # quadtree's world bounds, so it must not be passed to setSceneRect().
+        view_rect = None
+        rect_data = scene_data.get("sceneRect") or {}
+        try:
+            candidate = QRectF(
+                float(rect_data.get("x", 0.0)),
+                float(rect_data.get("y", 0.0)),
+                float(rect_data.get("width", 0.0)),
+                float(rect_data.get("height", 0.0)),
+            )
+        except (TypeError, ValueError):
+            candidate = None
+        if (
+            candidate is not None
+            and candidate.width() > 0
+            and candidate.height() > 0
+        ):
+            view_rect = candidate
+
+        # Page background colour; older files simply keep the scene default.
+        color_data = scene_data.get("backgroundColor")
+        if isinstance(color_data, str) and color_data.strip():
+            background_color = QColor(color_data.strip())
+            if background_color.isValid():
+                scene.set_bg_color(background_color)
+
         max_id =0
         # 反序列化图元
         for item_data in scene_data["items"]:
@@ -481,6 +521,8 @@ class SceneSerializer:
                 item = rect_element.from_dict(item_data)
                 # print(f"rect{item._topLeft}")
                 # print(f"rect{item.get_scene_topLeft()}")
+            elif item_data["type"] == "triangle":
+                item = triangle_element.from_dict(item_data)
             elif item_data["type"] == "circle":
                 item = circle_element.from_dict(item_data)
             elif item_data["type"] == "text":
@@ -503,6 +545,11 @@ class SceneSerializer:
 
         scene.scene_manager.m_idGenerator.updateAfterLoad(max_id)
         restore_relationship(scene.scene_manager.m_items)
+
+        if view_rect is not None:
+            # Applied immediately for an already-visible scene, otherwise
+            # deferred until showEvent() gives the widget its final size.
+            scene.set_view_scene_rect(view_rect)
         # for  id,item in      scene.scene_manager.m_items:
         #     if item.m_parent_id>0:
     
@@ -512,6 +559,7 @@ class QuadTreeScene(myGraphicsScene):
     action_begin_draw_line   =pyqtSignal()
     action_begin_draw_rect   =pyqtSignal()
     action_begin_draw_circle =pyqtSignal()
+    action_begin_draw_triangle =pyqtSignal()
     action_begin_new_rect    =pyqtSignal(dict)
     action_begin_new_text    =pyqtSignal()
     action_begin_new_image   =pyqtSignal()
@@ -875,6 +923,7 @@ class QuadTreeScene(myGraphicsScene):
         action_line           = menu.addAction("绘制直线")
         action_rect           = menu.addAction("绘制矩形")
         action_circle         = menu.addAction("绘制圆")
+        action_triangle       = menu.addAction("绘制三角形")
         action_new_image       = menu.addAction("新建图片")
         action_new_text       = menu.addAction("新建标签")
         action_fill_unfill    = menu.addAction("填充/不填充")
@@ -910,6 +959,9 @@ class QuadTreeScene(myGraphicsScene):
         elif   selected_action == action_circle:
             print("绘制圆")
             self.action_begin_draw_circle.emit()
+        elif   selected_action == action_triangle:
+            print("绘制三角形")
+            self.action_begin_draw_triangle.emit()
         elif   selected_action == action_new_image:
             print("新建图片")
             self.action_begin_new_image.emit()
@@ -1211,6 +1263,10 @@ class QuadTreeScene(myGraphicsScene):
                 while item.set_name(name + str(group_element.count))==False:
                     # name += str(group_element.count)+"_"
                     group_element.count+=1
+            elif isinstance(item,triangle_element)  :
+                name = "三角形_"
+                while item.set_name(name + str(triangle_element.count))==False:
+                    triangle_element.count+=1
             elif isinstance(item,rect_element)  :
                 name = "矩形_"
                 while item.set_name(name + str(rect_element.count))==False:
@@ -1292,6 +1348,12 @@ class QuadTreeScene(myGraphicsScene):
     def load_element_info(self):
         self.delete_all_elements()
         SceneSerializer.deserialize_scene(self, "data.json")
+        self.update()
+        self.__load_done = True
+
+    def load_element_info2(self):
+        self.delete_all_elements()
+        SceneSerializer.deserialize_scene(self, "data2.json")
         self.update()
         self.__load_done = True
     
@@ -1483,6 +1545,10 @@ class SceneManager(QObject):
                 group_element.count+=1
             
             item.initialize()
+        elif isinstance(item,triangle_element)  :
+            name = "三角形_"
+            while item.set_name(name + str(triangle_element.count))==False:
+                triangle_element.count+=1
         elif isinstance(item,rect_element)  :
             name = "矩形_"
             while item.set_name(name + str(rect_element.count))==False:

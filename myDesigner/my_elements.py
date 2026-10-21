@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt, QTimer, QEvent,QObject,QRegularExpression,QPointF,Q
 
 from math import sin,cos ,atan,pi,sqrt
 from typing import overload,Union,List,Optional
-from PyQt6.QtGui import QFont,QColor, QPainter, QTransform, QRegion,QAction, QRegularExpressionValidator, QPalette,QPen,QPainterPath,QFontMetrics,QPixmap
+from PyQt6.QtGui import QFont,QColor, QPainter, QTransform, QRegion,QAction, QRegularExpressionValidator, QPalette,QPen,QPainterPath,QPainterPathStroker,QFontMetrics,QPixmap
 from .my_transform import Transform
 import time
 from .my_common import SceneMode
@@ -2960,10 +2960,10 @@ class text_element(base_element):
         # painter.drawText(text_pos, self.context)
 
         # 获取文本的精确边界框
-        text_rect = painter.boundingRect(bg_rect, Qt.AlignCenter, self._context)
+        text_rect = painter.boundingRect(bg_rect, Qt.AlignmentFlag.AlignCenter, self._context)
     
         # 直接绘制在计算好的位置
-        painter.drawText(text_rect, Qt.AlignCenter, self._context)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self._context)
 
         painter.restore()
         
@@ -3494,3 +3494,423 @@ class image_element(base_element):
 
         return item
         
+
+
+
+class triangle_element(rect_element):
+    """三角形图元。
+
+    包围盒、变换、属性与序列化完全复用 ``rect_element``，只在绘制和命中
+    测试时使用三角形轮廓。局部坐标以中心为原点，默认形状为顶点朝上的
+    等腰三角形（场景 y 轴在视图中向上）：
+
+        apex  = ( 0,      h/2)
+        left  = (-w/2,   -h/2)
+        right = ( w/2,   -h/2)
+
+    包围盒仍然保持为矩形。
+    """
+
+    count = 0
+
+    def __init__(self, *args, **kwargs):
+        triangle_element.count += 1
+        super().__init__(*args, **kwargs)
+        self.type = "triangle"
+        self._vertices_local: List[QPointF] = []
+        self._draft_scene_vertices: List[QPointF] = []
+        if not self.constructed_by_draw:
+            self._vertices_local = self._default_local_vertices(
+                self.scene_size.width(), self.scene_size.height()
+            )
+            self._refresh_local_bounds()
+
+    def __del__(self):
+        print(f"销毁triangle图元 id:{self.id()} name：{self.get_name()}")
+
+    def _default_local_vertices(self, width, height) -> List[QPointF]:
+        """Return the legacy apex-up triangle fitted into ``width``/``height``."""
+        width = float(width)
+        height = float(height)
+        return [
+            QPointF(0.0, height / 2.0),
+            QPointF(-width / 2.0, -height / 2.0),
+            QPointF(width / 2.0, -height / 2.0),
+        ]
+
+    @staticmethod
+    def _parse_scene_vertices(value) -> List[QPointF]:
+        if not isinstance(value, (list, tuple)) or len(value) != 3:
+            return []
+        vertices = []
+        for point in value:
+            if not isinstance(point, dict):
+                return []
+            try:
+                vertices.append(QPointF(float(point["x"]), float(point["y"])))
+            except (KeyError, TypeError, ValueError):
+                return []
+        return vertices
+
+    @staticmethod
+    def _bounding_rect(points: List[QPointF]) -> QRectF:
+        if not points:
+            return QRectF()
+        xs = [point.x() for point in points]
+        ys = [point.y() for point in points]
+        return QRectF(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys))
+
+    def _local_bounding_rect(self) -> QRectF:
+        return self._bounding_rect(self._vertices_local)
+
+    def _refresh_local_bounds(self):
+        """Keep the rect-compatible bbox fields in sync with the vertices."""
+        rect = self._local_bounding_rect()
+        if self._vertices_local:
+            self._head_pos = rect.topLeft()
+            self._end_pos = rect.bottomRight()
+            self._topLeft = self._head_pos
+            self._bottomRight = self._end_pos
+            self._topRight = QPointF(rect.right(), rect.top())
+            self._bottomLeft = QPointF(rect.left(), rect.bottom())
+            self._center_pos = rect.center()
+            self.scene_size = QSizeF(rect.width(), rect.height())
+        else:
+            self._head_pos = None
+            self._end_pos = None
+            self._topLeft = None
+            self._bottomRight = None
+            self._topRight = None
+            self._bottomLeft = None
+            self._center_pos = None
+            self.scene_size = QSizeF(0.0, 0.0)
+
+
+    def _apply_scene_vertices(self, scene_vertices: List[QPointF], angle: float = 0.0,
+                              origin_scene: Optional[QPointF] = None):
+        """Define the triangle from three scene points.
+
+        The local origin is normalised to the centre of the local bounding
+        box so the inherited position/rotation helpers keep working.  When
+        the triangle already owns vertices its current local transform is
+        kept, otherwise a fresh rotation by ``angle`` is used.  Keeping the
+        transform matters for triangles that live inside a rotated group:
+        the group supplies its own rotation and the child must only adopt
+        the requested parent-space points.
+        """
+        points = [QPointF(point) for point in scene_vertices]
+        if len(points) != 3:
+            return False
+
+        parent = self.m_parent
+        if parent is not None:
+            parent_points = [parent.mapFromScene(point) for point in points]
+        else:
+            parent_points = points
+        if self._vertices_local:
+            transform = self.m_transform
+        else:
+            transform = Transform()
+            transform.rotate(angle)
+
+        local_points = [transform.map_inverse(point) for point in parent_points]
+        local_center = self._bounding_rect(local_points).center()
+        self._vertices_local = [point - local_center for point in local_points]
+
+        # Solve Q = m_pos + transform(vertex) for m_pos.  Using the first
+        # vertex keeps this correct even when the transform contains a
+        # translation (rotating around a custom origin produces one).
+        self.m_pos_init = self.m_pos = parent_points[0] - transform.map(
+            self._vertices_local[0]
+        )
+        self.m_angle_init = self.m_angle = angle
+        self.m_transform = transform
+
+        if origin_scene is not None:
+            origin_parent = (
+                parent.mapFromScene(origin_scene) if parent is not None else origin_scene
+            )
+            self.m_origin = transform.map_inverse(origin_parent - self.m_pos)
+        else:
+            self.m_origin = QPointF(0.0, 0.0)
+
+        self._draft_scene_vertices = []
+        self._refresh_local_bounds()
+        self.update_boundingRect()
+        return True
+
+    def get_scene_vertices(self) -> List[QPointF]:
+        # Use the live transform instead of the cached ``mapToScene`` path so
+        # serialization and group/property edits never depend on whether a
+        # paint pass has already refreshed ``_Transform_last``.
+        transform = self.sceneTransform()
+        return [transform.map(point) for point in self._vertices_local]
+
+    def get_local_vertices(self) -> List[QPointF]:
+        return [QPointF(point) for point in self._vertices_local]
+
+    def set_scene_vertices(self, scene_vertices: List[QPointF]) -> bool:
+        """Replace the three vertices while preserving the current angle."""
+        origin_scene = self.get_scene_OriginPoint() if self._vertices_local else None
+        return self._apply_scene_vertices(
+            scene_vertices, angle=self.m_angle, origin_scene=origin_scene
+        )
+
+    def set_default_geometry(self, top_left: QPointF, width: float, height: float):
+        """Create the legacy apex-up triangle inside an axis aligned rect."""
+        center = QPointF(
+            float(top_left.x()) + float(width) / 2.0,
+            float(top_left.y()) + float(height) / 2.0,
+        )
+        local_vertices = self._default_local_vertices(width, height)
+        scene_vertices = [center + point for point in local_vertices]
+        self._apply_scene_vertices(scene_vertices, angle=0.0)
+        self.completed()
+
+    def get_draw_vertices(self) -> List[QPointF]:
+        return [QPointF(point) for point in self._draft_scene_vertices]
+
+    def add_draw_vertex(self, scene_pos: QPointF) -> bool:
+        """Append one click-position; the third click finishes the triangle."""
+        if not self.get_actived() or len(self._draft_scene_vertices) >= 3:
+            return False
+
+        self._draft_scene_vertices.append(QPointF(scene_pos))
+        if len(self._draft_scene_vertices) == 3:
+            self._apply_scene_vertices(self._draft_scene_vertices, angle=0.0)
+            self.completed()
+        return True
+
+    def transfer_head_pos(self, pos: QPointF):
+        self.add_draw_vertex(pos)
+
+    def transfer_end_pos(self, pos: QPointF):
+        self.add_draw_vertex(pos)
+
+    def update_boundingRect(self):
+        base_element.update_boundingRect(self)
+        self.prepareGeometryChange()
+
+        points = self.get_scene_vertices()
+        if not points:
+            self._sceneBoundingRect = QRectF()
+            return
+
+        xs = [point.x() for point in points]
+        ys = [point.y() for point in points]
+        self._sceneBoundingRect = QRectF(
+            min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
+        )
+
+    def completed(self, construct_from_dict=False):
+        if construct_from_dict:
+            base_element.completed(self, True)
+            return True
+        if not self._vertices_local:
+            return False
+        base_element.completed(self, False)
+        return True
+
+
+    def change_position(self, pos: QPointF):
+        """Move the whole triangle so its bbox top-left follows the property box."""
+        if not self._vertices_local:
+            return
+        old_head = self.get_scene_head_pos()
+        if self.m_parent is not None:
+            delta = self.m_parent.mapFromScene(pos) - self.m_parent.mapFromScene(old_head)
+        else:
+            delta = QPointF(pos) - old_head
+        self.m_pos = self.m_pos + delta
+        self.m_pos_init = self.m_pos_init + delta
+        self.update_boundingRect()
+
+    def change_size(self, width, height):
+        """Scale the vertices so their bbox matches the requested size.
+
+        The scale is anchored at the local bounding-box top-left, matching
+        ``rect_element.change_size`` semantics: group resizing first moves a
+        child to its scaled top-left and then calls ``change_size``.  Scaling
+        around the local origin (the bbox centre) would move the top-left and
+        make triangles drift/look wrong inside a resized group.
+        """
+        rect = self._local_bounding_rect()
+        if rect.width() <= 0.0 or rect.height() <= 0.0:
+            return
+        width = float(width)
+        height = float(height)
+        if width <= 0.0 or height <= 0.0:
+            return
+
+        sx = width / rect.width()
+        sy = height / rect.height()
+        anchor = rect.topLeft()
+
+        def scale_point(point: QPointF) -> QPointF:
+            return QPointF(
+                anchor.x() + (point.x() - anchor.x()) * sx,
+                anchor.y() + (point.y() - anchor.y()) * sy,
+            )
+
+        self._vertices_local = [scale_point(point) for point in self._vertices_local]
+        # Keep the rotation origin at the same relative place inside the
+        # triangle so later rotations still pivot around the same point.
+        self.m_origin = scale_point(self.m_origin)
+        self._refresh_local_bounds()
+        self.update_boundingRect()
+
+        for child in list(self.childItems()):
+            local_head = self.mapFromScene(child.get_scene_head_pos())
+            new_head = self.mapToScene(scale_point(local_head))
+            child.change_position(new_head)
+            child.change_size(
+                child.getSize().width() * sx, child.getSize().height() * sy
+            )
+
+    def _triangle_path(self) -> QPainterPath:
+        """Local-coordinate triangle outline built from the three vertices."""
+        path = QPainterPath()
+        if not self._vertices_local:
+            return path
+        path.moveTo(self._vertices_local[0])
+        for point in self._vertices_local[1:]:
+            path.lineTo(point)
+        path.closeSubpath()
+        return path
+
+    def check_hover(self, mouse_pos: QPointF):
+        if self.is_moving() or not self.get_selectable() or not self._vertices_local:
+            self.set_hover(False)
+            return False
+
+        base_element.check_hover(self, mouse_pos)
+
+        pos = self.mapFromScene(mouse_pos)
+        path = self._triangle_path()
+        if self.get_fill():
+            hovered = path.contains(pos)
+        else:
+            # Match rect_element's 10-unit hover margin while following the
+            # triangle outline instead of the rectangular bounding box.
+            stroker = QPainterPathStroker()
+            stroker.setWidth(max(10.0, float(self.get_line_width())))
+            hovered = stroker.createStroke(path).contains(pos)
+
+        self.set_hover(bool(hovered))
+        return bool(hovered)
+
+    def paint(self, painter: QPainter, shine_flag):
+        if self.get_visibility() == False:
+            base_element.paint(self, painter, shine_flag)
+            return
+
+        if not (self.m_veiw_dirty_region.intersects(self.viewBoundingRect().toRect())):
+            base_element.paint(self, painter, shine_flag)
+            return
+        if not self._vertices_local:
+            base_element.paint(self, painter, shine_flag)
+            return
+
+        painter.save()
+        color = self._color
+        if self.get_hover() or self.is_in_group() and self._is_group_in_hover:
+            color = QColor(14, 248, 236)
+
+        view_points = [
+            self.m_scene.sceneToView(point) for point in self.get_scene_vertices()
+        ]
+        path = QPainterPath(view_points[0])
+        for point in view_points[1:]:
+            path.lineTo(point)
+        path.closeSubpath()
+
+        fill_color = self._fill_color
+        painter.setBrush(fill_color if self.get_fill() else Qt.BrushStyle.NoBrush)
+        if self.get_line_width() > 0:
+            painter.setPen(QPen(color, self.get_line_width()))
+        else:
+            painter.setPen(QPen(fill_color, 0))
+        painter.drawPath(path)
+        painter.restore()
+
+        base_element.paint(self, painter, shine_flag)
+
+
+    def clone(self):
+        """深度克隆图元及其子图元"""
+        cloned = triangle_element()
+        # 复制名称：复制/粘贴时据此保留成员名，只替换组名前缀
+        cloned._name = self._name
+
+        cloned.m_pos = self.m_pos
+        cloned.set_line_width(self.get_line_width())
+        cloned.set_color(self.get_color())
+        cloned.set_fill(self.get_fill())
+        cloned.set_fill_color(self.get_fill_color())
+        cloned.set_opacity(self.get_opacity())
+        cloned._vertices_local = [QPointF(point) for point in self._vertices_local]
+        cloned._draft_scene_vertices = []
+        cloned.setTransformOriginPoint(self.transformOriginPoint())
+        cloned.setTransform(Transform(self.transform().m))
+        cloned.m_angle      = self.m_angle
+        cloned.m_angle_init = self.m_angle_init
+        cloned.m_pos_init   = self.m_pos_init
+        cloned._refresh_local_bounds()
+
+        cloned.set_group_id(self.get_group_id())
+        cloned.set_zValue(self.zValue())
+
+        for child in self.childItems():
+            child_clone = child.clone()
+            child_clone.m_parent = cloned
+            cloned.m_children.add(child_clone)
+
+        return cloned
+
+    def to_dict(self):
+        """Serialize the three vertices in scene coordinates."""
+        data = super().to_dict()
+        transform = self.sceneTransform()
+        center = transform.map(self._center_pos)
+        origin = transform.map(self.m_origin)
+        data["center_pos"] = {
+            "x": round(center.x(), 3),
+            "y": round(center.y(), 3),
+        }
+        data["origin_pos"] = {
+            "x": round(origin.x(), 3),
+            "y": round(origin.y(), 3),
+        }
+        data["vertices"] = [
+            {"x": round(point.x(), 3), "y": round(point.y(), 3)}
+            for point in self.get_scene_vertices()
+        ]
+        return data
+
+    @classmethod
+    def from_dict(cls, data):
+        """Restore the triangle from its vertices, with a bbox fallback for old files."""
+        item = super().from_dict(data)
+        vertices = cls._parse_scene_vertices(data.get("vertices"))
+        if len(vertices) == 3:
+            origin_data = data.get("origin_pos") or {}
+            try:
+                origin_scene = QPointF(
+                    float(origin_data["x"]), float(origin_data["y"])
+                )
+            except (KeyError, TypeError, ValueError):
+                origin_scene = None
+            try:
+                angle = float(data.get("rotate", 0.0))
+            except (TypeError, ValueError):
+                angle = 0.0
+            item._apply_scene_vertices(vertices, angle=angle, origin_scene=origin_scene)
+        else:
+            item._vertices_local = item._default_local_vertices(
+                item.scene_size.width(), item.scene_size.height()
+            )
+            item._draft_scene_vertices = []
+            item._refresh_local_bounds()
+            item.update_boundingRect()
+        return item
+

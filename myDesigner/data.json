@@ -1,10 +1,11 @@
 {
     "sceneRect": {
-        "x": 0,
-        "y": 0,
-        "width": 0,
-        "height": 0
+        "x": -1442.141092640012,
+        "y": -2593.695162047189,
+        "width": 2782.852088455531,
+        "height": 4919.912547223672
     },
+    "backgroundColor": "#fff4f5e7",
     "items": [
         {
             "id": 2,
@@ -29,7 +30,8 @@
                 "strokeWidth": 3,
                 "fill": false,
                 "fill_color": "#00ff00",
-                "opacity": 255
+                "opacity": 255,
+                "cornerRadius": 0.0
             },
             "zValue": 2
         },
@@ -110,7 +112,8 @@
                 "strokeWidth": 2,
                 "fill": true,
                 "fill_color": "#000000",
-                "opacity": 255
+                "opacity": 255,
+                "cornerRadius": 0.0
             },
             "zValue": 6
         },
@@ -398,14 +401,14 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                6,
-                11,
-                16,
-                12,
-                15,
-                13,
                 17,
+                6,
+                13,
+                16,
+                11,
+                12,
                 10,
+                15,
                 14
             ],
             "group_id": 0,
@@ -425,7 +428,8 @@
                 "strokeWidth": 2,
                 "fill": false,
                 "fill_color": "#00ff00",
-                "opacity": 255
+                "opacity": 255,
+                "cornerRadius": 0.0
             },
             "zValue": 18
         },
@@ -452,7 +456,8 @@
                 "strokeWidth": 2,
                 "fill": true,
                 "fill_color": "#000000",
-                "opacity": 255
+                "opacity": 255,
+                "cornerRadius": 0.0
             },
             "zValue": 6
         },
@@ -628,11 +633,11 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                20,
                 21,
-                23,
                 22,
-                28
+                23,
+                28,
+                20
             ],
             "group_id": 0,
             "center_pos": {
@@ -651,7 +656,8 @@
                 "strokeWidth": 2,
                 "fill": false,
                 "fill_color": "#00ff00",
-                "opacity": 255
+                "opacity": 255,
+                "cornerRadius": 0.0
             },
             "zValue": 31
         }

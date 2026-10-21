@@ -13,10 +13,14 @@ from datetime import datetime
 import weakref
 
 import json,sys,os
-from .my_elements import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element
+from .my_elements import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
 from .mySnapSystem import SnapSystem
 import copy
 from .my_common import SceneMode
+
+# Default page background colour, stored as ``#aarrggbb`` in the page JSON.
+DEFAULT_BACKGROUND_COLOR = "#BEE1F59B"
+
 
 
 class AxisLine(QObject):
@@ -132,7 +136,7 @@ class grid_map_window(QWidget):
         self.if_show_axis_icon = True
         self.__redraw_when_mouse_move = redraw_when_mouse_move
 
-        self.__bg_color = QColor("#BEE1F59B")
+        self.__bg_color = QColor(DEFAULT_BACKGROUND_COLOR)
         self.__show_grid=True
 
         self.is_animating = False
@@ -234,7 +238,15 @@ class grid_map_window(QWidget):
         self.update()
 
     def set_bg_color(self,color:QColor):
+        """Set the page background colour and repaint immediately."""
+        if not isinstance(color, QColor):
+            color = QColor(color)
+        if not color.isValid():
+            return
         self.__bg_color = color
+        # The background is filled from scratch on every repaint, so a plain
+        # update() is enough to show the new colour right away.
+        self.update()
     def get_bg_color(self):
         return  self.__bg_color 
     def is_show_grid(self):
@@ -284,7 +296,8 @@ class grid_map_window(QWidget):
         painter = QPainter(self)
 
         painter.setBrush(self.__bg_color )
-        painter.drawRect(self.rect())
+        # painter.drawRect(self.rect())
+        painter.fillRect(self.rect(),self.__bg_color)
 
         painter.end()
     def draw_grid(self, painter,repaint_view:QRegion):
@@ -762,6 +775,13 @@ class myGraphicsScene(grid_map_window):
         self.setSceneScale(1.0)
         self.show_axis_icon(True)
         self.__sceneRect =None
+        # Scene-coordinate view range restored from JSON.  It is kept until
+        # the widget is visible with its final size, then applied once.
+        self._pending_view_rect = None
+        # Last range loaded from the page file.  "调整视图" restores this
+        # instead of always jumping back to the coordinate origin.
+        self._saved_view_rect = None
+        self._view_initialized = False
         self.items = []           # 存储的图形项
         
         self.last_update_time=0
@@ -866,6 +886,145 @@ class myGraphicsScene(grid_map_window):
     def setSceneRect(self, rect: QRectF):
         self.__sceneRect = rect
 
+    # ------------------------------------------------------------------
+    # Visible view range persistence
+    # ------------------------------------------------------------------
+    def get_view_scene_rect(self) -> QRectF:
+        """Return the scene-coordinate rectangle currently visible.
+
+        The scene uses a custom view transform (``view_x0`` ... ``view_y1``)
+        instead of ``QGraphicsView`` scrolling, so map both view corners back
+        to scene coordinates and normalise them into one rectangle.  For the
+        AGV coordinate system the axes are inverted, hence the normalisation.
+        """
+
+        if not self._view_initialized:
+            # A loaded page may be saved again before its first show; keep the
+            # range that came from disk instead of overwriting it with zeros.
+            if self._pending_view_rect is not None:
+                return QRectF(self._pending_view_rect)
+            return QRectF()
+
+        self.update_coordinate()
+        top_left = self.viewToScene(self.view_x0, self.view_y0)
+        bottom_right = self.viewToScene(self.view_x1, self.view_y1)
+        return QRectF(top_left, bottom_right).normalized()
+
+    def set_view_scene_rect(self, rect: QRectF) -> None:
+        """Restore a scene-coordinate view range.
+
+        Pages/dialogs are loaded before they are shown, so the request may be
+        deferred until ``showEvent``/``resizeEvent`` provides the final widget
+        size.
+        """
+
+        if rect is None or rect.width() <= 0 or rect.height() <= 0:
+            return
+        self._saved_view_rect = QRectF(rect)
+        self._pending_view_rect = QRectF(rect)
+        self._apply_pending_view_rect()
+
+    def set_saved_view_scene_rect(self, rect: QRectF) -> None:
+        """Record the range stored in the page file without moving the view.
+
+        The serializer writes the *currently visible* range into
+        ``sceneRect``, so after every save this record has to follow the file.
+        Otherwise "调整视图" would keep restoring the range the page was
+        opened with instead of the one actually written to disk.
+        """
+
+        if rect is None or rect.width() <= 0 or rect.height() <= 0:
+            return
+        self._saved_view_rect = QRectF(rect)
+
+    def get_saved_view_scene_rect(self) -> QRectF:
+        """Return the view range recorded in the page's ``sceneRect``."""
+
+        if self._saved_view_rect is None:
+            return QRectF()
+        return QRectF(self._saved_view_rect)
+
+    def restore_saved_view(self, animate: bool = True) -> bool:
+        """Restore the view range recorded in the page's ``sceneRect``.
+
+        Returns ``False`` when the page has no usable record yet (a brand new
+        page), so callers can fall back to the default origin view.  The PyQt
+        port applies the range immediately; ``animate`` is accepted for API
+        compatibility with the PySide6 implementation.
+        """
+
+        rect = self.get_saved_view_scene_rect()
+        if rect.width() <= 0 or rect.height() <= 0:
+            return False
+        self.set_view_scene_rect(rect)
+        return True
+
+    def _view_state_for_scene_rect(self, rect: QRectF):
+        """Return ``((center_x, center_y), scale)`` that shows ``rect``.
+
+        ``center_x``/``center_y`` are view coordinates, i.e. the frame used by
+        :meth:`sceneToView`, so callers can apply them directly.
+        """
+
+        top_left = self.sceneToView(rect.topLeft())
+        bottom_right = self.sceneToView(rect.bottomRight())
+        view_rect = QRectF(top_left, bottom_right).normalized()
+        if view_rect.width() <= 0 or view_rect.height() <= 0:
+            return None
+
+        # A single scale factor drives both axes.  Use the smaller one so the
+        # whole saved range remains visible if the window aspect has changed.
+        target_scale = min(
+            self.width() / view_rect.width(),
+            self.height() / view_rect.height(),
+        )
+        if not math.isfinite(target_scale) or target_scale <= 0:
+            return None
+        # Interactive zoom stops at 0.1, but a page recorded from a larger
+        # window (or a hand-written sceneRect) may need a smaller factor to be
+        # shown completely.  The floor only guards against absurd values.
+        scale = max(0.01, min(10.0, target_scale))
+        center = view_rect.center()
+        return (center.x(), center.y()), scale
+
+    def _apply_view_state(self, center_x: float, center_y: float, scale: float) -> None:
+        """Center view coordinate ``(center_x, center_y)`` at ``scale``."""
+        self.scale_factor = scale
+        self.offset = QPointF(
+            self.width() / 2.0 - center_x * scale,
+            self.height() / 2.0 - center_y * scale,
+        )
+        self.update_coordinate()
+        self.update()
+
+    def _apply_pending_view_rect(self) -> None:
+        if self._pending_view_rect is None:
+            return
+        if not self.isVisible() or self.width() <= 1 or self.height() <= 1:
+            return
+
+        target = self._pending_view_rect
+        self._pending_view_rect = None
+        # Keep the custom coordinate frame centred, matching showEvent(), so
+        # the saved and restored ranges use the same reference point.
+        self.scene_origin = QPointF(self.width() / 2.0, self.height() / 2.0)
+        state = self._view_state_for_scene_rect(target)
+        if state is None:
+            return
+        (center_x, center_y), scale = state
+        self._view_initialized = True
+        self._apply_view_state(center_x, center_y, scale)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._apply_pending_view_rect()
+        if self._pending_view_rect is None:
+            self._view_initialized = True
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._apply_pending_view_rect()
+
     def addItem(self, item:base_element )-> bool:
        
         if  self.__sceneRect.intersects(item.sceneBoundingRect()):
@@ -939,6 +1098,37 @@ class myGraphicsScene(grid_map_window):
         painter.drawLine(pos0,pos1)
         painter.restore()
     
+
+    def draw_triangle_draft_on_sence(self,painter:QPainter,points,preview_pos:QPointF=None,color=QColor(0,0,0),lineWidth=2):
+        """Draw the in-progress triangle while the user is still clicking.
+
+        ``points`` holds the already collected scene vertices, while
+        ``preview_pos`` is the current (possibly snapped) mouse position.
+        """
+        scene_points = [QPointF(point) for point in points]
+        if preview_pos is not None:
+            scene_points.append(QPointF(preview_pos))
+        if not scene_points:
+            return
+
+        view_points = [self.sceneToView(point) for point in scene_points]
+
+        painter.save()
+        pen = QPen(color, lineWidth)
+        pen.setStyle(Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        if len(view_points) >= 2:
+            painter.drawPolyline(QPolygonF(view_points))
+        if len(view_points) >= 3:
+            # Close the preview so the user sees the upcoming triangle.
+            painter.drawLine(view_points[-1], view_points[0])
+
+        painter.setPen(QPen(color, 1))
+        painter.setBrush(color)
+        for point in view_points:
+            painter.drawEllipse(point, 3, 3)
+        painter.restore()
 
     def draw_group_on_sence(self,painter:QPainter,leftTop:QPointF,rightTop:QPointF,bottomleft:QPointF,bottmRight:QPointF,angle:float,color=QColor(0,0,0),lineWidth=1):
         painter.save()
@@ -1360,7 +1550,16 @@ class myGraphicsScene(grid_map_window):
         
         if self.current_element_id>0:
             child =self.current_element
-            if isinstance(child, circle_element):
+            if isinstance(child, triangle_element):
+                if child.get_actived():
+                    self.draw_triangle_draft_on_sence(
+                        painter,
+                        child.get_draw_vertices(),
+                        self.get_pos_from_mouse(),
+                        child.get_color(),
+                        child.get_line_width(),
+                    )
+            elif isinstance(child, circle_element):
                 if  child.get_actived():
                     color = QColor(0,0,0)
                     if child.get_center_pos() is not None:
@@ -1581,7 +1780,15 @@ class myGraphicsScene(grid_map_window):
             # child=self.findChild(QObject,str(self.current_element_id))
             child = self.current_element if self.current_element_id>0 else None
             
-            if isinstance(child, rect_element):
+            if isinstance(child, triangle_element):
+                if child.get_actived():
+                    points = child.get_draw_vertices()
+                    if len(points) < 3:
+                        child.add_draw_vertex(self.get_pos_from_mouse())
+                        print(f"获得第{len(points) + 1}个点{self.get_pos_from_mouse()}")
+                        self.update()
+
+            elif isinstance(child, rect_element):
                 if child.constructed_by_draw ==False:
                     print(child.constructed_by_draw)
                     child.set_actived(False)

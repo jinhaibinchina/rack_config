@@ -12,7 +12,8 @@ from typing import List
 # from common import NameValLabel
 from functools import partial
 
-from myDesigner import RackStoreWindow
+from myDesigner import RackStoreWindow,RackStoresWindow
+
 from global_config import global_cfg
 
 from flip_clock import FlipDigit_Time_display
@@ -107,7 +108,7 @@ class ConfigWindow(LoadWidget):
 
     def __init__(self,plc_mgr:PLCManager,data_broker:DataBroker,SerialNumber:str, parent=None):
 
-        ui_file_path = res_mng.get_ui_path('rack_config.ui')
+        ui_file_path = res_mng.get_ui_path('rack_config_v2.ui')
         qss_file     = res_mng.get_ui_path('rcd.qss')
         super().__init__(ui_file_path,qss_file)
         ui:QWidget =self.ui
@@ -120,6 +121,13 @@ class ConfigWindow(LoadWidget):
         self.flip_time = FlipDigit_Time_display(self,size_factor=0.5)
         time_frame_layout.addWidget(self.flip_time)
         time_frame.setLayout(time_frame_layout)
+
+
+        scene_frame :QFrame = self.ui.frame_scene
+        scene_frame_layout =QVBoxLayout()
+        self.rack_stores = RackStoresWindow()
+        scene_frame_layout.addWidget(self.rack_stores)
+        scene_frame.setLayout(scene_frame_layout)
 
         self.plc_mgr = plc_mgr
         # self.data_broker = DataBroker(plc_mgr)
@@ -315,6 +323,12 @@ class ConfigWindow(LoadWidget):
     
     def handle_login_out(self):
         groupBox :QGroupBox = self.ui.groupBox_rack_paras
+        if global_cfg.is_logged_in :
+            groupBox.setVisible(True)
+        else:
+            groupBox.setVisible(False)
+
+        groupBox :QGroupBox = self.ui.groupBox_rack_status
         if global_cfg.is_logged_in :
             groupBox.setVisible(True)
         else:
