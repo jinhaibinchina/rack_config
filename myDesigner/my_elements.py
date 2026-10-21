@@ -117,6 +117,14 @@ class base_element(QObject):
         # self._m_pos_last                 =None
         self._Transform_last             =Transform()
         #-----------------------------------------------------------------------------------------
+        # 变换缓存：m_pos/m_transform/父链不变时直接复用，避免每帧重算纯 Python 矩阵
+        self._tf_self_epoch   = 0      # 自身几何版本号（m_transform 变化时 +1）
+        self._tf_item_cache   = None   # itemTransform() 缓存
+        self._tf_item_key     = None   # (m_pos.x, m_pos.y, _tf_self_epoch)
+        self._tf_scene_cache  = None   # sceneTransform() 缓存
+        self._tf_scene_parent = None   # 生成该缓存时父项返回的变换对象
+        self._tf_scene_own    = None   # 生成该缓存时自身的 itemTransform 对象
+        #-----------------------------------------------------------------------------------------
         self._is_group_in_hover =False
        
         self._sceneBoundingRect = QRectF()
@@ -226,15 +234,17 @@ class base_element(QObject):
    
     
     def __check_position_change(self):#__check_local_geometry_change
-        
-        if self._Transform_last != self.sceneTransform():
-         
+
+        current_transform = self.sceneTransform()
+        # 缓存命中时是同一个对象，先用身份判断短路，避免 9 次浮点比较
+        if self._Transform_last is not current_transform and self._Transform_last != current_transform:
+
             self.update_boundingRect()
 
-       
-        self._Transform_last  = self.sceneTransform()
 
-        
+        self._Transform_last  = current_transform
+
+
     def pos(self)->QPointF:
         """获取位置"""
         return self.m_pos
@@ -260,6 +270,7 @@ class base_element(QObject):
         else:
             return
         self.m_pos =pos
+        self.invalidate_transform_cache()
         
     def handle_parent_move(self):
         """父图元位置变化"""
@@ -268,6 +279,8 @@ class base_element(QObject):
 
     def setRotation(self,ang):
         self.m_transform.rotate_around(ang,self.m_origin)
+        # m_transform 是原地修改，必须让变换缓存与下一帧重绘生效
+        self.invalidate_transform_cache()
         # self.__check_position_change()
     
     def transform(self):
@@ -277,6 +290,7 @@ class base_element(QObject):
     def setTransform(self, transform):
         """设置变换矩阵"""
         self.m_transform = transform
+        self.invalidate_transform_cache()
         if not self.m_parent and self.__active==False:
             self.__check_position_change()
     
@@ -373,6 +387,7 @@ class base_element(QObject):
         self.setTransform(t)
         self.m_pos      = m_pos_in_parent
         self.m_pos_init =copy.deepcopy(self.m_pos)
+        self.invalidate_transform_cache()
 
         print("设置父对象")
         
@@ -415,6 +430,7 @@ class base_element(QObject):
       
         self.m_parent.m_children.remove(self)
         self.m_parent   = None
+        self.invalidate_transform_cache()
 
     def Delete(self):
 
@@ -455,42 +471,80 @@ class base_element(QObject):
         
 
 
+    def invalidate_transform_cache(self, mark_dirty=True):
+        """几何变化后调用：丢弃变换缓存，并让 mapToScene / 下一帧绘制使用新变换。
+
+        位置(m_pos)本身由 itemTransform() 的取值校验覆盖，任何直接给 m_pos
+        赋值的代码无需通知；本方法主要处理 m_transform 的原地修改（旋转）、
+        父链变化以及"必须立刻重绘"的场合。
+
+        mark_dirty=False 用于紧跟着还会调用 update_boundingRect() 的赋值，
+        避免重复发脏区域信号。
+        """
+        self._tf_self_epoch += 1
+        self._tf_item_cache = None
+        self._tf_item_key = None
+        self.__moving_flag = True
+        if mark_dirty:
+            self.prepareDirtyChange()
+
     def itemTransform(self):
         """
-        计算从图元局部坐标系到父坐标系的变换
-    
+        计算从图元局部坐标系到父坐标系的变换（带缓存）
+
+        m_pos 用坐标值做键，所以任何直接给 m_pos 赋值的代码（move_by、
+        change_position 等）都能被正确感知；m_transform 的原地修改需要
+        调用 invalidate_transform_cache()。
         """
-        # 创建基础变换
-        t = Transform()
-        t = t.translate(self.m_pos)
-        # 2. 应用局部变换
-        t = t*self.m_transform 
-        return t
+        pos = self.m_pos
+        key = (pos.x(), pos.y(), self._tf_self_epoch)
+        if self._tf_item_key != key:
+            # 创建基础变换
+            t = Transform()
+            t = t.translate(pos)
+            # 2. 应用局部变换
+            t = t*self.m_transform
+            self._tf_item_cache = t
+            self._tf_item_key = key
+        return self._tf_item_cache
     
     def sceneTransform(self):
         """
-        计算从图元局部坐标系到场景坐标系的变换
-        
-        如果存在父图形项，则组合父项的场景变换和本图元的项变换
+        计算从图元局部坐标系到场景坐标系的变换（带缓存）
+
+        失效依据是"父项返回的变换对象"和"自身的 itemTransform 对象"的身份：
+        itemTransform() 自身变化时会返回新对象，父项的父链变化时父项也会重算，
+        因此子图元无需任何显式通知即可惰性刷新（直接改 m_pos 也能被感知）。
         """
-        if self.m_parent:
+        own_transform = self.itemTransform()
+        parent = self.m_parent
+        if parent is None:
+            # 没有父项时，场景变换就是本图元的项变换
+            if self._tf_scene_cache is not own_transform:
+                self._tf_scene_cache = own_transform
+            return self._tf_scene_cache
+
+        # 先让父项校验它自己是否需要重算
+        parent_transform = parent.sceneTransform()
+        if self._tf_scene_parent is not parent_transform or self._tf_scene_own is not own_transform:
             # 组合变换: 父项的场景变换 × 本图元的项变换
-            return self.m_parent.sceneTransform() * self.itemTransform()
-        # 没有父项时，直接返回本图元的项变换
-        return self.itemTransform()
+            self._tf_scene_cache = parent_transform * own_transform
+            self._tf_scene_parent = parent_transform
+            self._tf_scene_own = own_transform
+        return self._tf_scene_cache
     
     def mapToParent(self, point):
         """将点从局部坐标系映射到父坐标系"""
         return self.itemTransform().map(point)
     
     def mapToScene(self, point):
-        """将点从局部坐标系映射到场景坐标系"""
-        if self.__moving_flag:
-            self.__is_moving = True
-            return self.sceneTransform().map(point)
-        else:
-            self.__is_moving = False
-            return self._Transform_last.map(point)
+        """将点从局部坐标系映射到场景坐标系
+
+        sceneTransform() 自带缓存且会按 m_pos 校验，因此这里总是用实时变换，
+        不再依赖 _Transform_last 这个"上一帧快照"（轮询取消后它可能滞后）。
+        """
+        self.__is_moving = self.__moving_flag
+        return self.sceneTransform().map(point)
     
     def mapFromParent(self, point):
         """将点从父坐标系映射到局部坐标系"""
@@ -538,6 +592,8 @@ class base_element(QObject):
         else:
             raise ValueError("参数必须是(x,y)或QPointF")
         self.m_pos = self.m_pos + pos
+        # 拖动/成组移动只改 m_pos，必须自己发脏区域，不能再依赖渲染定时器轮询
+        self.invalidate_transform_cache()
 
     def move_to_pos(self,*args):
         pos = QPointF()
@@ -2606,7 +2662,7 @@ class text_element(base_element):
         for size in range(1, 500):
             font.setPointSize(size)
             painter.setFont(font)
-            rect = painter.boundingRect(pixmap.rect(), Qt.AlignCenter, text)
+            rect = painter.boundingRect(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
             
             # 记录最接近目标高度但不超过的大小
             if rect.height() <= target_height:
@@ -3625,6 +3681,8 @@ class triangle_element(rect_element):
         )
         self.m_angle_init = self.m_angle = angle
         self.m_transform = transform
+        # 直接赋值 m_transform 绕过了 setTransform()，这里手动让变换缓存失效
+        self.invalidate_transform_cache(mark_dirty=False)
 
         if origin_scene is not None:
             origin_parent = (

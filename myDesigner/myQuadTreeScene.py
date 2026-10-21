@@ -738,9 +738,10 @@ class QuadTreeScene(myGraphicsScene):
         # 只更新有变化的区域
         if not dirty_region.isEmpty():
             self.update(dirty_region)
-        else:
-            for child in  self.findChildren(base_element):
-                child.check_moving()
+        # 没有脏区域说明本帧没有任何变化，无需重绘：
+        # 位置/颜色/可见性变化都会经 prepareDirtyChange() 进入脏区域，
+        # 不再对全部图元做 check_moving() 轮询（那曾占满整个 GUI 线程）。
+        # 单帧内的几何漂移仍由 paint() 里的 __check_position_change() 兜底。
         # 重置脏区域记录
         self.dirtyRegion_manager.reset()
 

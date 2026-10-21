@@ -150,9 +150,18 @@ class Transform:
     def __eq__(self, other):
         if not isinstance(other, Transform):
             return False
+        if self is other:
+            return True
+        a = self.m
+        b = other.m
+        if a == b:
+            return True
+        # 浮点抖动容差比较（热路径：每帧每个图元都会调用一次）
         for i in range(3):
+            row_a = a[i]
+            row_b = b[i]
             for j in range(3):
-                if abs(self.m[i][j] - other.m[i][j]) > 1e-10:                   
+                if abs(row_a[j] - row_b[j]) > 1e-10:
                     return False
         return True
     
