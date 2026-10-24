@@ -48,6 +48,29 @@ class base_element(QObject):
     geometryChangeToChild = pyqtSignal()#告知子图元位置已改变
 
     # geometryChangeToGroupParent = Signal()
+    # Interactive signals.  They are declared on the base class so every
+    # element (and therefore every group instance) can be driven by the same
+    # event-binding machinery.
+    clicked  = pyqtSignal()
+    pressed  = pyqtSignal()
+    released = pyqtSignal()
+    toggled  = pyqtSignal(bool)
+
+    # geometryChangeToGroupParent = Signal()
+
+    EVENT_ATTACH   = "attach"
+    EVENT_CLICK    = "click"
+    EVENT_PRESSED  = "pressed"
+    EVENT_RELEASED = "released"
+    EVENT_TOGGLE   = "toggle"
+    EVENT_NAMES    = (
+        EVENT_ATTACH,
+        EVENT_PRESSED,
+        EVENT_RELEASED,
+        EVENT_CLICK,
+        EVENT_TOGGLE,
+    )
+
 
     def __init__(self,parent=None):
         super().__init__(parent=parent)
@@ -64,6 +87,17 @@ class base_element(QObject):
         self.__invisible = True #是否可见
         self.__selectable = True
         self.__selectable_last=True
+
+        # 运行态点击事件状态：事件绑定表 + toggle/pressed 状态。
+        # 缺少这些初始化时，set_event_binding/handle_mouse_press 会直接抛
+        # AttributeError，图元的点击绑定无法工作。
+        self._event_bindings = {}
+        self._toggle_enabled = False
+        self._checked = False
+        self._pressed = False
+        # 运行态交互开关：宿主（窗口代码）只是 connect 图元的 clicked 信号时，
+        # 并没有事件绑定表，需要这个标记才会被场景的命中测试选中。
+        self._interactive = False
 
         # self.m_items = items_map           # ID->图元映射字典
         self.type =None
@@ -219,6 +253,12 @@ class base_element(QObject):
 
     def _reset_moving_flag(self):
         self.__moving_flag = False
+
+        # 本帧绘制已经消费掉变换缓存，同步清掉 mapToScene() 记录的
+        # “正在移动”快照；否则 check_hover() 会把静止图元当成拖拽中，
+        # 永远拒绝命中，运行态点击图元（电柜等分组）就会没有反应。
+        self.__is_moving = False
+
     def is_moving(self):
         return self.__is_moving
     
@@ -742,6 +782,263 @@ class base_element(QObject):
             print(self.m_scene_manager.m_name_items)
             return True
 
+
+    # ------------------------------------------------------------------
+    # Event bindings
+    # ------------------------------------------------------------------
+    @classmethod
+    def normalize_event_name(cls, event):
+        """Return the canonical event key, or ``None`` for an unknown event."""
+        key = str(event or "").strip().lower()
+        aliases = {
+            "attach": cls.EVENT_ATTACH,
+            "init": cls.EVENT_ATTACH,
+            "initial": cls.EVENT_ATTACH,
+            "click": cls.EVENT_CLICK,
+            "clicked": cls.EVENT_CLICK,
+            "press": cls.EVENT_PRESSED,
+            "pressed": cls.EVENT_PRESSED,
+            "release": cls.EVENT_RELEASED,
+            "released": cls.EVENT_RELEASED,
+            "toggle": cls.EVENT_TOGGLE,
+            "toggled": cls.EVENT_TOGGLE,
+        }
+        return aliases.get(key)
+
+    def set_event_binding(
+        self, event, variable, value=None, handler="", args=None
+    ):
+        """Bind ``event`` to a variable write or a registered handler.
+
+        An empty variable and handler removes the binding.  When ``value`` is
+        empty the event payload is written: pressed=True, released=False,
+        click=True, toggle=the new checked state.
+
+        ``handler`` names a function registered by the run-mode host.  When it
+        is present the function runs instead of writing ``variable``; ``args``
+        is the JSON object passed to it.  Page files therefore never contain
+        executable Python, only a handler name and data.
+        """
+        event_name = self.normalize_event_name(event)
+        if event_name is None:
+            raise ValueError(f"不支持的事件: {event!r}")
+
+        variable = str(variable or "").strip()
+        handler = str(handler or "").strip()
+        if not variable and not handler:
+            self._event_bindings.pop(event_name, None)
+            return False
+
+        binding = {}
+        if variable:
+            binding["variable"] = variable
+        if handler:
+            binding["handler"] = handler
+        if value is not None and str(value).strip() != "":
+            binding["value"] = value
+        if handler and args is not None:
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except ValueError:
+                    args = None
+            if isinstance(args, dict) and args:
+                binding["args"] = copy.deepcopy(args)
+
+        self._event_bindings[event_name] = binding
+        if event_name == self.EVENT_TOGGLE:
+            # Binding a toggle event is only useful when clicks actually
+            # flip the state, so enable it as part of the binding.
+            self._toggle_enabled = True
+        return True
+
+    def get_event_binding(self, event):
+        event_name = self.normalize_event_name(event)
+        binding = self._event_bindings.get(event_name)
+        return copy.deepcopy(binding) if binding is not None else None
+
+    def get_event_bindings(self):
+        return copy.deepcopy(self._event_bindings)
+
+    def clear_event_binding(self, event):
+        event_name = self.normalize_event_name(event)
+        if event_name is not None:
+            self._event_bindings.pop(event_name, None)
+
+    def apply_event_bindings(self, data):
+        """Restore bindings from serialized JSON data."""
+        self._event_bindings.clear()
+        if not isinstance(data, dict):
+            return
+        for event, binding in data.items():
+            try:
+                if isinstance(binding, dict):
+                    self.set_event_binding(
+                        event,
+                        binding.get("variable"),
+                        binding.get("value"),
+                        binding.get("handler", ""),
+                        binding.get("args"),
+                    )
+                elif isinstance(binding, str):
+                    self.set_event_binding(event, binding)
+            except ValueError:
+                # Ignore future/unknown events instead of breaking page load.
+                continue
+
+    def event_bindings_to_dict(self):
+        return copy.deepcopy(self._event_bindings)
+
+    def has_event_bindings(self):
+        return bool(self._event_bindings)
+
+    def set_toggle_enabled(self, enable):
+        self._toggle_enabled = bool(enable)
+
+    def is_toggle_enabled(self):
+        return self._toggle_enabled
+
+    def set_interactive(self, enable):
+        """运行态是否参与点击命中测试。
+
+        纯代码 ``clicked.connect(...)`` 不会产生事件绑定表，只有打开这个
+        开关，场景的 ``_find_event_group_at`` 才会把该图元当作可点击目标，
+        进而触发 pressed/released/clicked 信号。
+        """
+        self._interactive = bool(enable)
+
+    def is_interactive(self):
+        return self._interactive
+
+    def set_checked(self, checked):
+        checked = bool(checked)
+        if self._checked != checked:
+            self._checked = checked
+            self.prepareDirtyChange()
+
+    def is_checked(self):
+        return self._checked
+
+    def is_pressed(self):
+        return self._pressed
+
+    @staticmethod
+    def parse_event_value(raw):
+        """Convert the text stored by the property panel into a runtime value."""
+        if isinstance(raw, (bool, int, float)):
+            return raw
+        text = str(raw).strip()
+        lowered = text.lower()
+        if lowered in {"true", "1", "on", "yes"}:
+            return True
+        if lowered in {"false", "0", "off", "no"}:
+            return False
+        try:
+            return int(text)
+        except ValueError:
+            pass
+        try:
+            return float(text)
+        except ValueError:
+            return text
+
+    def _dispatch_event_binding(self, event, event_value):
+        event_name = self.normalize_event_name(event)
+        binding = self._event_bindings.get(event_name)
+        if not binding:
+            return
+
+        handler = str(binding.get("handler", "")).strip()
+        if handler:
+            scene = self.m_scene
+            invoker = (
+                getattr(scene, "invoke_event_handler", None)
+                if scene is not None
+                else None
+            )
+            if callable(invoker):
+                invoker(
+                    handler,
+                    self,
+                    event_name,
+                    binding.get("args") or {},
+                    event_value,
+                )
+            else:
+                print(f"[事件绑定] 场景未安装事件处理函数解析器: {handler}")
+            return
+
+        variable = str(binding.get("variable", "")).strip()
+        if not variable:
+            return
+
+        raw_value = binding.get("value")
+        if raw_value is None or str(raw_value).strip() == "":
+            value = event_value
+        else:
+            value = self.parse_event_value(raw_value)
+
+        scene = self.m_scene
+        writer = getattr(scene, "write_variable", None) if scene is not None else None
+        if callable(writer):
+            writer(variable, value, self, event_name)
+
+    def _emit_event(self, event, event_value):
+        event_name = self.normalize_event_name(event)
+        if event_name == self.EVENT_CLICK:
+            self.clicked.emit()
+        elif event_name == self.EVENT_PRESSED:
+            self.pressed.emit()
+        elif event_name == self.EVENT_RELEASED:
+            self.released.emit()
+        elif event_name == self.EVENT_TOGGLE:
+            self.toggled.emit(bool(event_value))
+        self._dispatch_event_binding(event_name, event_value)
+
+    def handle_mouse_press(self):
+        if self._pressed:
+            return
+        self._pressed = True
+        self._emit_event(self.EVENT_PRESSED, True)
+
+    def cancel_mouse_press(self):
+        """Drop a pressed state without emitting release/click events."""
+        self._pressed = False
+
+    def _next_toggle_state(self):
+        """Flip the bound runtime variable when possible, else the local state."""
+        binding = self._event_bindings.get(self.EVENT_TOGGLE)
+        if binding:
+            variable = str(binding.get("variable", "")).strip()
+            scene = self.m_scene
+            reader = getattr(scene, "read_variable", None) if scene else None
+            if variable and callable(reader):
+                current = reader(variable, self._checked)
+                if isinstance(current, str):
+                    current = self.parse_event_value(current)
+                return not bool(current)
+        return not self._checked
+
+    def toggle(self):
+        """Programmatically toggle the checked state (when enabled)."""
+        if not self._toggle_enabled:
+            return
+        self.set_checked(self._next_toggle_state())
+        self._emit_event(self.EVENT_TOGGLE, self._checked)
+
+    def handle_mouse_release(self, inside=True):
+        if not self._pressed:
+            return
+        self._pressed = False
+        # A released event always represents the "not pressed" value.  The
+        # ``inside`` flag only decides whether click/toggle also fire.
+        self._emit_event(self.EVENT_RELEASED, False)
+        if not inside:
+            return
+        self._emit_event(self.EVENT_CLICK, True)
+        self.toggle()
+
+
     def get_line_width(self):
         return  int(self.__width)
     def set_line_width(self, val):
@@ -816,7 +1113,7 @@ class base_element(QObject):
     def get_actived(self):
         return self.__active==True
 
-    def set_fill(self,state):
+    def set_fill(self,state:bool):
         if state != self.__fill:
             self.__fill = state
             self.prepareDirtyChange()
@@ -2067,8 +2364,15 @@ class group_element(rect_element):
     
     def paint(self,painter:QPainter,shine_flag):
         
+       
         if self.m_scene and self.m_scene.mode() == SceneMode.Run:
+            # 运行态分组不绘制虚线框，但必须像其他图元一样在每帧绘制时清掉
+            # 变换缓存标记，否则 is_moving() 恒为 True，check_hover() 会跳过
+            # 该分组，鼠标点击电柜等分组时永远选不中。
+            self._reset_moving_flag()
             return
+
+        
         if self.get_visibility()==False :
             super().paint(painter,shine_flag)
             return
@@ -2677,7 +2981,7 @@ class text_element(base_element):
         # 重新计算最终边界框
         font.setPointSize(self.font_size)
         painter.setFont(font)
-        final_rect = painter.boundingRect(pixmap.rect(), Qt.AlignCenter, text)
+        final_rect = painter.boundingRect(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
         
         painter.end()
         return final_rect.width()

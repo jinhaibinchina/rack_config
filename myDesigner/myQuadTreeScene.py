@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import ( QToolTip)
 from PyQt6.QtCore import Qt, QPointF, QRectF,pyqtSignal,QSize,QObject,QRect,QPoint,QTimer,QSizeF
 from PyQt6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack
 
-import json,sys,os
+import json,sys,os,traceback
 from .my_elements import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
 from PyQt6.QtGui import QRegularExpressionValidator
 from PyQt6.QtCore import QRegularExpression
@@ -575,6 +575,9 @@ class QuadTreeScene(myGraphicsScene):
 
     run_mode_station_change = pyqtSignal(str)#切换子站点显示
 
+    # (variable_name, value, source_element, event_name)
+    variable_written = pyqtSignal(str, object, object, str)
+
     
 
     def __init__(self, parent=None):
@@ -620,6 +623,13 @@ class QuadTreeScene(myGraphicsScene):
         self.update_callback         = None
         self.__load_done = False
 
+        # 运行态点击事件：记录按下时命中的图元组，松开时据此判定 click。
+        self.runtime_variables = {}
+        self.variable_writer = None
+        # 运行态宿主可安装 callable；图元事件绑定的 handler 通过它分发。
+        self.event_handler_resolver = None
+        self._event_pressed_group = None
+
         # 提高渲染频率，减少拖影
      
         self.render_timer.timeout.connect(self.on_render_frame)
@@ -647,6 +657,123 @@ class QuadTreeScene(myGraphicsScene):
             self.show_grid(True)
             self.show_coordinate(True)
         self._mode =mode
+        if mode != SceneMode.Run:
+            # 离开运行态时丢弃按下状态，避免切换后残留 pressed/toggle。
+            if self._event_pressed_group is not None:
+                self._event_pressed_group.cancel_mouse_press()
+            self._event_pressed_group = None
+
+    # ------------------------------------------------------------------
+    # Group event bindings (run mode)
+    # ------------------------------------------------------------------
+    def write_variable(self, name, value, source=None, event=""):
+        """Write one runtime variable triggered by an element event.
+
+        The value is stored in ``runtime_variables`` and announced through
+        ``variable_written``.  A host can additionally assign
+        ``scene.variable_writer = callable(name, value)`` to forward it to a
+        PLC/Modbus layer.
+        """
+        name = str(name or "").strip()
+        if not name:
+            return False
+
+        self.runtime_variables[name] = value
+        self.variable_written.emit(name, value, source, event)
+
+        writer = self.variable_writer
+        if callable(writer):
+            try:
+                writer(name, value)
+            except Exception as exc:
+                # A broken PLC writer must not break the scene interaction.
+                print(f"写入变量失败({name}={value!r}): {exc}")
+        return True
+
+    def read_variable(self, name, default=None):
+        return self.runtime_variables.get(name, default)
+
+    def clear_runtime_variables(self):
+        self.runtime_variables.clear()
+
+    def set_event_handler_resolver(self, resolver):
+        """Install the run-mode ``handler_name -> bool`` dispatcher."""
+
+        self.event_handler_resolver = resolver if callable(resolver) else None
+
+    def invoke_event_handler(self, name, source, event, args=None, event_value=None):
+        """Resolve one design-time event handler; returns ``True`` if handled."""
+
+        resolver = self.event_handler_resolver
+        if not callable(resolver):
+            print(f"[运行态事件] 未安装事件处理函数解析器: {name}")
+            return False
+        try:
+            return bool(resolver(name, source, event, args or {}, event_value))
+        except Exception as exc:  # noqa: BLE001 - never break mouse interaction
+            traceback.print_exc()
+            print(f"[运行态事件] 处理函数 {name} 执行失败: {type(exc).__name__}: {exc}")
+            return False
+
+    def initialize_event_handlers(self):
+        """Run every serialized ``attach`` binding once after page load.
+
+        ``attach`` is not a mouse event: it lets a handler establish the
+        initial visual state without duplicating that logic in a click handler.
+        """
+
+        manager = getattr(self, "scene_manager", None)
+        if manager is None:
+            return 0
+        invoked = 0
+        for item in list(manager.m_items.values()):
+            if item is None:
+                continue
+            try:
+                binding = item.get_event_binding("attach")
+            except (AttributeError, RuntimeError):
+                continue
+            if not binding:
+                continue
+            handler = str(binding.get("handler", "")).strip()
+            if not handler:
+                continue
+            if self.invoke_event_handler(
+                handler, item, "attach", binding.get("args") or {}, None
+            ):
+                invoked += 1
+        return invoked
+
+    def _event_scene_pos(self, event):
+        """Convert a widget-space mouse event to this scene's custom coords."""
+        scale = self.scale_factor if self.scale_factor else 1.0
+        view_pos = QPointF(
+            event.position().x() / scale + self.view_x0,
+            event.position().y() / scale + self.view_y0,
+        )
+        return self.viewToScene(view_pos)
+
+    def _find_event_group_at(self, scene_pos):
+        """Topmost interactive group under ``scene_pos``."""
+        manager = getattr(self, "scene_manager", None)
+        if manager is None or scene_pos is None:
+            return None
+
+        for item in reversed(getattr(manager, "m_sorted_items", [])):
+            if not isinstance(item, group_element):
+                continue
+            if not item.get_visibility():
+                continue
+            if not (
+                item.has_event_bindings()
+                or item.is_toggle_enabled()
+                or item.is_interactive()
+            ):
+                continue
+            rect = item.sceneBoundingRect()
+            if isinstance(rect, QRectF) and rect.contains(scene_pos):
+                return item
+        return None
 
     def toggle_sence_mode(self):
         if self._mode==SceneMode.Design:
@@ -863,6 +990,16 @@ class QuadTreeScene(myGraphicsScene):
     
     def mousePressEvent(self, event):
         super().mousePressEvent( event)
+
+        if event.button() == Qt.MouseButton.LeftButton and self._mode == SceneMode.Run:
+            previous = self._event_pressed_group
+            if previous is not None:
+                previous.handle_mouse_release(False)
+            self._event_pressed_group = self._find_event_group_at(
+                self._event_scene_pos(event)
+            )
+            if self._event_pressed_group is not None:
+                self._event_pressed_group.handle_mouse_press()
         
         if event.button() == Qt.MouseButton.RightButton:
             if self.is_setting_father or self.is_setting_base_pos:
@@ -886,10 +1023,17 @@ class QuadTreeScene(myGraphicsScene):
       
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent( event)
-        
 
-
-
+        if event.button() == Qt.MouseButton.LeftButton and self._mode == SceneMode.Run:
+            group = self._event_pressed_group
+            self._event_pressed_group = None
+            if group is not None:
+                rect = group.sceneBoundingRect()
+                inside = (
+                    isinstance(rect, QRectF)
+                    and rect.contains(self._event_scene_pos(event))
+                )
+                group.handle_mouse_release(inside)
 
 
     def on_menu_closed(self):
