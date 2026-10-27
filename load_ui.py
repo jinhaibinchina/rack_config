@@ -1,6 +1,6 @@
-from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtWidgets import QWidget, QMainWindow, QDialog
-from PyQt6 import uic
+from PySide6.QtGui import QKeyEvent
+from PySide6.QtWidgets import QWidget, QMainWindow, QDialog
+from uic_compat import loadUi as uic_loadUi
 
 
 
@@ -15,7 +15,7 @@ class LoadWidget(QWidget):
         try:
            
 
-            self.ui = uic.loadUi(ui_file, self)
+            self.ui = uic_loadUi(ui_file, self)
         except Exception as e:
             print(f"Failed to load UI file: {str(e)}")
             sys.exit(1)
@@ -42,7 +42,7 @@ class LoadDialog(QDialog):
 
         # 加载UI文件
         try:
-            self.ui = uic.loadUi(ui_file, self)
+            self.ui = uic_loadUi(ui_file, self)
         except Exception as e:
             print(f"Failed to load UI file: {str(e)}")
             sys.exit(1)
@@ -63,7 +63,7 @@ class LoadMainWindow(QMainWindow):
 
         # 加载UI文件
         try:
-            self.ui = uic.loadUi(ui_file, self)
+            self.ui = uic_loadUi(ui_file, self)
         except Exception as e:
             print(f"Failed to load UI file: {str(e)}")
             sys.exit(1)

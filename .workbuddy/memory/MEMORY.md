@@ -1,0 +1,21 @@
+# RackConfigV2 项目约定
+- GUI 框架：PySide6（已从 PyQt6 全量迁移），信号用 Signal/Slot/Property，禁用 pyqtSignal
+- .ui 加载走 uic_compat.loadUi（QUiLoader 兼容层），不要直接改回 PyQt 的 uic
+- 料仓场景图元按名字识别，见 myDesigner/rack_store_model.py 模块头注释的命名树
+- 每个仓位只有一个 rect 型「灯带」本体，没有分色图层；颜色=改填充/边框色，闪烁=定时器切可见性
+- 场景大量图元，禁止在 addItem/setParent/completed 等热路径里直接 print，用 debug_log + 环境变量 RACK_DEBUG_SCENE=1 控制
+- 料仓分两层：rack_store_model.py 是图元层（读写 QGraphicsScene 对象），rack_stores_status_model.py 是状态层（纯数据，可脱离场景单独存在）。状态层是唯一真值，图形层只做显示
+- 隐藏仓位组（group.set_visibility(False)）会递归清掉子图元的可见标志，隐藏后读不回来状态；需要在重新显示时重灌一次状态
+- 每个区域「实料」只有一层，FULL_1/FULL_2 视觉等价；从图元反读状态要用 visual_key 判等，否则会把 FULL_2 降级成 FULL_1
+- text_element.context 的 setter 会强制前后加空格（渲染留白），比较文本前必须 strip
+- text_element 的长度方向是局部 y（paint 里故意把 w/h 换过来画，配合 is_use_for_agv_map 的 90° 映射，不要当成 bug）。改内容时靠 anchor_left_edge 钉住左侧，开关是 keep_left_on_context_change
+- 判断料位状态不要用 bool(state)：MaterialState.EMPTY 是枚举成员，恒为真
+- RackSlot.set_material 支持两种 calling 方式：传层名（'A库空筒'/'A库实料'）+ bool 表示显示/隐藏该层；传区域（'A'/'单库'）+ MaterialState 表示切换到该状态。改之前先确认调用方用的是哪种
+- 「料仓状态」面板（data2.json id=1584）走独立模型 rack_status_panel_model.py：2 个 IO 模块 × 8 通道 × A/B 两盏灯 = 32 盏 + 4 个文本；DB12 位序默认 channel_major，与 ui/rack_config_v2.ui 的 16 个指示灯按钮一致
+- IO 指示灯设计态全填绿色，绑定后要 set_all_off() 或等第一帧 DB12，否则 status() 会报 16/16 亮
+- 跑脚本必须用项目 .venv（`.venv/Scripts/python.exe`），PySide6 只装在这里；托管 python 3.13 和系统 python 都 import 不到
+- 场景重载（load_element_info2）后调 RackStoresWindow.refresh_models()，两套模型的图元引用会一起失效
+- group.m_children / m_children_ids 都是 set，子图元顺序**不保存**；data2.json 的 children_ids 是哈希序（不是 1..8）。要顺序必须显式排序
+- 组内图元搬家用 change_position(目标场景左上角)，setPos() 在 is_in_group() 时直接 return，搬不动
+- 料架仓位几何现状：仓位1 在屏幕最上、8 在最下（y 3479.7 → -2207.0，间距 812.385）；zValue 1=146 → 8=153
+- 仓位排列方向 rack_arrangements（DB7 offset 26/28/…/44，0 正序 / 1 反序）在 RackStoresWindow 里落地：只换格子的几何位置，仓位号/名字/PLC 映射不变，靠 _rack_reversed 保证幂等

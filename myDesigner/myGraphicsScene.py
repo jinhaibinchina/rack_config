@@ -1,19 +1,38 @@
-from PyQt6.QtWidgets import QMainWindow, QApplication
-from PyQt6.QtWidgets import (QGraphicsView, QGraphicsScene, QApplication,QWidget,QVBoxLayout, QFrame,QSpacerItem,QSizePolicy,QSplitter,QScrollArea,QToolTip,
+from PySide6.QtWidgets import QMainWindow, QApplication
+from PySide6.QtWidgets import (QGraphicsView, QGraphicsScene, QApplication,QWidget,QVBoxLayout, QFrame,QSpacerItem,QSizePolicy,QSplitter,QScrollArea,QToolTip,
                              QHBoxLayout, QLabel)
-from PyQt6.QtCore import Qt, QPointF, QRectF,QPoint,QObject,pyqtSignal,QTimer,QSize,QSizeF,QRect,QEvent,QPropertyAnimation,QEasingCurve
-from PyQt6.QtWidgets import ( QToolTip)
-from PyQt6.QtGui import QPainter, QPen, QColor,QBrush,QPolygonF , QPixmap,QFont,QMouseEvent,QKeyEvent,QRegion
-from PyQt6.QtGui import QPaintEvent,QMouseEvent
+from PySide6.QtCore import Qt, QPointF, QRectF,QPoint,QObject,Signal,QTimer,QSize,QSizeF,QRect,QEvent,QPropertyAnimation,QEasingCurve,Property
+from PySide6.QtWidgets import ( QToolTip)
+from PySide6.QtGui import QPainter, QPen, QColor,QBrush,QPolygonF , QPixmap,QFont,QMouseEvent,QKeyEvent,QRegion
+
 from typing import List
-from collections import deque,abc
+from collections import deque
 import math
 
 from datetime import datetime
 import weakref
 
 import json,sys,os
-from .my_elements import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
+
+# 图元级调试输出总开关。默认关闭：一次场景加载会产生上万行日志，
+# 需要排查时设置环境变量 RACK_DEBUG_SCENE=1 打开。
+DEBUG_SCENE = os.environ.get("RACK_DEBUG_SCENE", "") == "1"
+
+
+def debug_log(*args, **kwargs) -> None:
+    if DEBUG_SCENE:
+        print(*args, **kwargs)
+from .elements import (
+    base_element,
+    circle_element,
+    group_element,
+    image_element,
+    line_element,
+    rect_element,
+    text_element,
+    triangle_element,
+)
+# from my_elements_v2 import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
 from .mySnapSystem import SnapSystem
 import copy
 from .my_common import SceneMode
@@ -22,13 +41,12 @@ from .my_common import SceneMode
 DEFAULT_BACKGROUND_COLOR = "#BEE1F59B"
 
 
-
 class AxisLine(QObject):
     """Qt版本的坐标轴线条"""
-    needs_redraw = pyqtSignal()  # 需要重绘信号
+    needs_redraw = Signal()  # 需要重绘信号
     
     def __init__(self, parent: QWidget, place_way: str = "horizontal", 
-                 x: int = 0, y: int = 0, color: QColor = Qt.GlobalColor.gray):
+                 x: int = 0, y: int = 0, color: QColor = Qt.gray):
         super().__init__(parent)
         self.parent_widget = parent
         self.place_way = place_way
@@ -73,7 +91,7 @@ class AxisLine(QObject):
         if not self.visible:
             return
             
-        pen = QPen(self.grid_color, 1, Qt.PenStyle.SolidLine)
+        pen = QPen(self.grid_color, 1, Qt.SolidLine)
         painter.setPen(pen)
         painter.drawLine(self.start, self.end)
 
@@ -85,7 +103,7 @@ class ArrowWidget(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)  # 抗锯齿
+        painter.setRenderHint(QPainter.Antialiasing)  # 抗锯齿
 
         # 设置画笔和填充
         painter.setPen(QPen(Qt.black, 2))
@@ -117,7 +135,7 @@ class ArrowWidget(QWidget):
         painter.drawPolygon(arrow_head)
 
 class grid_map_window(QWidget):
-    animation_done =pyqtSignal()
+    animation_done =Signal()
     # 添加属性声明
     def get_animation_progress(self):
         return self._animation_progress
@@ -126,7 +144,7 @@ class grid_map_window(QWidget):
         self._animation_progress = value
         self.update()  # 值变化时触发重绘
 
-    # animation_progress = Property(int, get_animation_progress, set_animation_progress)
+    animation_progress = Property(int, get_animation_progress, set_animation_progress)
 
     def __init__(self, parent=None,is_use_for_agv_map = False,is_x_time=True,redraw_when_mouse_move=True):
         super().__init__()
@@ -140,8 +158,12 @@ class grid_map_window(QWidget):
         self.__show_grid=True
 
         self.is_animating = False
+        self.animation = None
         self._animation_progress = 0
         self.scale_factor_old = 1.0
+        # Target of the animated "调整视图" (see restore_saved_view).
+        self._view_animation_start = None
+        self._view_animation_target = None
         # 场景坐标系参数
         self.scene_origin = QPointF(0, 0)  # 场景原点在视图中的位置
         self.scene_scale = 1.0  # 场景缩放比例
@@ -163,7 +185,7 @@ class grid_map_window(QWidget):
         
         # 网格参数
         self.grid_size = 50
-        self.grid_color = Qt.GlobalColor.gray
+        self.grid_color = Qt.gray
         self.base_grid_size = 50
         
         # 视图变换参数
@@ -185,27 +207,66 @@ class grid_map_window(QWidget):
         # 创建双缓冲区
         self.backing_store  = QPixmap(self.size())
         self.dynamic_buffer = QPixmap(self.size())
-        self.backing_store.fill(Qt.GlobalColor.transparent)
-        self.dynamic_buffer.fill(Qt.GlobalColor.transparent)
+        self.backing_store.fill(Qt.transparent)
+        self.dynamic_buffer.fill(Qt.transparent)
 
         self.update_coordinate()
 
     def start_animation(self):
+        self._start_animation(self.animation_to_sence_origin)
+
+    def _start_animation(self, on_progress):
+        """Drive ``animation_progress`` 0 -> 100, calling ``on_progress``.
+
+        The 1s OutQuad curve is shared by every view animation so "调整视图"
+        keeps the same feel whichever range it restores.
+        """
+        self._stop_animation()
         self.is_animating = True
         self._animation_progress = 0
         self.animation = QPropertyAnimation(self, b"animation_progress")
         self.animation.setDuration(1000)
-        self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self.animation.setEasingCurve(QEasingCurve.OutQuad)
         self.animation.setStartValue(0)
         self.animation.setEndValue(100)
-        self.animation.valueChanged.connect(self.animation_to_sence_origin)
+        self.animation.valueChanged.connect(on_progress)
         self.animation.finished.connect(self.animation_finished)
         self.animation.start()
-        
+
+    def _stop_animation(self):
+        """Abort a running view animation without emitting ``animation_done``."""
+        animation = getattr(self, "animation", None)
+        self.animation = None
+        if animation is None:
+            return
+        try:
+            # Disconnect first: a stopped animation must not call
+            # animation_finished() for a target that is being replaced.
+            animation.valueChanged.disconnect()
+            animation.finished.disconnect()
+            animation.stop()
+        except (RuntimeError, TypeError):
+            pass
+        animation.deleteLater()
+        self.is_animating = False
+        self._animation_progress = 0
+        # Forget the pending animated restore: the next animation (for example
+        # goto_sence_origin) must not snap to a stale target when it finishes.
+        self._view_animation_start = None
+        self._view_animation_target = None
+
     def animation_finished(self):
         
         self.is_animating = False
         self._animation_progress = 0
+        # Snap to the exact target range so float rounding of the last frame
+        # does not leave the view a pixel off.
+        target = self._view_animation_target
+        self._view_animation_start = None
+        self._view_animation_target = None
+        if target is not None:
+            (center_x, center_y), scale = target
+            self._apply_view_state(center_x, center_y, scale)
         self.update()
         self.animation_done.emit()
     
@@ -217,6 +278,20 @@ class grid_map_window(QWidget):
         d = (pos_start-pos_end) * progress/100.0
         
         self.move_chart((d)*self.scale_factor)
+
+    def animation_to_view_target(self):
+        """Step of the animated restore started by :meth:`restore_saved_view`."""
+        if self._view_animation_start is None or self._view_animation_target is None:
+            return
+        progress = self._animation_progress / 100.0
+        (start_x, start_y), start_scale = self._view_animation_start
+        (target_x, target_y), target_scale = self._view_animation_target
+        scale = start_scale + (target_scale - start_scale) * progress
+        if scale <= 0:
+            return
+        center_x = start_x + (target_x - start_x) * progress
+        center_y = start_y + (target_y - start_y) * progress
+        self._apply_view_state(center_x, center_y, scale)
 
     def goto_sence_origin(self):
         self.scale_factor_old =self.scale_factor
@@ -261,8 +336,8 @@ class grid_map_window(QWidget):
         self.update_coordinate()
         self.backing_store  = QPixmap(self.size())
         self.dynamic_buffer = QPixmap(self.size())
-        self.backing_store.fill(Qt.GlobalColor.transparent)
-        self.dynamic_buffer.fill(Qt.GlobalColor.transparent)
+        self.backing_store.fill(Qt.transparent)
+        self.dynamic_buffer.fill(Qt.transparent)
         self.update()
 
     def update_background_buffer(self,repaint_view:QRegion):
@@ -304,7 +379,7 @@ class grid_map_window(QWidget):
         """绘制网格背景"""
         painter = QPainter(self)
 
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing)
         painter.setPen(QPen(self.grid_color, 1))
         
         
@@ -341,7 +416,7 @@ class grid_map_window(QWidget):
         right  = int(view_right / self.grid_size) * self.grid_size + self.grid_size
         bottom = int(view_bottom / self.grid_size) * self.grid_size + self.grid_size
         if self.is_use_for_agv_map:
-            xx,yy = int(self.sceneToView(0,0).x()),int(self.sceneToView(0,0).y())
+            xx,yy = self.sceneToView(0,0).toTuple()
 
             x = xx
             while x <= right:
@@ -401,7 +476,7 @@ class grid_map_window(QWidget):
         
         painter.end()
 
-    def wheelEvent(self, event:QMouseEvent):
+    def wheelEvent(self, event):
         # 获取鼠标位置
         mouse_pos = event.position()
         # 计算缩放前的坐标
@@ -414,7 +489,7 @@ class grid_map_window(QWidget):
         self.scale_factor = max(0.1, min(self.scale_factor, 10.0))  # 限制缩放范围
         
         # 计算缩放后的偏移量，保持鼠标位置不变
-        self.offset = (mouse_pos - old_pos * self.scale_factor)
+        self.offset = mouse_pos - old_pos * self.scale_factor
 
         self.update_coordinate()
         if self.__redraw_when_mouse_move:
@@ -425,15 +500,15 @@ class grid_map_window(QWidget):
         super().mouseDoubleClickEvent(event)
 
     def mousePressEvent(self, event:QMouseEvent):
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.LeftButton:
             self.panning = True
             self.last_pos = event.position().toPoint()
             
-    def mouseMoveEvent(self, event:QMouseEvent):
+    def mouseMoveEvent(self, event):
         # return
         if self.panning:
             delta = event.position().toPoint() - self.last_pos
-            self.offset += delta.toPointF()
+            self.offset += delta
             self.last_pos = event.position().toPoint()
 
 
@@ -488,7 +563,7 @@ class grid_map_window(QWidget):
             
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.LeftButton:
             self.panning = False
             
     def viewToScene(self, *args):
@@ -693,7 +768,7 @@ class FrameSelect(QObject):
 
         self.__processing = False
     def receive_start_pos(self,pos):
-        if self.parent.mode()== SceneMode.Run:
+        if self.parent._mode == SceneMode.Run:
             return
         if not self.__processing:
             self.start_pos= pos
@@ -764,12 +839,12 @@ class FrameSelect(QObject):
         painter.restore()
 
 class myGraphicsScene(grid_map_window):
-    mouse_not_move_signal =pyqtSignal()
-    shine_flag_change     =pyqtSignal()
-    selectionChanged      =pyqtSignal()
+    mouse_not_move_signal =Signal()
+    shine_flag_change     =Signal()
+    selectionChanged      =Signal()
     def __init__(self, parent=None,auto_redraw_when_mouse_move=False):
         super().__init__(parent=parent,is_use_for_agv_map=True,is_x_time=False,redraw_when_mouse_move=auto_redraw_when_mouse_move)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 确保能接收键盘事件
+        self.setFocusPolicy(Qt.StrongFocus)  # 确保能接收键盘事件
         
         self.setSceneUnitsPerGrid(200,200)
         self.setSceneScale(1.0)
@@ -794,7 +869,7 @@ class myGraphicsScene(grid_map_window):
 
         # 使用高精度定时器
         self.render_timer = QTimer()
-        self.render_timer.setTimerType(Qt.TimerType.PreciseTimer)  # 高精度模式
+        self.render_timer.setTimerType(Qt.PreciseTimer)  # 高精度模式
         
         self.render_timer.start(16)  # ~60 FPS
         self.needs_redraw = False
@@ -947,23 +1022,55 @@ class myGraphicsScene(grid_map_window):
     def restore_saved_view(self, animate: bool = True) -> bool:
         """Restore the view range recorded in the page's ``sceneRect``.
 
-        Returns ``False`` when the page has no usable record yet (a brand new
-        page), so callers can fall back to the default origin view.  The PyQt
-        port applies the range immediately; ``animate`` is accepted for API
-        compatibility with the PySide6 implementation.
+        With ``animate`` (the default, used by the "调整视图" menu entry) the
+        view glides to the recorded range with the same 1s easing as
+        :meth:`goto_sence_origin`; the range itself is not modified.  Returns
+        ``False`` when the page has no usable record yet (a brand new page), so
+        callers can fall back to the default origin view.
         """
 
         rect = self.get_saved_view_scene_rect()
         if rect.width() <= 0 or rect.height() <= 0:
             return False
-        self.set_view_scene_rect(rect)
+        if (
+            not animate
+            or not self.isVisible()
+            or self.width() <= 1
+            or self.height() <= 1
+        ):
+            # Nothing to animate yet: defer to the regular restore path, which
+            # also handles a widget that has not been shown.
+            self.set_view_scene_rect(rect)
+            return True
+
+        target = self._view_state_for_scene_rect(rect)
+        if target is None:
+            return False
+        self._pending_view_rect = None
+        self._view_initialized = True
+        # Animate from the centre of the currently visible range, expressed in
+        # the same grid/view frame as ``sceneToView`` (that is what keeps the
+        # motion straight while the scale changes).
+        self.update_coordinate()
+        start = (
+            (
+                (self.view_x0 + self.view_x1) / 2.0,
+                (self.view_y0 + self.view_y1) / 2.0,
+            ),
+            self.scale_factor,
+        )
+        self.scale_factor_old = self.scale_factor
+        self._start_animation(self.animation_to_view_target)
+        self._view_animation_start = start
+        self._view_animation_target = target
         return True
 
     def _view_state_for_scene_rect(self, rect: QRectF):
         """Return ``((center_x, center_y), scale)`` that shows ``rect``.
 
         ``center_x``/``center_y`` are view coordinates, i.e. the frame used by
-        :meth:`sceneToView`, so callers can apply them directly.
+        :meth:`sceneToView`, so callers can apply them directly or animate
+        towards them.
         """
 
         top_left = self.sceneToView(rect.topLeft())
@@ -1029,12 +1136,12 @@ class myGraphicsScene(grid_map_window):
        
         if  self.__sceneRect.intersects(item.sceneBoundingRect()):
             item.setParent(self)
-            print("添加进场景")
+            debug_log("添加进场景")
             return True
         
         item.setParent(None)
         item.deleteLater()
-        print("新增的图形在场景之外，因此移除了")
+        debug_log("新增的图形在场景之外，因此移除了")
         return False
         
     def removeItem(self, item:base_element ):
@@ -1076,9 +1183,21 @@ class myGraphicsScene(grid_map_window):
     # def draw_snap_on_scene(self,painter:QPainter,):
 
 
-    def draw_circle_on_sence(self,painter:QPainter,head_pos:QPointF,radius:float,color=QColor(0,0,0),isFill=False,lineWidth=2):
+    @staticmethod
+    def preview_pen(color=QColor(0,0,0),lineWidth=None,dashed:bool=False)->QPen:
+        """返回绘制过程中使用的预览画笔。
+
+        虚线样式与 ``draw_triangle_draft_on_sence`` 保持一致，使所有图元
+        在未完成绘制时都显示同样的虚线参考轮廓。
+        """
+        pen = QPen(color) if lineWidth is None else QPen(color, lineWidth)
+        if dashed:
+            pen.setStyle(Qt.DashLine)
+        return pen
+
+    def draw_circle_on_sence(self,painter:QPainter,head_pos:QPointF,radius:float,color=QColor(0,0,0),isFill=False,lineWidth=2,dashed:bool=False):
         painter.save()
-        painter.setPen(QPen(color, lineWidth))
+        painter.setPen(self.preview_pen(color, lineWidth, dashed))
         if isFill:
             # 设置填充颜色（蓝色）
             painter.setBrush(color)
@@ -1089,15 +1208,14 @@ class myGraphicsScene(grid_map_window):
         painter.restore()
 
     
-    def draw_line_on_sence(self,painter:QPainter,head_pos:QPointF,end_pos:QPointF,color=QColor(0,0,0),lineWidth=2):
+    def draw_line_on_sence(self,painter:QPainter,head_pos:QPointF,end_pos:QPointF,color=QColor(0,0,0),lineWidth=2,dashed:bool=False):
         painter.save()
-        painter.setPen(QPen(color, lineWidth))
+        painter.setPen(self.preview_pen(color, lineWidth, dashed))
         pos0=self.sceneToView(head_pos)
         pos1=self.sceneToView(end_pos)
         
         painter.drawLine(pos0,pos1)
         painter.restore()
-    
 
     def draw_triangle_draft_on_sence(self,painter:QPainter,points,preview_pos:QPointF=None,color=QColor(0,0,0),lineWidth=2):
         """Draw the in-progress triangle while the user is still clicking.
@@ -1114,10 +1232,9 @@ class myGraphicsScene(grid_map_window):
         view_points = [self.sceneToView(point) for point in scene_points]
 
         painter.save()
-        pen = QPen(color, lineWidth)
-        pen.setStyle(Qt.PenStyle.DashLine)
+        pen = self.preview_pen(color, lineWidth, True)
         painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setBrush(Qt.NoBrush)
         if len(view_points) >= 2:
             painter.drawPolyline(QPolygonF(view_points))
         if len(view_points) >= 3:
@@ -1129,6 +1246,8 @@ class myGraphicsScene(grid_map_window):
         for point in view_points:
             painter.drawEllipse(point, 3, 3)
         painter.restore()
+
+    
 
     def draw_group_on_sence(self,painter:QPainter,leftTop:QPointF,rightTop:QPointF,bottomleft:QPointF,bottmRight:QPointF,angle:float,color=QColor(0,0,0),lineWidth=1):
         painter.save()
@@ -1200,9 +1319,9 @@ class myGraphicsScene(grid_map_window):
     #     painter.restore()
 
 
-    def draw_rect_on_sence(self,painter:QPainter,center_pos:QPointF,size:QSize,angle:float,color=QColor(0,0,0),isFill=False,lineWidth=2):
+    def draw_rect_on_sence(self,painter:QPainter,center_pos:QPointF,size:QSize,angle:float,color=QColor(0,0,0),isFill=False,lineWidth=2,dashed:bool=False):
         painter.save()
-        painter.setPen(QPen(color, lineWidth))
+        painter.setPen(self.preview_pen(color, lineWidth, dashed))
         if isFill:
             # 设置填充颜色（蓝色）
             painter.setBrush(color)
@@ -1219,7 +1338,7 @@ class myGraphicsScene(grid_map_window):
 
         painter.restore()
 
-    def draw_text_on_sence(self,painter:QPainter,center_pos:QPointF,size:QSize,context:str,font_size:int):
+    def draw_text_on_sence(self,painter:QPainter,center_pos:QPointF,size:QSize,context:str,font_size:int,dashed:bool=False):
         painter.save()
         color = QColor(0,0,0)
         center_pos_view=self.sceneToView(center_pos)
@@ -1240,6 +1359,12 @@ class myGraphicsScene(grid_map_window):
 
         # 绘制背景
         painter.fillRect(bg_rect, QColor(0,255,0))
+        if dashed:
+            # 未完成绘制时用虚线框标出文本将要占据的区域
+            painter.setPen(self.preview_pen(color, None, True))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(bg_rect)
+            painter.setPen(color)
 
         # 获取文本的精确边界框
         text_rect = painter.boundingRect(bg_rect, Qt.AlignCenter, context)
@@ -1249,7 +1374,7 @@ class myGraphicsScene(grid_map_window):
  
         painter.restore()
     
-    def draw_image_on_sence(self,painter:QPainter,center_pos:QPointF,size:QSize):
+    def draw_image_on_sence(self,painter:QPainter,center_pos:QPointF,size:QSize,dashed:bool=False):
         painter.save()
         color = QColor(0,0,0)
         center_pos_view=self.sceneToView(center_pos)
@@ -1259,7 +1384,7 @@ class myGraphicsScene(grid_map_window):
       
         bg_rect =QRectF(-w/2.0 ,-h/2.0,w,h)
     
-        painter.setPen(color)
+        painter.setPen(self.preview_pen(color, None, dashed))
         
          # 应用视图变换
         painter.translate(center_pos_view)
@@ -1337,7 +1462,7 @@ class myGraphicsScene(grid_map_window):
         # self.dynamic_buffer.fill(Qt.transparent)
         
         dyn_painter = QPainter(self.dynamic_buffer)
-        dyn_painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        dyn_painter.setRenderHint(QPainter.Antialiasing)
         # 应用视图变换
         dyn_painter.translate(self.offset)
         dyn_painter.scale(self.scale_factor, self.scale_factor)
@@ -1362,17 +1487,17 @@ class myGraphicsScene(grid_map_window):
         dyn_painter.scale(self.scale_factor, self.scale_factor)
 
         # 1. 先清除整个动态缓冲区
-        dyn_painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+        dyn_painter.setCompositionMode(QPainter.CompositionMode_Clear)
         dyn_painter.eraseRect(repaint_area.boundingRect())
-        dyn_painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+        dyn_painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
         
         # 2. 从背景缓冲区精确复制需要恢复的区域
-        # for restore_rect in list[repaint_area.boundingRect()]:
+        for restore_rect in repaint_area:
             # 计算视图坐标系下的矩形
-        view_rect = repaint_area.boundingRect()
-        # 确保矩形在有效范围内
-        if not view_rect.isEmpty():
-            dyn_painter.drawPixmap(view_rect, self.backing_store, view_rect)
+            view_rect = restore_rect
+            # 确保矩形在有效范围内
+            if not view_rect.isEmpty():
+                dyn_painter.drawPixmap(view_rect, self.backing_store, view_rect)
             
         dyn_painter.end()
 
@@ -1412,7 +1537,7 @@ class myGraphicsScene(grid_map_window):
         )
 
 
-    def paintEvent(self, event:QPaintEvent):
+    def paintEvent(self, event):
         self._allow_update_data = False
         # super().paintEvent(event)
     
@@ -1421,13 +1546,9 @@ class myGraphicsScene(grid_map_window):
             return
 
         update_region_view = QRegion()
-        # print(event.region())
-        if isinstance(event.region(),abc.Iterable):
-            for rect in event.region():
-                update_region_view += self.rect_windowToView(rect) 
-        else:
-            rect = event.region().boundingRect()
+        for rect in event.region():
             update_region_view += self.rect_windowToView(rect) 
+
         #视图坐标系下的重绘区域
         toRepaint_view = self.dirtyRegion_manager.region().united( update_region_view )
         # print(toRepaint_view)
@@ -1517,7 +1638,7 @@ class myGraphicsScene(grid_map_window):
         # painter.setClipping(False)  # 绘制完成后禁用裁剪
 
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing)
         # 恢复变换并重置所有变换
         painter.resetTransform()
         # 1. 绘制背景缓冲区
@@ -1564,8 +1685,8 @@ class myGraphicsScene(grid_map_window):
                     color = QColor(0,0,0)
                     if child.get_center_pos() is not None:
                         child.transfer_pos(self.sence_pos_mouse)
-                        self.draw_line_on_sence(painter,child.get_center_pos(),self.sence_pos_mouse)
-                        self.draw_circle_on_sence(painter,child.get_center_pos(),child.radius,color,child.get_fill())
+                        self.draw_line_on_sence(painter,child.get_center_pos(),self.sence_pos_mouse, dashed=True)
+                        self.draw_circle_on_sence(painter,child.get_center_pos(),child.radius,color,child.get_fill(), dashed=True)
             elif isinstance(child, rect_element):
                 if child.get_actived():
                     if child.constructed_by_draw:
@@ -1575,7 +1696,7 @@ class myGraphicsScene(grid_map_window):
                         child.move_to_pos(self.sence_pos_mouse.x(),self.sence_pos_mouse.y())
                         color = child.get_color()
                     if child.get_head_pos() is not None:
-                        self.draw_rect_on_sence(painter, child.get_center_pos(), child.scene_size,child.m_angle,color,child.get_fill(),child.get_line_width())
+                        self.draw_rect_on_sence(painter, child.get_center_pos(), child.scene_size,child.m_angle,color,child.get_fill(),child.get_line_width(), dashed=True)
             elif isinstance(child, line_element):
                 
                 if child.get_actived():
@@ -1584,7 +1705,7 @@ class myGraphicsScene(grid_map_window):
                     if child.get_head_pos() is not None:
                         head_pos = child.mapToScene(child.get_head_pos())
                         end_pos  = child.mapToScene(child.get_end_pos())
-                        self.draw_line_on_sence(painter,head_pos,end_pos,color,child.get_line_width())
+                        self.draw_line_on_sence(painter,head_pos,end_pos,color,child.get_line_width(), dashed=True)
                         # child.paint(painter,self.shine_flag)
             elif isinstance(child, text_element):
                 
@@ -1593,7 +1714,7 @@ class myGraphicsScene(grid_map_window):
                     if child.get_center_pos() is not None:
                         center_pos = child.get_center_pos()
                         size       = child.getSize()
-                        self.draw_text_on_sence(painter,center_pos,size,child.context,child.font_size)
+                        self.draw_text_on_sence(painter,center_pos,size,child.context,child.font_size, dashed=True)
             
             elif isinstance(child, image_element):
                 
@@ -1602,14 +1723,14 @@ class myGraphicsScene(grid_map_window):
                     if child.get_center_pos() is not None:
                         center_pos = child.get_center_pos()
                         size       = child.getSize()
-                        self.draw_image_on_sence(painter,center_pos,size)
+                        self.draw_image_on_sence(painter,center_pos,size, dashed=True)
         
         if self.__show_coordinate:
             # 恢复变换并重置所有变换
             painter.resetTransform()
             
             # 设置文本属性
-            text_pen = QPen(Qt.GlobalColor.black, 1)
+            text_pen = QPen(Qt.black, 1)
             painter.setPen(text_pen)
             font = painter.font()
             font.setPixelSize(12)
@@ -1632,10 +1753,10 @@ class myGraphicsScene(grid_map_window):
                 painter.drawText(QPointF(self.width()//6*(i+1), self.height() - 15), f"{(top_edge-b*(i+1)):.1f}")
 
 
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)  # 抗锯齿
+            painter.setRenderHint(QPainter.Antialiasing)  # 抗锯齿
             # 设置画笔和填充
-            painter.setPen(QPen(Qt.GlobalColor.black, 2))
-            painter.setBrush(QBrush(Qt.GlobalColor.black))  # 填充箭头
+            painter.setPen(QPen(Qt.black, 2))
+            painter.setBrush(QBrush(Qt.black))  # 填充箭头
             if not self.is_use_for_agv_map:
                 painter.drawText(QPointF(70, self.height() - 25), "X")
                 painter.drawText(QPointF(25, self.height() - 90), "Y")
@@ -1733,7 +1854,7 @@ class myGraphicsScene(grid_map_window):
     def mouseDoubleClickEvent(self, event: QMouseEvent):
         """鼠标双击事件"""
         super().mouseDoubleClickEvent(event)
-        if event.button() == Qt.MouseButton.LeftButton :
+        if event.button() == Qt.LeftButton :
             if self._mode == SceneMode.Design:
                 if False==self.double_click_select_handle():
                     self.set_current_select_item(self)#如果什么都没选中，则选中背景
@@ -1742,8 +1863,8 @@ class myGraphicsScene(grid_map_window):
 
     def mousePressEvent(self, event:QMouseEvent):
         """鼠标单击事件"""
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            if event.button() == Qt.MouseButton.LeftButton:
+        if event.modifiers() & Qt.ControlModifier:
+            if event.button() == Qt.LeftButton:
                 for child in self.findChildren(QObject):
                     if isinstance(child, base_element) :
                         if child.get_selected() and not child.is_has_parent():
@@ -1764,8 +1885,8 @@ class myGraphicsScene(grid_map_window):
             return
        
         super().mousePressEvent( event)
-        if event.button() == Qt.MouseButton.LeftButton:
-            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+        if event.button() == Qt.LeftButton:
+            if event.modifiers() & Qt.ShiftModifier:
                 self.multi_select_handle()
             else:
                 if False== self.single_select_handle():
@@ -1836,7 +1957,7 @@ class myGraphicsScene(grid_map_window):
                     child.transfer_end_pos(self.get_pos_from_mouse())
                     print(f"获得第1个点{self.get_pos_from_mouse()}")  
 
-        elif event.button() == Qt.MouseButton.RightButton:
+        elif event.button() == Qt.RightButton:
             if self.is_setting_group_pos:
                 pass
                
@@ -1862,16 +1983,16 @@ class myGraphicsScene(grid_map_window):
         # print(f"Key pressed: {event.key()}, modifiers: {event.modifiers()}")
         
         # 检测 Ctrl 键是否按下
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+        if event.modifiers() & Qt.ControlModifier:
             self.CTRL_pressed_flag = True
             print("CTRL pressed")
         else:
             self.CTRL_pressed_flag = False
             # 处理其他按键
-            if event.key() == Qt.Key.Key_Escape:
+            if event.key() == Qt.Key_Escape:
                 print("ESC pressed - clearing selection")
                 self.clearSelection()
-            elif event.key() == Qt.Key.Key_Delete:
+            elif event.key() == Qt.Key_Delete:
                 print("Delete pressed - deleting selected items")
                 self.deleteSelectedItems()
         
@@ -1882,7 +2003,7 @@ class myGraphicsScene(grid_map_window):
         print(f"Key released: {event.key()}, modifiers: {event.modifiers()}")
         
         # 检测 Ctrl 键是否释放
-        if event.key() == Qt.Key.Key_Control:
+        if event.key() == Qt.Key_Control:
             self.CTRL_pressed_flag = False
             self.frame_select.finish()
             print("CTRL released")
@@ -1922,7 +2043,7 @@ class myGraphicsScene(grid_map_window):
                     child.set_m_pos_init(child.pos())
 
 
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.LeftButton:
             print("松开鼠标左键")
             self.frame_select.finish()
         
@@ -1937,7 +2058,7 @@ class myGraphicsScene(grid_map_window):
     
     def handle_mouse_move(self,event):
         if self._mode == SceneMode.Design:
-            if event.modifiers() & Qt.KeyboardModifier.ControlModifier and hasattr(self,"move_flag") and self.move_flag:
+            if event.modifiers() & Qt.ControlModifier and hasattr(self,"move_flag") and self.move_flag:
                 for child in self.findChildren(QObject):
                     if isinstance(child, base_element) :
                         if child.get_selected() and not child.is_has_parent():
@@ -1990,7 +2111,7 @@ class myGraphicsScene(grid_map_window):
         if self.roll_dog_need_feed:
                 self.wheel_event_watcher.feed()
                 self.roll_dog_need_feed =False
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+        if event.modifiers() & Qt.ControlModifier:
             self.CTRL_wheel_rolling = True
             
 

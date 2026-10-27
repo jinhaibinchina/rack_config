@@ -1,8 +1,8 @@
 
 import math
 import enum
-from PyQt6.QtCore import QPointF
-from PyQt6.QtGui import QTransform 
+from PySide6.QtCore import QPointF
+from PySide6.QtGui import QTransform 
 
 
 class Transform:

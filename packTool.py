@@ -14,22 +14,22 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTextEdit, QListWidget, QFileDialog, QLabel, QLineEdit,
     QProgressBar, QGroupBox, QCheckBox, QMessageBox, QListWidgetItem,
     QScrollArea, QDialog, QDialogButtonBox, QPlainTextEdit, QComboBox,
     QFormLayout, QSpinBox
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QDateTime, pyqtSignal
-from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtWidgets import QInputDialog
+from PySide6.QtCore import Qt, QThread, Signal, QDateTime
+from PySide6.QtGui import QFont, QIcon
+from PySide6.QtWidgets import QInputDialog
 
 class PackagerThread(QThread):
     """基于 Spec 文件的打包线程"""
-    log_signal = pyqtSignal(str)
-    progress_signal = pyqtSignal(int)
-    finished_signal = pyqtSignal(bool, str)
+    log_signal = Signal(str)
+    progress_signal = Signal(int)
+    finished_signal = Signal(bool, str)
 
     def __init__(self, spec_file: Path, project_path: Path):
         super().__init__()

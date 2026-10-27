@@ -1,181 +1,35 @@
 
 from threading import Lock
-from PyQt6.QtCore import QRectF, QPointF
+from PySide6.QtCore import QRectF, QPointF
 
 from .my_common import SceneMode
-from .myGraphicsScene import myGraphicsScene, DEFAULT_BACKGROUND_COLOR
+from .myGraphicsScene import myGraphicsScene, DEFAULT_BACKGROUND_COLOR, debug_log
 
-from PyQt6.QtWidgets import QMainWindow, QApplication
+from PySide6.QtWidgets import QMainWindow, QApplication
 
-from PyQt6.QtWidgets import QMenu,QDialog,QSizePolicy
-from PyQt6.QtWidgets import ( QToolTip)
-from PyQt6.QtCore import Qt, QPointF, QRectF,pyqtSignal,QSize,QObject,QRect,QPoint,QTimer,QSizeF
-from PyQt6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack
+from PySide6.QtWidgets import QMenu,QDialog,QSizePolicy
+from PySide6.QtWidgets import ( QToolTip)
+from PySide6.QtCore import Qt, QPointF, QRectF,Signal,QSize,QObject,QRect,QPoint,QTimer,QSizeF
+from PySide6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack
 
 import json,sys,os,traceback
-from .my_elements import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
-from PyQt6.QtGui import QRegularExpressionValidator
-from PyQt6.QtCore import QRegularExpression
+from .elements import (
+    base_element,
+    circle_element,
+    group_element,
+    image_element,
+    line_element,
+    rect_element,
+    text_element,
+    triangle_element,
+)
+# from my_elements_v2 import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
+from PySide6.QtGui import QRegularExpressionValidator
+from PySide6.QtCore import QRegularExpression
 
-# from rect_params_ui import Ui_Dialog
-# from group_params_ui import Ui_Dialog as Group_params_Ui
-# from agv_test_ui import Ui_Dialog as agv_test_Ui
-# from property_set_ui import Ui_Dialog as property_set_Ui
+
 from .mySnapSystem import SnapSystem
 import copy
-
-# class property_set(QDialog):
-#     # clean_timer =Signal()
-#     def __init__(self,parent=None,rect_params=None):
-#         super().__init__(parent)
-#         self.ui = property_set_Ui()
-#         self.ui.setupUi(self)
-
-        
-#         self.rect_params_ref=rect_params
-    
-#     def accept(self):
-#         print("accept")
-#         self.rect_params_ref["line_width"] = self.ui.spinBox_lineWidth.value()
-#         self.rect_params_ref["font_size"]   = self.ui.spinBox_fontSize.value()
-#         self.rect_params_ref["fill"]   = self.ui.checkBox_fill.isChecked()
-#         if self.ui.radioButton_black.isChecked():
-#             self.rect_params_ref["color"]   = QColor(0,0,0)
-#         elif self.ui.radioButton_blue.isChecked():
-#             self.rect_params_ref["color"]   = QColor(0,0,255)
-#         elif self.ui.radioButton_green.isChecked():
-#             self.rect_params_ref["color"]   = QColor(0,255,0)
-#         elif self.ui.radioButton_yellow.isChecked():
-#             self.rect_params_ref["color"]   = QColor(255,255,0)
-#         elif self.ui.radioButton_red.isChecked():
-#             self.rect_params_ref["color"]   = QColor(255,0,0)
-        
-        
-#         return super().accept()
-    
-#     def reject(self):
-       
-#         return super().reject()
-#     def closeEvent(self, arg__1):
-        
-#         return super().closeEvent(arg__1)
-
-# class rect_params_setup(QDialog):
-#     # clean_timer =Signal()
-#     def __init__(self,parent=None,rect_params=None):
-#         super().__init__(parent)
-#         self.ui = Ui_Dialog()
-#         self.ui.setupUi(self)
-
-#         regex = QRegularExpression("^[1-9]\\d*$")
-#         validator = QRegularExpressionValidator(regex, self.ui.lineEdit_width)
-#         self.ui.lineEdit_width.setValidator(validator)
-#         self.ui.lineEdit_height.setValidator(validator)
-#         self.ui.lineEdit_width.setText("200")
-#         self.ui.lineEdit_height.setText("200")
-       
-   
-
-#         self.rect_params_ref=rect_params
-    
-#     def accept(self):
-#         print("accept")
-       
-#         self.rect_params_ref["height"] = int(self.ui.lineEdit_width.text())
-#         self.rect_params_ref["width"] = int(self.ui.lineEdit_height.text())
-        
-#         return super().accept()
-#     def reject(self):
-#         self.rect_params_ref = None
-#         return super().reject()
-#     def closeEvent(self, arg__1):
-#         self.rect_params_ref = None
-#         return super().closeEvent(arg__1)
-
-# class group_params_setup(QDialog):
-#     # clean_timer =Signal()
-#     def __init__(self,parent=None,rect_params=None):
-#         super().__init__(parent)
-#         self.ui = Group_params_Ui()
-#         self.ui.setupUi(self)
-
-#         regex = QRegularExpression("^[1-9]\\d*$")
-#         validator = QRegularExpressionValidator(regex, self.ui.lineEdit_group_id)
-#         self.ui.lineEdit_group_id.setValidator(validator)
-#         self.ui.lineEdit_group_id.setText("1")
-#         self.rect_params_ref=rect_params
-    
-#     def accept(self):
-#         print("accept")
-#         self.rect_params_ref["group_id"] = int(self.ui.lineEdit_group_id.text())
-#         self.rect_params_ref["group_name"]   = self.ui.lineEdit_group_name.text()
-#         return super().accept()
-    
-#     def reject(self):
-#         self.rect_params_ref = None
-#         return super().reject()
-#     def closeEvent(self, arg__1):
-#         self.rect_params_ref = None
-#         return super().closeEvent(arg__1)
-
-
-# class agv_test(QDialog):
-    
-#     def __init__(self,parent=None,manager =None):
-#         super().__init__(parent)
-#         self.ui = agv_test_Ui()
-#         self.ui.setupUi(self)
-#         self.parent =parent
-#         self.ui.Slider_x.valueChanged.connect(self.update_data)
-#         self.ui.Slider_y.valueChanged.connect(self.update_data)
-#         self.ui.Slider_a.valueChanged.connect(self.update_data)
-#         self.ui.Slider_angle_F.valueChanged.connect(self.update_data)
-#         self.ui.Slider_angle_B.valueChanged.connect(self.update_data)
-       
-#         self.scene_manager = manager
-#         # self.rect_params_ref=rect_params
-
-#     def update_data(self):
-#         id =self.ui.spinBox_group_id.value()
-#         x = self.ui.Slider_x.value()
-#         y = self.ui.Slider_y.value()
-#         a = self.ui.Slider_a.value()
-#         angle_F =self.ui.Slider_angle_F.value()
-#         angle_B =self.ui.Slider_angle_B.value()
-
-#         if self.parent or True:
-           
-#             element =   self.scene_manager.m_items[id]
-#             element.move_to_pos(x,y)
-#             element.rotate_to_ang(a)
-
-
-# class circle_params_setup(QDialog):
-#     # clean_timer =Signal()
-#     def __init__(self,parent=None,rect_params=None):
-#         super().__init__(parent)
-#         self.ui = Ui_Dialog()
-#         self.ui.setupUi(self)
-
-#         regex = QRegularExpression("^[1-9]\\d*$")
-#         validator = QRegularExpressionValidator(regex, self.ui.lineEdit_width)
-#         self.ui.lineEdit_width.setValidator(validator)
-#         self.ui.lineEdit_height.setValidator(validator)
-#         self.ui.lineEdit_width.setText("200")
-#         self.ui.lineEdit_height.setText("200")
-#         self.ui.combo_color.addItems(["黑","绿","蓝"])
-#         # self.ui.lineEdit_width.editingFinished.connect()
-
-#         self.rect_params_ref=rect_params
-    
-#     def accept(self):
-#         print("accept")
-       
-#         self.rect_params_ref["height"] = int(self.ui.lineEdit_width.text())
-#         self.rect_params_ref["width"] = int(self.ui.lineEdit_height.text())
-#         self.rect_params_ref["info"]   = self.ui.lineEdit_info.text()
-#         self.rect_params_ref["color"]   =self.ui.combo_color.currentIndex()
-#         self.rect_params_ref["fill"]   = self.ui.checkBox_isFill.isChecked()
 
 
 
@@ -389,20 +243,55 @@ class QuadtreeNode:
 
 class SceneSerializer:
     @staticmethod
-    def get_json_path(filename: str):
+    def get_json_path(relative_path=""):
+        """获取json文件路径
+        Args:
+            relative_path: 相对于exe或脚本目录的子路径，如"config/data.json"
+        """
         if getattr(sys, 'frozen', False):
-            
-            from pathlib import Path
+            try:
+            # PyInstaller 创建的临时文件夹，包含所有添加的资源文件
+                base_dir = sys._MEIPASS
+            except AttributeError:
+                # 如果 _MEIPASS 不存在，回退到可执行文件目录
+                base_dir = os.path.dirname(sys.executable)
+
+
+
             # 打包后的可执行文件路径（如 PyInstaller）
-            # app_dir = os.path.dirname(sys.executable)
-            app_dir = Path(sys._MEIPASS)
-            return os.path.join(app_dir, "myDesigner", "data.json")
+            # base_dir = os.path.dirname(sys.executable)
         else:
             # 脚本文件所在路径
-            app_dir = os.path.dirname(os.path.abspath(__file__))
-
-            return os.path.join(app_dir,filename)
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # 处理相对路径
+        if relative_path:
+            return os.path.join(base_dir, relative_path)
+        return os.path.join(base_dir, "data.json")
     
+
+
+    # def get_json_path():
+    #     if getattr(sys, 'frozen', False):
+    #         # 打包后的可执行文件路径（如 PyInstaller）
+    #         app_dir = os.path.dirname(sys.executable)
+    #     else:
+    #         # 脚本文件所在路径
+    #         app_dir = os.path.dirname(os.path.abspath(__file__))
+
+    #     return os.path.join(app_dir, "data.json")
+
+
+    @staticmethod
+    def item_to_dict(item):
+        """Serialize one element including its design-time event bindings."""
+
+        data = item.to_dict()
+        events = item.event_bindings_to_dict()
+        if events:
+            data["events"] = events
+        return data
+
     @staticmethod
     def serialize_scene(scene: myGraphicsScene, filename: str):
         """将场景序列化为JSON文件"""
@@ -426,7 +315,7 @@ class SceneSerializer:
                 "height": view_rect.height()
             },
             # Page background colour, written as ``#aarrggbb``.
-            "backgroundColor": background_color.name(QColor.NameFormat.HexArgb),
+            "backgroundColor": background_color.name(QColor.HexArgb),
             "items": []
         }
         for item in scene.findChildren(base_element):
@@ -435,13 +324,14 @@ class SceneSerializer:
 
             # 处理不同类型的图元
             if isinstance(item, base_element) :
-                scene_data["items"].append(item.to_dict()) 
+                scene_data["items"].append(SceneSerializer.item_to_dict(item)) 
             # elif isinstance(item, group_element):
             #     scene_data["items"].append(item.to_dict()) 
             # 可以继续添加其他图元类型的处理...
 
         
-        # 统一写到 get_json_path() 解析出的文件，避免额外产生一个工作目录副本
+        # with open(filename, 'w') as f:
+        #     json.dump(scene_data, f, indent=4)
 
 
    
@@ -465,9 +355,13 @@ class SceneSerializer:
 
 
         json_path=SceneSerializer.get_json_path(filename)
+        if not os.path.isfile(json_path):
+            # A brand-new design page has no file yet; treat it as empty
+            # instead of aborting the application startup.
+            print(f"场景文件不存在，按空场景处理: {json_path}")
+            return
         with open(json_path, "r", encoding="utf-8") as f:
             scene_data = json.load(f)  # 解析为 Python 字典或列表
-            print("提取的数据:", scene_data)
         
         # for item in scene.findChildren(base_element):
         #     item.deleteLater()
@@ -477,12 +371,6 @@ class SceneSerializer:
 
 
 
-        # # 设置场景尺寸
-        # rect_data = scene_data["sceneRect"]
-        # scene.setSceneRect(QRectF(
-        #     rect_data["x"], rect_data["y"],
-        #     rect_data["width"], rect_data["height"]
-        # ))
         # The serialized sceneRect is the design/run view range, not the
         # quadtree's world bounds, so it must not be passed to setSceneRect().
         view_rect = None
@@ -540,6 +428,9 @@ class SceneSerializer:
                 item.set_scene_manager_ref(scene.scene_manager)
                 id =item.id()
                 item.completed(True)
+                item.apply_event_bindings(
+                    item_data.get("events") or item_data.get("event_bindings")
+                )
                 if id>max_id:
                     max_id = id
 
@@ -550,47 +441,51 @@ class SceneSerializer:
             # Applied immediately for an already-visible scene, otherwise
             # deferred until showEvent() gives the widget its final size.
             scene.set_view_scene_rect(view_rect)
+
+
+        debug_log(scene.scene_manager.m_name_items)
         # for  id,item in      scene.scene_manager.m_items:
         #     if item.m_parent_id>0:
     
 
 
 class QuadTreeScene(myGraphicsScene):
-    action_begin_draw_line   =pyqtSignal()
-    action_begin_draw_rect   =pyqtSignal()
-    action_begin_draw_circle =pyqtSignal()
-    action_begin_draw_triangle =pyqtSignal()
-    action_begin_new_rect    =pyqtSignal(dict)
-    action_begin_new_text    =pyqtSignal()
-    action_begin_new_image   =pyqtSignal()
-    action_set_parent        =pyqtSignal()
-    action_set_group         =pyqtSignal(list)# 图元编辑成组
-    scene_updated            =pyqtSignal()
-    quadtree_updated         =pyqtSignal()
+    action_begin_draw_line   =Signal()
+    action_begin_draw_rect   =Signal()
+    action_begin_draw_triangle =Signal()
+    action_begin_draw_circle =Signal()
+    action_begin_new_rect    =Signal(dict)
+    action_begin_new_text    =Signal()
+    action_begin_new_image   =Signal()
+    action_set_parent        =Signal()
+    action_set_group         =Signal(list)# 图元编辑成组
+    scene_updated            =Signal()
+    quadtree_updated         =Signal()
+
     
-    item_GeometryChange      =pyqtSignal(base_element)
-    item_DirtyChange         =pyqtSignal(base_element)
+    item_GeometryChange      =Signal(base_element)
+    item_DirtyChange         =Signal(base_element)
 
-    hover_sta_change = pyqtSignal(base_element)
+    hover_sta_change = Signal(base_element)
 
-    run_mode_station_change = pyqtSignal(str)#切换子站点显示
+    run_mode_station_change = Signal(SceneMode)#切换子站点显示
 
     # (variable_name, value, source_element, event_name)
-    variable_written = pyqtSignal(str, object, object, str)
+    variable_written = Signal(str, object, object, str)
 
-    
+    double_clicked_without_group = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         
-        # self.setMinimumSize(300,300)
+        self.setMinimumSize(300,300)
         # self.setWindowFlags(Qt.FramelessWindowHint)
         # self.setAttribute(Qt.WA_TranslucentBackground)
         self.setSizePolicy(
-            QSizePolicy.Policy.Expanding,  # 水平策略：可扩展
-            QSizePolicy.Policy.Expanding   # 垂直策略：可扩展
+            QSizePolicy.Expanding,  # 水平策略：可扩展
+            QSizePolicy.Expanding   # 垂直策略：可扩展
             )
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 允许接收事件
+        self.setFocusPolicy(Qt.StrongFocus)  # 允许接收事件
 
         self.quadtree = None
         self.boundingRect_old = {}
@@ -598,8 +493,22 @@ class QuadTreeScene(myGraphicsScene):
         # self.dirtyRegion = QRegion()#脏区域集
         
         
-        self.setSceneRect(QRectF(QPointF(-50000.0,-50000.0),QPointF(50000.0,50000.0)))
-        # self.statusBar = parent.status_bar
+        self.setSceneRect(QRectF(QPointF(-100000.0,-100000.0),QPointF(100000.0,100000.0)))
+        # Design-mode pages are also created without a MainWindow that owns a
+        # status bar, so do not rely on that attribute being present.
+        self.statusBar = getattr(parent, "status_bar", None)
+        # Optional per-scene file used by the built-in context-menu save/load
+        # actions.  None keeps the legacy datas/data.json behaviour.
+        self.scene_file_path = None
+
+        # Runtime variables written by group event bindings.  A run-mode host
+        # may additionally install ``variable_writer`` to forward them to PLC.
+        self.runtime_variables = {}
+        self.variable_writer = None
+        # Run-mode hosts install a callable here; element event bindings then
+        # resolve ``{"handler": "name", "args": {...}}`` through it.
+        self.event_handler_resolver = None
+        self._event_pressed_group = None
 
         self.copied_items = []  # 存储复制的图元
         self.all_copied_items = []  # 存储复制的图元
@@ -608,7 +517,7 @@ class QuadTreeScene(myGraphicsScene):
 
         self.snapSys = SnapSystem(self,self.scene_units_per_grid_x/self.grid_size*self.scale_factor*10,self.map_scene_to_screen)
         self.snapSys.move_item_to_snap_pos.connect(self.move_item_to_snap_pos)
-        self.mouse_not_move_signal.connect(lambda:self.snapSys.move_cursor_to_snaped_pos_V2(self.snapSys.current_snap_pos,not self.menu_opened and self.cursor_inside_flag and self.is_show_grid()))
+        self.mouse_not_move_signal.connect(lambda:self.snapSys.move_cursor_to_snaped_pos_V2(self.snapSys.current_snap_pos,not self.menu_opened and self.cursor_inside_flag and self.is_show_grid() and self.snap_auto_enabled()))
 
         self.set_snap_sys_ref(self.snapSys)
 
@@ -623,26 +532,27 @@ class QuadTreeScene(myGraphicsScene):
         self.update_callback         = None
         self.__load_done = False
 
-        # 运行态点击事件：记录按下时命中的图元组，松开时据此判定 click。
-        self.runtime_variables = {}
-        self.variable_writer = None
-        # 运行态宿主可安装 callable；图元事件绑定的 handler 通过它分发。
-        self.event_handler_resolver = None
-        self._event_pressed_group = None
-
         # 提高渲染频率，减少拖影
-     
+
         self.render_timer.timeout.connect(self.on_render_frame)
         # # 确保拖动时也能及时更新
         # self.setRenderHint(QPainter.Antialiasing | QPainter.SmoothPixmapTransform | QPainter.TextAntialiasing)
         self.frame_count =0
         # 使用高精度定时器
         self.frame_count_timer = QTimer()
-        self.frame_count_timer.setTimerType(Qt.TimerType.PreciseTimer)  # 高精度模式
+        self.frame_count_timer.setTimerType(Qt.PreciseTimer)  # 高精度模式
         self.frame_count_timer.timeout.connect(self.handle_frame_count)
         self.frame_count_timer.start(1000)
 
         self.set_scene_mode(SceneMode.Run)
+
+    def snap_auto_enabled(self) -> bool:
+        """鼠标停止移动时是否自动吸附到捕捉点。
+
+        运行模式保持自动吸附；设计模式（DesignScene）覆盖为 False，
+        只按快捷键 T 手动吸附。
+        """
+        return True
 
     def loadDone(self):
         return self.__load_done
@@ -658,10 +568,10 @@ class QuadTreeScene(myGraphicsScene):
             self.show_coordinate(True)
         self._mode =mode
         if mode != SceneMode.Run:
-            # 离开运行态时丢弃按下状态，避免切换后残留 pressed/toggle。
             if self._event_pressed_group is not None:
                 self._event_pressed_group.cancel_mouse_press()
             self._event_pressed_group = None
+        self.run_mode_station_change.emit(mode)
 
     # ------------------------------------------------------------------
     # Group event bindings (run mode)
@@ -719,7 +629,8 @@ class QuadTreeScene(myGraphicsScene):
         """Run every serialized ``attach`` binding once after page load.
 
         ``attach`` is not a mouse event: it lets a handler establish the
-        initial visual state without duplicating that logic in a click handler.
+        initial visual state (for example hide the alarm image of a safety
+        door) without duplicating that logic in a click handler.
         """
 
         manager = getattr(self, "scene_manager", None)
@@ -777,8 +688,13 @@ class QuadTreeScene(myGraphicsScene):
 
     def toggle_sence_mode(self):
         if self._mode==SceneMode.Design:
+            for item in self.findChildren(base_element):
+                item.set_selectable(False)
             self.set_scene_mode(SceneMode.Run)
         else:
+            for item in self.findChildren(base_element):
+                item.set_selectable(True)
+                item.set_visibility(True)
             self.set_scene_mode(SceneMode.Design)
 
     def handle_frame_count(self):
@@ -841,7 +757,8 @@ class QuadTreeScene(myGraphicsScene):
         self._ready_for_update = False
 
         if self.update_callback and callable(self.update_callback):
-            self.update_callback()
+            if self._mode==SceneMode.Run:
+                self.update_callback()
             
         if self.needs_redraw:
             self.needs_redraw = False
@@ -984,14 +901,18 @@ class QuadTreeScene(myGraphicsScene):
 
     def mouseMoveEvent(self, event):
 
+        # ``super().mouseMoveEvent`` refreshes ``sence_pos_mouse`` from this
+        # event, so evaluate snapping afterwards.  Doing it before used the
+        # previous mouse sample, which made a fast move to a grid intersection
+        # stop one event short of the actual position.
+        super().mouseMoveEvent(event)
         self.on_mouse_move(self.sence_pos_mouse)
-        super().mouseMoveEvent( event)
        
     
     def mousePressEvent(self, event):
         super().mousePressEvent( event)
 
-        if event.button() == Qt.MouseButton.LeftButton and self._mode == SceneMode.Run:
+        if event.button() == Qt.LeftButton and self._mode == SceneMode.Run:
             previous = self._event_pressed_group
             if previous is not None:
                 previous.handle_mouse_release(False)
@@ -1001,10 +922,10 @@ class QuadTreeScene(myGraphicsScene):
             if self._event_pressed_group is not None:
                 self._event_pressed_group.handle_mouse_press()
         
-        if event.button() == Qt.MouseButton.RightButton:
+        if event.button() == Qt.RightButton:
             if self.is_setting_father or self.is_setting_base_pos:
                 event.ignore()  # 明确忽略事件，阻止传递到contextMenuEvent
-                self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)  # 完全禁用默认右键菜单
+                self.setContextMenuPolicy(Qt.NoContextMenu)  # 完全禁用默认右键菜单
                 
                 # self.is_setting_group_pos = False
                 self.is_setting_father = False
@@ -1014,8 +935,8 @@ class QuadTreeScene(myGraphicsScene):
                 return  # 直接返回，确保不会继续处理
             else:
                 print("------------")
-                self.setContextMenuPolicy(Qt.ContextMenuPolicy.DefaultContextMenu)
-        elif event.button() == Qt.MouseButton.MiddleButton:
+                self.setContextMenuPolicy(Qt.DefaultContextMenu)
+        elif event.button() == Qt.MiddleButton:
             area = QRectF(QPointF(-50000.0,-50000.0),QPointF(50000.0,50000.0))
             items = self.items_in_area(area)
             print(items)
@@ -1023,21 +944,33 @@ class QuadTreeScene(myGraphicsScene):
       
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent( event)
+        
 
-        if event.button() == Qt.MouseButton.LeftButton and self._mode == SceneMode.Run:
+
+
+
+
+        if event.button() == Qt.LeftButton and self._mode == SceneMode.Run:
             group = self._event_pressed_group
             self._event_pressed_group = None
             if group is not None:
-                rect = group.sceneBoundingRect()
-                inside = (
-                    isinstance(rect, QRectF)
-                    and rect.contains(self._event_scene_pos(event))
+                group.handle_mouse_release(
+                    group.contains_scene_pos(self._event_scene_pos(event))
                 )
-                group.handle_mouse_release(inside)
 
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        if event.button() == Qt.LeftButton and self._mode == SceneMode.Run:
+            group = self._find_event_group_at(self._event_scene_pos(event))
+            if group is None:
+                self.double_clicked_without_group.emit()
 
     def on_menu_closed(self):
         self.menu_opened = False
+
+    def extend_context_menu(self, menu):
+        """Hook for subclasses that want to append their own actions."""
+
     def contextMenuEvent(self, event):
         """鼠标右键按下时（默认行为）：
             当用户按下并释放鼠标右键后，若未在 mousePressEvent 或 mouseReleaseEvent 中拦截事件，系统会自动触发 contextMenuEvent。
@@ -1054,6 +987,78 @@ class QuadTreeScene(myGraphicsScene):
                     set_group_zValue(child,val)
             else:
                 item.set_zValue(val)
+        
+        def add_zValue_group(item:base_element,val):
+            if item.is_has_child():
+                item.set_zValue(val+ item.zValue())
+                for child in item.childItems():
+                    add_zValue_group(child,val)
+            else:
+                item.set_zValue(val+ item.zValue())
+
+        def handle_go_top():
+            def get_min_zValue_in_group(item:base_element):
+                min_val =9999
+                            # 当前节点的 zValue 参与比较
+                min_val = min(min_val, item.zValue())
+
+                # 如果有子节点，递归查找最小值
+                if item.is_has_child():
+                    for child in item.childItems():
+                        child_min = get_min_zValue_in_group(child)
+                        min_val = min(min_val, child_min)
+                return min_val
+
+            print("上移到顶")
+            max_val= -9999
+            for child in self.findChildren(base_element):
+                if child.zValue()>max_val:
+                    max_val = child.zValue()
+            min_in_selected = 9999
+           
+
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    min_in_selected =get_min_zValue_in_group(child)
+
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    if isinstance(child,group_element):
+                        add_zValue_group(child, max_val-min_in_selected+1)
+                    else:
+                        child.set_zValue( max_val + 1 )
+
+        def handle_go_bottom():
+            def get_max_zValue_in_group(item:base_element):
+                max_val =9999
+                            # 当前节点的 zValue 参与比较
+                max_val = min(max_val, item.zValue())
+
+                # 如果有子节点，递归查找最小值
+                if item.is_has_child():
+                    for child in item.childItems():
+                        child_min = get_max_zValue_in_group(child)
+                        max_val = min(max_val, child_min)
+                return max_val
+
+            print("移到最底")
+            min_val= 9999
+            for child in self.findChildren(base_element):
+                if child.zValue()<min_val:
+                    min_val = child.zValue()
+
+            max_in_selected = 9999
+
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    max_in_selected =get_max_zValue_in_group(child)
+
+            for child in self.findChildren(base_element):
+                if child.get_selected():
+                    if isinstance(child,group_element):
+                        add_zValue_group(child, -(max_in_selected-min_val+1))
+                    else:
+                        child.set_zValue(min_val - 1 )
         #     return
         self.menu_opened = True
         menu                   = QMenu(self)
@@ -1067,8 +1072,8 @@ class QuadTreeScene(myGraphicsScene):
         menu.aboutToHide.connect(self.on_menu_closed)
         action_line           = menu.addAction("绘制直线")
         action_rect           = menu.addAction("绘制矩形")
-        action_circle         = menu.addAction("绘制圆")
         action_triangle       = menu.addAction("绘制三角形")
+        action_circle         = menu.addAction("绘制圆")
         action_new_image       = menu.addAction("新建图片")
         action_new_text       = menu.addAction("新建标签")
         action_fill_unfill    = menu.addAction("填充/不填充")
@@ -1093,6 +1098,7 @@ class QuadTreeScene(myGraphicsScene):
        
         action_save_widget    = menu.addAction("保存控件")
         action_agv_test       = menu.addAction("agv test")
+        self.extend_context_menu(menu)
         selected_action       = menu.exec(event.globalPos())
         
         if selected_action == action_line:
@@ -1101,12 +1107,12 @@ class QuadTreeScene(myGraphicsScene):
         elif selected_action == action_rect:
             print("绘制矩形")
             self.action_begin_draw_rect.emit()
+        elif selected_action == action_triangle:
+            print("绘制三角形")
+            self.action_begin_draw_triangle.emit()
         elif   selected_action == action_circle:
             print("绘制圆")
             self.action_begin_draw_circle.emit()
-        elif   selected_action == action_triangle:
-            print("绘制三角形")
-            self.action_begin_draw_triangle.emit()
         elif   selected_action == action_new_image:
             print("新建图片")
             self.action_begin_new_image.emit()
@@ -1154,10 +1160,10 @@ class QuadTreeScene(myGraphicsScene):
             self.delete_all_elements()
         elif selected_action == action_save:
             print("save")
-            self.save_element_info()
+            self.save_element_info(self.scene_file_path or "datas/data.json")
         elif selected_action == action_load:
             print("load")
-            self.load_element_info()
+            self.load_element_info(self.scene_file_path or "datas/data.json")
         elif selected_action == action_set_group:
             """编辑成组"""
             if not hasattr(self,"has_selected_flag"):
@@ -1202,7 +1208,7 @@ class QuadTreeScene(myGraphicsScene):
                 return
             del self.has_selected_flag
             self.is_setting_base_pos = True
-            self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)  # 完全禁用默认右键菜单
+            self.setContextMenuPolicy(Qt.NoContextMenu)  # 完全禁用默认右键菜单
         
         elif selected_action == action_set_father:
             """设置父图元"""
@@ -1260,17 +1266,38 @@ class QuadTreeScene(myGraphicsScene):
                         child.free_group()
 
         elif selected_action == action_go_top:
-            print("上移到顶")
-            max= -1
-            for child in self.findChildren(base_element):
-                if child.zValue()>max:
-                    max = child.zValue()
-            for child in self.findChildren(base_element):
-                if child.get_selected():
-                    if isinstance(child,group_element):
-                        set_group_zValue(child,max+ 1 )
-                    else:
-                        child.set_zValue(max+1 )
+            handle_go_top()
+            
+            # def get_min_zValue_in_group(item:base_element):
+            #     min_val =9999
+            #                 # 当前节点的 zValue 参与比较
+            #     min_val = min(min_val, item.zValue())
+
+            #     # 如果有子节点，递归查找最小值
+            #     if item.is_has_child():
+            #         for child in item.childItems():
+            #             child_min = get_min_zValue_in_group(child)
+            #             min_val = min(min_val, child_min)
+            #     return min_val
+
+            # print("上移到顶")
+            # max_val= -9999
+            # for child in self.findChildren(base_element):
+            #     if child.zValue()>max_val:
+            #         max_val = child.zValue()
+            # min_in_selected = 9999
+           
+
+            # for child in self.findChildren(base_element):
+            #     if child.get_selected():
+            #         min_in_selected =get_min_zValue_in_group(child)
+
+            # for child in self.findChildren(base_element):
+            #     if child.get_selected():
+            #         if isinstance(child,group_element):
+            #             add_zValue_group(child, max_val-min_in_selected+1)
+            #         else:
+            #             child.set_zValue( max_val + 1 )
 
         elif selected_action == action_go_up:
             print("上移")
@@ -1292,17 +1319,37 @@ class QuadTreeScene(myGraphicsScene):
                         child.set_zValue(child.zValue() - 1)
         
         elif selected_action == action_go_bottom:
-            print("移到最底")
-            min= 999
-            for child in self.findChildren(base_element):
-                if child.zValue()<min:
-                    min = child.zValue()
-            for child in self.findChildren(base_element):
-                if child.get_selected():
-                    if isinstance(child,group_element):
-                        set_group_zValue(child,min-1)
-                    else:
-                        child.set_zValue(min-1)
+            handle_go_bottom()
+            # def get_max_zValue_in_group(item:base_element):
+            #     max_val =9999
+            #                 # 当前节点的 zValue 参与比较
+            #     max_val = min(max_val, item.zValue())
+
+            #     # 如果有子节点，递归查找最小值
+            #     if item.is_has_child():
+            #         for child in item.childItems():
+            #             child_min = get_max_zValue_in_group(child)
+            #             max_val = min(max_val, child_min)
+            #     return max_val
+
+            # print("移到最底")
+            # min_val= 9999
+            # for child in self.findChildren(base_element):
+            #     if child.zValue()<min_val:
+            #         min_val = child.zValue()
+
+            # max_in_selected = 9999
+
+            # for child in self.findChildren(base_element):
+            #     if child.get_selected():
+            #         max_in_selected =get_max_zValue_in_group(child)
+
+            # for child in self.findChildren(base_element):
+            #     if child.get_selected():
+            #         if isinstance(child,group_element):
+            #             add_zValue_group(child, -(max_in_selected-min_val+1))
+            #         else:
+            #             child.set_zValue(min_val - 1 )
            
            
 
@@ -1325,9 +1372,9 @@ class QuadTreeScene(myGraphicsScene):
                         self.current_widget_to_save = child
 
         elif selected_action == action_agv_test:
-            return
-            # top_window=agv_test(self,self.scene_manager)
-            # top_window.exec()
+         
+            top_window=agv_test(self,self.scene_manager)
+            top_window.exec()
 
 
     def save_current_widget(self,item:text_element):
@@ -1399,45 +1446,94 @@ class QuadTreeScene(myGraphicsScene):
 
         for  item in self.all_copied_items:   
             item.set_scene_ref(self)
-            item.set_scene_manager_ref(self.scene_manager)
             new_id = self.scene_manager.m_idGenerator.generateID()
             item.setID(new_id)
 
-            if  isinstance(item,group_element)  :
-                name = "组_"
-                while item.set_name(name + str(group_element.count))==False:
-                    # name += str(group_element.count)+"_"
-                    group_element.count+=1
-            elif isinstance(item,triangle_element)  :
-                name = "三角形_"
-                while item.set_name(name + str(triangle_element.count))==False:
-                    triangle_element.count+=1
-            elif isinstance(item,rect_element)  :
-                name = "矩形_"
-                while item.set_name(name + str(rect_element.count))==False:
-                    # name += str(rect_element.count)+"_"
-                    rect_element.count+=1
-            elif isinstance(item,line_element):
-                name = "直线_"
-                while item.set_name(name + str(line_element.count))==False:
-                    # name += str(line_element.count)+"_"
-                    line_element.count+=1
-            elif isinstance(item,circle_element):
-                name = "圆_"
-                while item.set_name(name + str(circle_element.count))==False:
-                    # name += str(circle_element.count)+"_"
-                    circle_element.count+=1
-            elif isinstance(item,text_element):
-                name = "文本_"
-                while item.set_name(name + str(text_element.count))==False:
-                    # name += str(text_element.count)+"_"
-                    text_element.count+=1
-            elif isinstance(item,image_element):
-                name = "图片_"
-                while item.set_name(name + str(image_element.count))==False:
-                    # name += str(text_element.count)+"_"
-                    image_element.count+=1
+        # ------------------------------------------------------------------
+        # 命名：顶层图元在这里确定名字，组内成员只替换组名前缀。
+        # 例如组“组1”的成员“组1_abc”复制后得到组“组1_2”、成员“组1_2_abc”，
+        # 成员名不会再追加 _2 之类的后缀。
+        # 这一步还没有绑定 manager，_rename_item 只改名字，不会动名字表。
+        # ------------------------------------------------------------------
+        reserved_names = set()
 
+        def name_in_use(name: str) -> bool:
+            return name in reserved_names or name in self.scene_manager.m_name_items
+
+        def free_name(candidate: str) -> str:
+            name = candidate
+            index = 2
+            while name_in_use(name):
+                name = f"{candidate}_{index}"
+                index += 1
+            reserved_names.add(name)
+            return name
+
+        def default_name_args(item: base_element):
+            """返回该图元默认名称的前缀与计数器。"""
+
+            if isinstance(item, group_element):
+                return "组_", group_element
+            if isinstance(item, triangle_element):
+                return "三角形_", triangle_element
+            if isinstance(item, rect_element):
+                return "矩形_", rect_element
+            if isinstance(item, line_element):
+                return "直线_", line_element
+            if isinstance(item, circle_element):
+                return "圆_", circle_element
+            if isinstance(item, text_element):
+                return "文本_", text_element
+            return "图片_", image_element
+
+        def next_default_name(prefix: str, counter_holder) -> str:
+            """沿用“类型_序号”命名，跳过已被占用的名字。"""
+
+            while True:
+                name = f"{prefix}{counter_holder.count}"
+                if not name_in_use(name):
+                    reserved_names.add(name)
+                    return name
+                counter_holder.count += 1
+
+        def rename_members(item: base_element, old_prefix: str, new_prefix: str):
+            """把子树里的组名前缀换成新组名前缀。
+
+            旧工程里的成员名可能还没有组名前缀，或者改写后的名字已被占用，
+            这类成员退回默认命名，避免覆盖已有的名字。
+            """
+
+            name = str(item.get_name() or "")
+            if old_prefix and name.startswith(old_prefix):
+                base = name[len(old_prefix):]
+            else:
+                base = name
+            candidate = f"{new_prefix}{base}" if (new_prefix and base) else ""
+            if candidate and not name_in_use(candidate):
+                reserved_names.add(candidate)
+                item._rename_item(candidate)
+            else:
+                item._rename_item(next_default_name(*default_name_args(item)))
+            for child in list(item.m_children):
+                rename_members(child, old_prefix, new_prefix)
+
+        for item in self.copied_items:
+            old_name = str(item.get_name() or "")
+            if isinstance(item, group_element):
+                if old_name:
+                    new_name = free_name(old_name)
+                else:
+                    new_name = next_default_name("组_", group_element)
+                item._rename_item(new_name)
+                if old_name:
+                    for child in list(item.m_children):
+                        rename_members(child, f"{old_name}_", f"{new_name}_")
+            else:
+                item._rename_item(next_default_name(*default_name_args(item)))
+
+        # 名字定下来后再绑定 manager 并入库，名字表里保存的就是最终名字。
+        for item in self.all_copied_items:
+            item.set_scene_manager_ref(self.scene_manager)
             item.completed(True)
 
         for item in self.scene_manager.m_items.values():
@@ -1486,19 +1582,23 @@ class QuadTreeScene(myGraphicsScene):
             child.Delete()
         self.quadtree.remove_all()
         self.update()
-    def save_element_info(self):
-        SceneSerializer.serialize_scene(self, "data.json")
+    def save_element_info(self, filename="datas/data.json"):
+        """Serialize the scene.
+
+        The default keeps the legacy run-mode behaviour, while design-mode
+        pages pass their own absolute page file path.
+        """
+        SceneSerializer.serialize_scene(self, filename)
 
 
-    def load_element_info(self):
+    def load_element_info(self, filename="data.json"):
         self.delete_all_elements()
-        SceneSerializer.deserialize_scene(self, "data.json")
+        SceneSerializer.deserialize_scene(self, filename)
         self.update()
         self.__load_done = True
-
-    def load_element_info2(self):
+    def load_element_info2(self, filename="data2.json"):
         self.delete_all_elements()
-        SceneSerializer.deserialize_scene(self, "data2.json")
+        SceneSerializer.deserialize_scene(self, filename)
         self.update()
         self.__load_done = True
     
@@ -1648,8 +1748,8 @@ class IDGenerator:
 
 
 class SceneManager(QObject):
-    delete_item_signal = pyqtSignal(base_element)
-    completed_item_signal =pyqtSignal(base_element,bool)
+    delete_item_signal = Signal(base_element)
+    completed_item_signal =Signal(base_element,bool)
 
     def __init__(self, scene:QuadTreeScene, undo_stack=None, parent=None):
         super().__init__(parent)
@@ -1659,9 +1759,9 @@ class SceneManager(QObject):
         self.m_idGenerator = IDGenerator()
         self.m_scene = scene        # QuadTreeScene实例
         self.m_undoStack = undo_stack  # QUndoStack实例
-        self.delete_item_signal.connect(self.deleteItem,Qt.ConnectionType.UniqueConnection)
-        self.completed_item_signal.connect(self.addItem,Qt.ConnectionType.UniqueConnection)
-
+        self.delete_item_signal.connect(self.deleteItem,Qt.UniqueConnection)
+        self.completed_item_signal.connect(self.addItem,Qt.UniqueConnection)
+        
     # # 创建图元
     # def createItem(self, item_class, *args, **kwargs):
     #     item = item_class(*args, **kwargs)  # 动态创建图元
@@ -1764,7 +1864,7 @@ class SceneManager(QObject):
         construct_from_dict = arg[1]
         # 注册到管理容器
         self.m_items[item.id()] = item
-        print(self.m_items.keys())
+        debug_log(self.m_items.keys())
        
         self.m_scene.addItem(item)
 
@@ -1773,7 +1873,7 @@ class SceneManager(QObject):
         self.sort_items_by_zValue()
         
         
-        print(f"加入id:{item.id()}type:{item.type}到了场景")
+        debug_log(f"加入id:{item.id()}type:{item.type}到了场景")
 
     def re_addItem_to_tree(self,id):
         
@@ -1794,7 +1894,7 @@ class SceneManager(QObject):
             if item_id==item.id():
                 del self.m_name_items[item_name]
         self.sort_items_by_zValue()
-        print(self.m_items.keys() , self.m_name_items)
+        debug_log(self.m_items.keys(), self.m_name_items)
     
         
 

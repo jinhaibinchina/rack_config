@@ -1,6 +1,6 @@
 
 
-# from PyQt6.QtCore import pyqtSignal,QObject
+# from PySide6.QtCore import Signal,QObject
 
 
 

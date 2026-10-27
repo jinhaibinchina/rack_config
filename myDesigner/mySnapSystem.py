@@ -1,11 +1,49 @@
 import math
+import sys
 from collections import defaultdict
-from PyQt6.QtCore import Qt, QPointF,QPoint, QRectF,pyqtSignal,QTimer,QObject
-from PyQt6.QtGui import QCursor,QPainter,QPen, QColor
+from PySide6.QtCore import Qt, QPointF,QPoint, QRectF,Signal,QTimer,QObject
+from PySide6.QtGui import QCursor,QPainter,QPen, QColor
 import math
 
+# On macOS, ``QCursor.setPos()`` is silently ignored in some PySide6/Cocoa
+# setups (the call returns normally, but the cursor never moves).  Warping the
+# cursor through CoreGraphics works reliably, so use it when available and
+# keep ``QCursor.setPos()`` as the cross-platform fallback.
+_CG_WARP_CURSOR = None
+_CG_POINT = None
+if sys.platform == "darwin":
+    try:
+        import ctypes
+        import ctypes.util
+
+        class _CGPoint(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_double), ("y", ctypes.c_double)]
+
+        _cg_path = ctypes.util.find_library("CoreGraphics")
+        if _cg_path:
+            _cg = ctypes.CDLL(_cg_path)
+            _cg.CGWarpMouseCursorPosition.argtypes = [_CGPoint]
+            _cg.CGWarpMouseCursorPosition.restype = ctypes.c_int32
+            _CG_WARP_CURSOR = _cg.CGWarpMouseCursorPosition
+            _CG_POINT = _CGPoint
+    except Exception:
+        _CG_WARP_CURSOR = None
+        _CG_POINT = None
+
+
+def warp_cursor(pos: QPoint) -> None:
+    """Move the system cursor, working around macOS' ignored setPos()."""
+    if _CG_WARP_CURSOR is not None and _CG_POINT is not None:
+        try:
+            if _CG_WARP_CURSOR(_CG_POINT(float(pos.x()), float(pos.y()))) == 0:
+                return
+        except Exception:
+            pass
+    QCursor.setPos(pos)
+
+
 class SnapSystem(QObject):
-    move_item_to_snap_pos =pyqtSignal(QPointF)
+    move_item_to_snap_pos =Signal(QPointF)
     def __init__(self,parent=None, threshold=10 ,map_scene_to_screen=None):
         super().__init__(parent=parent)
         # 捕捉点集合
@@ -40,11 +78,11 @@ class SnapSystem(QObject):
     def update_endpoints(self,poses):
         self.snap_points['endpoints'].clear()
         for pos in poses:
-            self.snap_points['endpoints'].add((pos.x(),pos.y()))
+            self.snap_points['endpoints'].add(pos.toTuple())
     def update_midpoints(self,poses):
         self.snap_points['midpoints'].clear()
         for pos in poses:
-            self.snap_points['midpoints'].add((pos.x(),pos.y()))
+            self.snap_points['midpoints'].add(pos.toTuple())
 
 
 
@@ -59,7 +97,7 @@ class SnapSystem(QObject):
            
             if distance<self.distance_when_found_snap_pos:
                 target_cursor_pos=self.mapToScreen(snaped_pos)#目标吸附点
-                QCursor.setPos(target_cursor_pos)
+                warp_cursor(target_cursor_pos)
                 QTimer.singleShot(1000,lambda:setattr(self,"distance_when_found_snap_pos",0.0))
                 
             # 计算距离
@@ -77,7 +115,7 @@ class SnapSystem(QObject):
             distance = math.sqrt(dpos.x()*dpos.x() + dpos.y()*dpos.y())
             if distance>400.0:
                 return
-            QCursor.setPos(target_cursor_pos)
+            warp_cursor(target_cursor_pos)
             print(f"发送{snaped_pos}")
             self.move_item_to_snap_pos.emit(QPointF(snaped_pos[0],snaped_pos[1]))
             
@@ -176,8 +214,8 @@ class SnapSystem(QObject):
                 painter.setPen(QPen(QColor(255,0,0), 1))
                 
                 
-                painter.drawLine(QPointF(view_pos.x()-10, view_pos.y()), QPointF(view_pos.x()+10, view_pos.y()))
-                painter.drawLine(QPointF(view_pos.x(), view_pos.y()-10), QPointF(view_pos.x(), view_pos.y()+10))
+                painter.drawLine(QPoint(view_pos.x()-10, view_pos.y()), QPoint(view_pos.x()+10, view_pos.y()))
+                painter.drawLine(QPoint(view_pos.x(), view_pos.y()-10), QPoint(view_pos.x(), view_pos.y()+10))
 
                 painter.restore()
                 
@@ -188,8 +226,8 @@ class SnapSystem(QObject):
                 painter.setPen(QPen(QColor(255,0,0), 1))
                 
                 
-                painter.drawLine(QPointF(view_pos.x()-10, view_pos.y()), QPointF(view_pos.x()+10, view_pos.y()))
-                painter.drawLine(QPointF(view_pos.x(), view_pos.y()-10), QPointF(view_pos.x(), view_pos.y()+10))
+                painter.drawLine(QPoint(view_pos.x()-10, view_pos.y()), QPoint(view_pos.x()+10, view_pos.y()))
+                painter.drawLine(QPoint(view_pos.x(), view_pos.y()-10), QPoint(view_pos.x(), view_pos.y()+10))
 
                 painter.restore()
 
@@ -217,26 +255,23 @@ class SnapSystem(QObject):
             return
             
         self.snap_points['grid'].clear()
-        
-        x1 =  scene_area.x()  #left
-        x0 =  scene_area.x()  + scene_area.width()
-        y1 =  scene_area.y()  
-        y0 =  scene_area.y()  +scene_area.height()
-        
-        x0_count  =  math.floor(x0/self.grid_size)+1
-        x1_count  =  math.floor(x1/self.grid_size)
-        y0_count  =  math.floor(y0/self.grid_size)+1
-        y1_count  =  math.floor(y1/self.grid_size)
 
-        # x0  =  math.floor(x0/self.grid_size)*self.grid_size +self.grid_size
-        # x1  =  math.floor(x1/self.grid_size)*self.grid_size 
-        # y0  =  math.floor(y0/self.grid_size)*self.grid_size +self.grid_size
-        # y1  =  math.floor(y1/self.grid_size)*self.grid_size
+        # The scene may use swapped/inverted axes (``is_use_for_agv_map``),
+        # in which case a QRectF built from two points can have negative
+        # width/height.  Normalize before reading left/right/top/bottom.
+        scene_area = scene_area.normalized()
 
-        # d=[]
-        for x in range(x0_count, x1_count+1, 1):
-            for y in range(y0_count, y1_count+1, 1):
-                # d.append((x,y))
+        # Collect every grid intersection that touches the visible scene
+        # area.  The old code used the right/bottom edge as the range start
+        # and the left/top edge as the end, so ``range`` was always empty and
+        # no grid snap point was ever generated.
+        x_min = math.floor(scene_area.left() / self.grid_size)
+        x_max = math.ceil(scene_area.right() / self.grid_size)
+        y_min = math.floor(scene_area.top() / self.grid_size)
+        y_max = math.ceil(scene_area.bottom() / self.grid_size)
+
+        for x in range(x_min, x_max + 1):
+            for y in range(y_min, y_max + 1):
                 self.snap_points['grid'].add((x*self.grid_size, y*self.grid_size))
         
 

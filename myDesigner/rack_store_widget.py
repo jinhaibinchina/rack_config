@@ -2,9 +2,9 @@
 
 
 
-from PyQt6.QtWidgets import QApplication,QWidget, QListWidget, QMessageBox, QFrame, QDialog, QToolButton,QVBoxLayout,QHBoxLayout,QLabel,QListWidgetItem
-from PyQt6.QtGui import QIcon,QAction
-from PyQt6.QtCore import Qt, QObject, QEvent ,pyqtSignal
+from PySide6.QtWidgets import QApplication,QWidget, QListWidget, QMessageBox, QFrame, QDialog, QToolButton,QVBoxLayout,QHBoxLayout,QLabel,QListWidgetItem
+from PySide6.QtGui import QIcon,QAction
+from PySide6.QtCore import Qt, QObject, QEvent ,Signal
 from .myQuadTreeScene import QuadTreeScene,SceneManager
 
 

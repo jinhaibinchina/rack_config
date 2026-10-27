@@ -1,12 +1,12 @@
 
-from PyQt6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QMessageBox,QLabel,QLineEdit,QPushButton,QApplication
+from PySide6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QMessageBox,QLabel,QLineEdit,QPushButton,QApplication
 import sys
 from global_config import global_cfg
-from PyQt6.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 
 # class LoginWindow(QDialog):
 
-#     login_signal = pyqtSignal(bool)
+#     login_signal = Signal(bool)
 
 
 #     def __init__(self, parent = None):
@@ -84,7 +84,7 @@ from PyQt6.QtCore import pyqtSignal
 
 
 class LoginWindow(QDialog):
-    login_change_signal = pyqtSignal()
+    login_change_signal = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -159,8 +159,8 @@ class LoginWindow(QDialog):
 
     def setupCompleter(self, word_list):
 
-        from PyQt6.QtWidgets import QCompleter
-        from PyQt6.QtCore import QStringListModel ,Qt
+        from PySide6.QtWidgets import QCompleter
+        from PySide6.QtCore import QStringListModel ,Qt
         # 创建补全器
         self.completer = QCompleter()
         
@@ -204,7 +204,7 @@ class LoginWindow(QDialog):
     def customMousePressEvent(self, event):
         
         """自定义鼠标点击事件，点击时显示补全列表"""
-        from PyQt6.QtCore import QTimer
+        from PySide6.QtCore import QTimer
         # 调用原始的鼠标点击事件
         QLineEdit.mousePressEvent(self.user_name, event)
         

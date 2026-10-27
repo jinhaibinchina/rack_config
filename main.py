@@ -1,7 +1,7 @@
 
-from PyQt6.QtWidgets import QApplication,QWidget, QListWidget, QMessageBox, QFrame, QDialog, QToolButton,QVBoxLayout,QHBoxLayout,QLabel,QListWidgetItem
-from PyQt6.QtGui import QIcon,QAction
-from PyQt6.QtCore import Qt, QObject, QEvent ,pyqtSignal,QTimer
+from PySide6.QtWidgets import QApplication,QWidget, QListWidget, QMessageBox, QFrame, QDialog, QToolButton,QVBoxLayout,QHBoxLayout,QLabel,QListWidgetItem
+from PySide6.QtGui import QIcon,QAction
+from PySide6.QtCore import Qt, QObject, QEvent ,Signal,QTimer
 
 import sys
 import os
@@ -24,7 +24,7 @@ VERSION_INFO = f"版本:{VERSION}\n1,初版\n2,支持冷压1-50，模切1-50，�
 class Panel(QFrame):
     """基础导航面板，不包含新生成数据和脚本功能"""
     
-    ask_open_tab = pyqtSignal(str,str)
+    ask_open_tab = Signal(str,str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -179,7 +179,20 @@ class MainWidget(LoadMainWindow):
         :param event:
         :return:
         """
-      
+
+        # 退出前必须停掉状态栏定时器和所有标签页的后台线程：
+        # 否则解释器退出时 QThread 仍在运行，会打印
+        # "QThread: Destroyed while thread is still running" 并可能崩溃。
+        timer = getattr(self, "_timer", None)
+        if timer is not None:
+            timer.stop()
+
+        tabbed = getattr(self, "_tabbedPlc", None)
+        if tabbed is not None:
+            stop_all = getattr(tabbed, "_stop_all_tabs", None)
+            if callable(stop_all):
+                stop_all()
+
         event.accept()  # 接受事件
 
     def eventFilter(self, source, event):

@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QLabel,QHBoxLayout,QVBoxLayout
-from PyQt6.QtCore import QObject
+from PySide6.QtWidgets import QWidget, QLabel,QHBoxLayout,QVBoxLayout
+from PySide6.QtCore import QObject
 
 class NameValLabel(QWidget):
     def __init__(self,name:str='', parent = None):

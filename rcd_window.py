@@ -1,13 +1,13 @@
-from PyQt6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QMessageBox,QLabel,QLineEdit,QPushButton,QApplication,QPlainTextEdit
+from PySide6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QMessageBox,QLabel,QLineEdit,QPushButton,QApplication,QPlainTextEdit
 import sys,os
 from global_config import global_cfg
-from PyQt6.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 from resource_manager import resource_manager as res_mng
 from load_ui import LoadDialog
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
-from PyQt6.QtWidgets import QInputDialog,QFileDialog
+from PySide6.QtWidgets import QInputDialog,QFileDialog
 
 def convert_with_error_handling(input_file, output_file):
     """

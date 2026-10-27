@@ -1,14 +1,14 @@
-from PyQt6.QtWidgets import QWidget, QApplication, QLabel,QVBoxLayout,QHBoxLayout,QMainWindow,QPushButton
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QPoint, QEasingCurve,pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen,QFontMetrics
-from PyQt6.QtCore import pyqtProperty
+from PySide6.QtWidgets import QWidget, QApplication, QLabel,QVBoxLayout,QHBoxLayout,QMainWindow,QPushButton
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QPoint, QEasingCurve,Signal
+from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen,QFontMetrics
+from PySide6.QtCore import Property
 
 import time
 import sys
 from math import sin,cos,pi
 
 class FlipDigit_top(QWidget):
-    animation_done =pyqtSignal()
+    animation_done =Signal()
     def __init__(self, parent=None, width=280, height=180, bg=QColor(30,30,30), text_color=QColor(255,255,255), **kwargs):
         super().__init__(parent)
         self.width = width
@@ -42,7 +42,7 @@ class FlipDigit_top(QWidget):
         self._animation_progress = value
         self.update()  # 值变化时触发重绘
 
-    animation_progress = pyqtProperty(int, get_animation_progress, set_animation_progress)
+    animation_progress = Property(int, get_animation_progress, set_animation_progress)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -175,7 +175,7 @@ class FlipDigit_top(QWidget):
         painter.drawText(QPoint(int(x), int(y)), number_str)
             
 class FlipDigit_bottom(QWidget):
-    animation_done =pyqtSignal()
+    animation_done =Signal()
     def __init__(self, parent=None, width=280, height=180, bg=QColor(30,30,30), text_color=QColor(255,255,255), **kwargs):
         super().__init__(parent)
         self.width = width
@@ -210,7 +210,7 @@ class FlipDigit_bottom(QWidget):
         self._animation_progress = value
         self.update()  # 值变化时触发重绘
 
-    animation_progress = pyqtProperty(int, get_animation_progress, set_animation_progress)
+    animation_progress = Property(int, get_animation_progress, set_animation_progress)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -435,23 +435,53 @@ class FlipDigit_Time_display(QWidget):
                 self.digits[name].flip()
         
     def get_time_parts_by_plc(self,now):
-        """获取当前时间并分解为各个数字位"""
-        
-        hours, minutes, seconds = now.split(":")
+        """把 PLC 时间字符串 "HH:MM:SS" 分解成 6 个数字位。
 
-        # current_time = QTime.currentTime()
-        # current_time.
+        兼容以下情况（返回 None 表示无法解析，调用方应保持原显示）：
+          * 空值 / None
+          * 段数不足（如 "12:30"）或过多
+          * 时分秒不是两位数字（如 "1:2:3"、"':'"、乱码）
+          * 数值越界（时 > 23、分/秒 > 59）
+        """
+        parts = self.parse_plc_time(now)
+        if parts is None:
+            return None
+        hours, minutes, seconds = parts
         return [
-            hours[0], hours[1], 
-            minutes[0], minutes[1], 
-            seconds[0], seconds[1]]   
-    
+            hours[0], hours[1],
+            minutes[0], minutes[1],
+            seconds[0], seconds[1]]
+
+    @staticmethod
+    def parse_plc_time(now):
+        """解析 "HH:MM:SS"，成功返回 ("HH","MM","SS")，失败返回 None。"""
+        if now is None:
+            return None
+        if isinstance(now, (bytes, bytearray)):
+            now = now.decode("ascii", errors="ignore")
+        text = str(now).strip()
+        # 去掉 PLC 字符串里可能残留的空字节与非法字符
+        text = text.replace("\x00", "").strip()
+        if not text:
+            return None
+        fields = text.split(":")
+        if len(fields) != 3:
+            return None
+        if not all(len(f) == 2 and f.isdigit() for f in fields):
+            return None
+        hours, minutes, seconds = fields
+        if int(hours) > 23 or int(minutes) > 59 or int(seconds) > 59:
+            return None
+        return hours, minutes, seconds
+
     def update_time_by_plc(self,time_h_m_s):
-        """更新时间显示"""
+        """更新时间显示；PLC 时间非法时保持当前显示不变。"""
         new_time = self.get_time_parts_by_plc(time_h_m_s)
-      
+        if new_time is None:
+            return False
+
         current_digits = ['h1', 'h2', 'm1', 'm2', 's1', 's2']
-        
+
         for name, new_val in zip(current_digits, new_time):
             if self.digits['h1'].top_digit.current_value==2:
                 self.digits['h2'].set_max_value(3)
@@ -460,6 +490,7 @@ class FlipDigit_Time_display(QWidget):
             current_val = self.digits[name].top_digit.current_value
             if int(new_val) != current_val:
                 self.digits[name].flip()
+        return True
 
 
 class MainWindow(QMainWindow):
