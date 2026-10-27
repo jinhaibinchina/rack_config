@@ -471,7 +471,7 @@ class ConfigWindow(LoadWidget):
 
     
     def read_config_actual(self):
-        datas = self.plc_mgr.read_data(7,0,47, priority=True)
+        datas = self.plc_mgr.read_data(7,0,68, priority=True)
         if datas is None:
             return
         

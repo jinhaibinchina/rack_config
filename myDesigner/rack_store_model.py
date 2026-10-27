@@ -1325,6 +1325,13 @@ class Rack:
     @property
     def name(self) -> str:
         return f"料架{self.number}"
+    @property
+    def label_position(self) -> QPointF:
+        return (
+            self.machine_label.get_scene_end_pos()
+            if self.machine_label is not None
+            else QPointF(0, 0)
+        )
 
     def slot(self, slot_no: int) -> Optional[RackSlot]:
         return self.slots.get(int(slot_no))

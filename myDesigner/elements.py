@@ -155,7 +155,12 @@ class line_element(base_element):
         self.setSize(x_max-x_min ,y_max-y_min)
         self.setTransformOriginPoint(self._center_pos)
         self.update_boundingRect()
+
+    def change_end_pos_to_target_scenePos(self,pos):
+        pass
     
+
+
     def change_position(self,pos):
         """"属性设置移动位置"""
         w ,h=self.getSize().width(),self.getSize().height()

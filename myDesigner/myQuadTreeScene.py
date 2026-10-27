@@ -1903,7 +1903,11 @@ class SceneManager(QObject):
         return self.m_items.get(id, None)
 
 
-
+    def findItemByName(self, name):
+        item_id = self.m_name_items.get(name, None)
+        if item_id is not None:
+            return self.findItem(item_id)
+        return None
 
 
 

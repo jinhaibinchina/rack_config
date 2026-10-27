@@ -4,7 +4,7 @@
 
 from PySide6.QtWidgets import QApplication,QWidget, QListWidget, QMessageBox, QFrame, QDialog, QToolButton,QVBoxLayout,QHBoxLayout,QLabel,QListWidgetItem
 from PySide6.QtGui import QIcon,QAction,QColor
-from PySide6.QtCore import Qt, QObject, QEvent ,Signal
+from PySide6.QtCore import Qt, QObject, QEvent ,Signal,QPointF
 from .myQuadTreeScene import QuadTreeScene,SceneManager
 from .elements import group_element,text_element
 
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 from .rack_store_model import RackStoreModel
 from .rack_status_panel_model import RackStatusPanelModel
-
+from .rack_store_hmi_config_model import RackHmiConfigModel
 
 
 class RackStoresWindow(QWidget):
@@ -41,6 +41,10 @@ class RackStoresWindow(QWidget):
         # 同一场景里还有「料仓状态」面板（data2.json id=1584）：两块 IO 模块指示灯 + 4 个文本
         self.panel_status = RackStatusPanelModel(self.SceneManager, self)
         self.Scene.double_clicked_without_group.connect(self.handle_double_click_without_group)  # 双击空白处时隐藏面板
+
+        self.rack_hmi_config_models = [RackHmiConfigModel(self.SceneManager, self,group_name=f"HMI{i+1}") for i in range(5)]  # HMI1..HMI5
+
+
         if self.panel_status.warnings:
             print("料仓状态面板：", self.panel_status.warnings)
 
@@ -87,7 +91,7 @@ class RackStoresWindow(QWidget):
         self.panel_status.show_all()  # 显示料仓状态面板
 
 
-    def handle_rack_status(self,host_type,host_start_No,host_count:int,rack_counts:List[int],rack_arrangements:List[int]=None):
+    def handle_rack_status(self,host_type,host_start_No,host_count:int,rack_counts:List[int],rack_arrangements:List[int]=None, hmi_config:dict=None):
 
         # 仓位排列方向：0 正序（编号 1 在最上面）/ 1 反序（编号 1 在最下面）
         # 只换格子的位置，仓位号、图元名字、PLC 映射口径都不变；
@@ -116,6 +120,28 @@ class RackStoresWindow(QWidget):
                 else:
                     self.rack_store_model.setVisible_slot(i+1,j+1,False)
 
+        for key, (rack_no_A, rack_no_B) in (hmi_config or {}).items():
+            index = int(key.split("_")[1]) - 1
+
+            self.rack_hmi_config_models[index].set_text(key)
+            if 0 <= index < len(self.rack_hmi_config_models):
+
+                if rack_no_A >0 and rack_no_B >0:
+                    pos = self.rack_store_model.rack(rack_no_A).label_position
+                    self.rack_hmi_config_models[index].move_endpos_of_line(1, pos)
+                    pos = self.rack_store_model.rack(rack_no_B).label_position
+                    self.rack_hmi_config_models[index].move_endpos_of_line(2, pos)
+                elif rack_no_A >0 :
+                    pos = self.rack_store_model.rack(rack_no_A).label_position
+                    self.rack_hmi_config_models[index].move_endpos_of_line(1, pos)
+                    self.rack_hmi_config_models[index].move_endpos_of_line(2, pos)
+                elif rack_no_B >0 :
+                    pos = self.rack_store_model.rack(rack_no_B).label_position
+                    self.rack_hmi_config_models[index].move_endpos_of_line(1, pos)
+                    self.rack_hmi_config_models[index].move_endpos_of_line(2, pos)
+                else:
+                    self.rack_hmi_config_models[index].hide_all()
+                   
     # ------------------------------------------------------------ 仓位排列方向
     def set_rack_arrangements(self, rack_arrangements) -> List[int]:
         """按每台料架的方向批量设置（0 正序 / 1 反序），返回实际翻转过的料架号。
@@ -322,3 +348,14 @@ class RackStoresWindow(QWidget):
         self._selected_slot_key = None
         self._reset_all_number_colors()
         self.panel_status.hide_all()  # 隐藏料仓状态面板
+
+
+    def set_hmi_text(self, hmi_index: int, text: str):
+        """设置 HMI 面板的文本内容"""
+        if 1 <= hmi_index <= len(self.rack_hmi_config_models):
+            self.rack_hmi_config_models[hmi_index - 1].set_text(text)
+
+    def move_hmi_line_endpos(self, hmi_index: int, line_index: int, target):
+        """移动 HMI 面板的直线终点坐标"""
+        if 1 <= hmi_index <= len(self.rack_hmi_config_models):
+            self.rack_hmi_config_models[hmi_index - 1].move_endpos_of_line(line_index, target)
