@@ -999,7 +999,12 @@ class RackStatusPanelModel(QObject):
         host_index：哪台主机（决定从 20 + host_index 取模块在线位）。
         返回 {"lamps": 变化灯数, "texts": 变化文本数}。
         """
+        
+
         result = {"lamps": 0, "texts": 0}
+
+        if not self.group.get_visibility():
+            return result
         if data is None or len(data) < 34:
             self.warnings.append("DB12 数据为空或长度不足，已忽略")
             return result

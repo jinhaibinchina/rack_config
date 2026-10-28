@@ -957,6 +957,8 @@ class ConfigWindow(LoadWidget):
             self.name_update.emit(context)
 
             self.read_paras()
+
+            self.set_plc_time()
             msg = QMessageBox()
             msg.setWindowTitle("success")
             msg.setText('参数写入成功，重启PLC生效')
@@ -966,6 +968,25 @@ class ConfigWindow(LoadWidget):
             msg.setWindowTitle("failure")
             msg.setText('参数写入失败')
             msg.exec()# 显示信息框
+
+    def set_plc_time(self):
+        import time
+        year = time.localtime().tm_year 
+        month = time.localtime().tm_mon 
+        day = time.localtime().tm_mday 
+        hour = time.localtime().tm_hour
+        minute = time.localtime().tm_min 
+        second = time.localtime().tm_sec 
+
+        datas = bytearray([0]*13)
+        set_uint(datas,0,year) 
+        set_usint(datas,2,month) 
+        set_usint(datas,3,day) 
+        set_usint(datas,5,hour) 
+        set_usint(datas,6,minute) 
+        set_usint(datas,7,second) 
+        set_int(datas,12,1) 
+        self.plc_mgr.write_data(5,0,datas, priority=True)
 
     def on_login_success(self):
         if global_cfg._user_name != 'admin':

@@ -13,8 +13,7 @@ from typing import List, Optional, Sequence, Tuple
 from .rack_store_model import RackStoreModel
 from .rack_status_panel_model import RackStatusPanelModel
 from .rack_store_hmi_config_model import RackHmiConfigModel
-
-
+from .rack_store_process_model import RackProcessModel
 class RackStoresWindow(QWidget):
 
     slot_clicked = Signal(int,int)  # rack_no, slot_no    
@@ -44,6 +43,7 @@ class RackStoresWindow(QWidget):
 
         self.rack_hmi_config_models = [RackHmiConfigModel(self.SceneManager, self,group_name=f"HMI{i+1}") for i in range(5)]  # HMI1..HMI5
 
+        self.rack_process_model = RackProcessModel(self.SceneManager, self)
 
         if self.panel_status.warnings:
             print("料仓状态面板：", self.panel_status.warnings)
@@ -87,9 +87,11 @@ class RackStoresWindow(QWidget):
 
         self.slot_clicked.emit(rack_no, slot_no)
 
-        self.panel_status.move(self.rack_store_model.get_position(rack_no, slot_no))  # 将面板移动到选中仓位的上方
+        self.panel_status.move(self.rack_store_model.get_end_position(rack_no, slot_no))  # 将面板移动到选中仓位的上方
         self.panel_status.show_all()  # 显示料仓状态面板
 
+        self.rack_process_model.move_endpos_to_tagret(self.rack_store_model.get_head_position(rack_no, slot_no))
+        self.rack_process_model.show_all() 
 
     def handle_rack_status(self,host_type,host_start_No,host_count:int,rack_counts:List[int],rack_arrangements:List[int]=None, hmi_config:dict=None):
 
@@ -334,7 +336,8 @@ class RackStoresWindow(QWidget):
             34/138/242 报警 / 灯语 / 提示 WSTRING
         返回实际发生变化的灯位数（含 2 个模块在线标志）。
         """
-        return self.panel_status.apply_db12(datas)
+        self.panel_status.apply_db12(datas)
+        self.rack_process_model.apply_db12(datas)
 
     def refresh_models(self) -> None:
         """场景重新 load_element_info2 之后调用，重建两套模型的图元索引。"""
@@ -348,7 +351,7 @@ class RackStoresWindow(QWidget):
         self._selected_slot_key = None
         self._reset_all_number_colors()
         self.panel_status.hide_all()  # 隐藏料仓状态面板
-
+        self.rack_process_model.hide_all()
 
     def set_hmi_text(self, hmi_index: int, text: str):
         """设置 HMI 面板的文本内容"""

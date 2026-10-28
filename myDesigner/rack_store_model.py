@@ -898,9 +898,11 @@ class RackSlot:
 
     # ------------------------------------------------------------ 查询
     @property
-    def number_label_position(self) -> QPointF:
+    def number_label_end_position(self) -> QPointF:
         return self.number_label.get_scene_end_pos() if self.number_label is not None else QPointF(0, 0)
-    
+    @property
+    def number_label_head_position(self) -> QPointF:
+        return self.number_label.get_scene_head_pos() if self.number_label is not None else QPointF(0, 0)
     @property
     def position(self) -> QPointF:
         return self.group.get_scene_head_pos() if self.group is not None else QPointF(0, 0)
@@ -1656,13 +1658,18 @@ class RackStoreModel(QObject):
 
 
 
-    def get_position(self, rack_no: int, slot_no: int,) -> QPointF:
+    def get_end_position(self, rack_no: int, slot_no: int,) -> QPointF:
         """返回仓位组图元的场景坐标（没有图元时返回 (0, 0)）。"""
         slot = self.slot(rack_no, slot_no)
         if slot is None:
             return QPointF(0, 0)
-        return slot.number_label_position
+        return slot.number_label_end_position
 
-
+    def get_head_position(self, rack_no: int, slot_no: int,) -> QPointF:
+        """返回仓位组图元的场景坐标（没有图元时返回 (0, 0)）。"""
+        slot = self.slot(rack_no, slot_no)
+        if slot is None:
+            return QPointF(0, 0)
+        return slot.number_label_head_position
 
 

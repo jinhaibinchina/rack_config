@@ -101,7 +101,7 @@ class PollingThread(QThread):
 
             self._read_and_emit(21,50,26, self.broker.data_ready, 'db21', timeout=2)
 
-            self._read_and_emit(12,0,242+104, self.broker.data_ready, 'db12', timeout=2)
+            self._read_and_emit(12,0,242+104 +2, self.broker.data_ready, 'db12', timeout=2)
 
             self._read_and_emit(24,0,458, self.broker.data_ready, 'db24', timeout=2)
 
