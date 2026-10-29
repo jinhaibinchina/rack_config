@@ -19,3 +19,6 @@
 - 组内图元搬家用 change_position(目标场景左上角)，setPos() 在 is_in_group() 时直接 return，搬不动
 - 料架仓位几何现状：仓位1 在屏幕最上、8 在最下（y 3479.7 → -2207.0，间距 812.385）；zValue 1=146 → 8=153
 - 仓位排列方向 rack_arrangements（DB7 offset 26/28/…/44，0 正序 / 1 反序）在 RackStoresWindow 里落地：只换格子的几何位置，仓位号/名字/PLC 映射不变，靠 _rack_reversed 保证幂等
+- 打包（PyInstaller）必须带 `myDesigner/data2.json`（1.3 MB 场景）；漏了程序能起但画面全空。get_json_path 的查找顺序：exe 同目录 → _MEIPASS → _MEIPASS/myDesigner → cwd
+- hook-snap7.py 里 os.add_dll_directory 只能传**目录**，且要判存在；传 dll 文件路径会 FileNotFoundError 直接把 exe 顶死在启动阶段
+- 场景为空是合法状态（源码里 data2.json 可能还没生成），所有 handle_* 入口都要对 `rack()`/图元返回 None 做兜底，别链式调用

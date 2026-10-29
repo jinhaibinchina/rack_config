@@ -243,31 +243,70 @@ class QuadtreeNode:
 
 class SceneSerializer:
     @staticmethod
+    def _resource_dirs():
+        """按优先级返回查找场景文件的候选目录。
+
+        打包后 exe 的资源可能落在不同位置，取决于 ``--add-data`` 的目标路径：
+        直接放在解包根目录、放在 ``myDesigner/`` 子目录，或者被现场替换到
+        exe 同目录。单看 ``sys._MEIPASS`` 一处会漏，所以这里全部列出来逐个试。
+        """
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates = []
+
+        if getattr(sys, 'frozen', False):
+            # 1) exe 同目录：允许现场直接替换 data2.json，不必重新打包
+            candidates.append(os.path.dirname(os.path.abspath(sys.executable)))
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass:
+                # 2) --add-data 目标为根目录
+                candidates.append(meipass)
+                # 3) --add-data 目标为 myDesigner（打包工具按源相对路径放置）
+                candidates.append(os.path.join(meipass, 'myDesigner'))
+        else:
+            # 源码运行：data2.json 就在 myDesigner 包里
+            candidates.append(module_dir)
+            candidates.append(os.path.dirname(module_dir))
+
+        # 4) 兜底：当前工作目录
+        try:
+            candidates.append(os.getcwd())
+        except OSError:
+            pass
+
+        # 去重且保持顺序
+        seen, ordered = set(), []
+        for path in candidates:
+            if not path:
+                continue
+            key = os.path.normcase(os.path.abspath(path))
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered.append(path)
+        return ordered
+
+    @staticmethod
     def get_json_path(relative_path=""):
         """获取json文件路径
+
         Args:
-            relative_path: 相对于exe或脚本目录的子路径，如"config/data.json"
+            relative_path: 相对于资源根目录的子路径，如"config/data.json"。
+                为空时默认 "data.json"。
+
+        查找顺序见 :meth:`_resource_dirs`：取第一个真实存在的文件。
+        都不存在时返回第一候选（调用方按"空场景"处理，保存时也不会写到
+        临时解包目录里白白丢失）。
         """
-        if getattr(sys, 'frozen', False):
-            try:
-            # PyInstaller 创建的临时文件夹，包含所有添加的资源文件
-                base_dir = sys._MEIPASS
-            except AttributeError:
-                # 如果 _MEIPASS 不存在，回退到可执行文件目录
-                base_dir = os.path.dirname(sys.executable)
+        name = relative_path or "data.json"
+        if os.path.isabs(name):
+            return name
 
-
-
-            # 打包后的可执行文件路径（如 PyInstaller）
-            # base_dir = os.path.dirname(sys.executable)
-        else:
-            # 脚本文件所在路径
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # 处理相对路径
-        if relative_path:
-            return os.path.join(base_dir, relative_path)
-        return os.path.join(base_dir, "data.json")
+        dirs = SceneSerializer._resource_dirs()
+        for base_dir in dirs:
+            candidate = os.path.join(base_dir, name)
+            if os.path.isfile(candidate):
+                return candidate
+        return os.path.join(dirs[0], name)
     
 
 

@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "current_page": "page_1",
+    "pages": [
+        {
+            "id": "page_1",
+            "name": "主场景",
+            "file": "datas/design/pages/page_1.json"
+        }
+    ]
+}

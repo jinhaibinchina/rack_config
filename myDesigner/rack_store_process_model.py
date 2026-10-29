@@ -59,6 +59,9 @@ class RackProcessModel(QObject):
             self.text.context = text
 
     def move_endpos_to_tagret(self,target:QPointF):
+        # 场景没加载到「流程」组时（例如打包漏了 data2.json）直接跳过
+        if self.group is None:
+            return
         w,h = self.group.sceneBoundingRect().width(),self.group.sceneBoundingRect().height()
         pos =QPointF(target.x()-w , target.y()-h)
         self.group.change_position(pos)
@@ -83,12 +86,18 @@ class RackProcessModel(QObject):
         返回 {"lamps": 变化灯数, "texts": 变化文本数}。
         """
         
-        if data is None or len(data) < 34:
+        if data is None or len(data) <= DB12_TASK_INDEX_OFFSETS:
             self.warnings.append("DB12 数据为空或长度不足，已忽略")
             return 
         raw = bytes(bytearray(data))
-        
-            
+
+        # 场景里没有「流程」相关图元时（打包漏了 data2.json），不要继续往下走，
+        # 否则 self.in1.set_visibility 会在 None 上抛 AttributeError
+        parts = (self.text, self.in1, self.in2, self.in3, self.in4,
+                 self.out1, self.out2, self.out3, self.out4)
+        if any(part is None for part in parts):
+            return
+
         process_byte = raw[DB12_PROCESS_STATUS_OFFSETS]
         task_byte    = raw[DB12_TASK_INDEX_OFFSETS]
         

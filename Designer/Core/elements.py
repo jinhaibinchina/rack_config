@@ -1,4 +1,16 @@
-from element import*
+import os
+
+from .element import*
+from res.designer_resource_manager import  resource_manager as res_mng
+# 图元析构时的调试输出。默认关闭：一次场景加载会产生上千行日志，
+# 需要排查时可设置环境变量 RACK_DEBUG_DESTROY=1 打开。
+_DEBUG_DESTROY = os.environ.get("RACK_DEBUG_DESTROY", "") == "1"
+
+
+def _log_destroy(kind: str, item) -> None:
+    if _DEBUG_DESTROY:
+        print(f"销毁{kind} id:{item.id()} name：{item.get_name()}")
+
 
 
 class line_element(base_element):
@@ -16,7 +28,7 @@ class line_element(base_element):
         self.set_selected(False)
    
     def __del__(self):
-        print(f"销毁line图元 id:{self.id()} name：{self.get_name()}")
+        _log_destroy("line", self)
 
     def update_boundingRect(self):
         super().update_boundingRect()
@@ -143,7 +155,12 @@ class line_element(base_element):
         self.setSize(x_max-x_min ,y_max-y_min)
         self.setTransformOriginPoint(self._center_pos)
         self.update_boundingRect()
+
+    def change_end_pos_to_target_scenePos(self,pos):
+        pass
     
+
+
     def change_position(self,pos):
         """"属性设置移动位置"""
         w ,h=self.getSize().width(),self.getSize().height()
@@ -615,7 +632,7 @@ class rect_element(base_element):
             self._end_pos   =self.sence_rect.bottomRight()
            
     def __del__(self):
-        print(f"销毁rect图元 id:{self.id()} name：{self.get_name()}")
+        _log_destroy("rect", self)
        
     
     def update_boundingRect(self):
@@ -739,7 +756,7 @@ class rect_element(base_element):
         self.scene_size.setHeight(abs(self._end_pos.y()-self._head_pos.y()))
         self.completed()
 
-    def change_position(self,pos):
+    def change_position(self,pos:QPointF):
         w ,h=self.getSize().width(),self.getSize().height()
         self._head_pos_last = self.mapToScene(self._head_pos)
         self._head_pos      = pos
@@ -970,7 +987,9 @@ class rect_element(base_element):
 
         
         angle =    self.sceneTransform().get_rotation_angle()
-        print(f"id:{self.id()}angle{angle}")
+
+        # print(f"id:{self.id()}angle{angle}")
+
         return {
             "id"   :self.id(),
             "name"   :self.get_name(),
@@ -1060,7 +1079,7 @@ class group_element(rect_element):
             self.members.append(item)
        
     def __del__(self):
-        print(f"销毁group id:{self.id()} name：{self.get_name()}")
+        _log_destroy("group", self)
 
     # ------------------------------------------------------------------
     # Member names follow the group name
@@ -1274,6 +1293,10 @@ class group_element(rect_element):
     def paint(self,painter:QPainter,shine_flag):
         
         if self.m_scene and self.m_scene.mode() == SceneMode.Run:
+            # 运行态分组不绘制虚线框，但必须像其他图元一样在每帧绘制时清掉
+            # 变换缓存标记，否则 is_moving() 恒为 True，check_hover() 会跳过
+            # 该分组，鼠标点击电柜等分组时永远选不中。
+            self._reset_moving_flag()
             return
         if self.get_visibility()==False :
             super().paint(painter,shine_flag)
@@ -1407,7 +1430,7 @@ class circle_element(base_element):
         circle_element.count += 1
     
     def __del__(self):
-        print(f"销毁circle图元 id:{self.id()} name：{self.get_name()}")
+        _log_destroy("circle", self)
 
     def update_boundingRect(self):
         super().update_boundingRect()
@@ -1821,6 +1844,8 @@ class circle_element(base_element):
     
 class text_element(base_element):
     count = 0
+    #: 内容变化时是否把文本框左侧钉住（False 恢复成左右对称扩展的老行为）
+    keep_left_on_context_change = True
     contextChanged = Signal(str)
     def __init__(self,parent=None,text_height=100,bg_color=QColor(0,255,0,50)):
         super().__init__(parent=parent)
@@ -1855,7 +1880,7 @@ class text_element(base_element):
             self.contextChanged.emit(new_str)
 
     def __del__(self):
-        print(f"销毁text图元 id:{self.id()} name：{self.get_name()}")
+        _log_destroy("text", self)
 
     def calc_font_size(self, target_height, text) -> float:
         # 创建临时绘图设备
@@ -2044,11 +2069,43 @@ class text_element(base_element):
 
 
         
+    def anchor_left_edge(self, old_height, new_height):
+        """内容长度变化后，让屏幕上左侧那条边保持不动，只向右（或向左）伸缩。
+
+        文本的长度方向是局部 y（不是局部 x）：
+        ``is_use_for_agv_map`` 为 True 时局部 +y 映射到视图左侧，
+        普通模式下局部 +y 映射到视图上方。所以先用 ``sceneToView`` 判断
+        两条候选边哪条在屏幕上更靠左，再把 ``_center_pos`` 沿局部 y 平移
+        半个长度差。全程在局部坐标里算，图元转过多少度都成立。
+        """
+        if not self.keep_left_on_context_change:
+            return
+        if not old_height or abs(new_height - old_height) < 1e-9:
+            return
+
+        half_old = old_height / 2.0
+        half_new = new_height / 2.0
+
+        try:
+            plus_view  = self.m_scene.sceneToView(self.mapToScene(QPointF(0, half_old)))
+            minus_view = self.m_scene.sceneToView(self.mapToScene(QPointF(0, -half_old)))
+            sign = 1.0 if plus_view.x() <= minus_view.x() else -1.0
+        except AttributeError:
+            # 没有场景（单元测试里裸建图元）时按 agv 地图的约定：局部 +y 在左侧
+            sign = 1.0
+
+        # 钉住局部 y = center_y + sign*half 这条边：center_y' = center_y + sign*(half_old-half_new)
+        delta = sign * (half_old - half_new)
+        self._center_pos = QPointF(self._center_pos.x(), self._center_pos.y() + delta)
+
     def handle_context_change(self):
+        old_height = self._scene_size.height()
         self.width  =self.getSize().width()
         text_height_view =  self.width* self.m_scene.grid_size  / self.m_scene.scene_units_per_grid_x
         text_width_view  =  self.calc_font_size(text_height_view,self._context)
         self.height       =  text_width_view *self.m_scene.scene_units_per_grid_x/self.m_scene.grid_size 
+        # 内容变了：左侧钉住，不要左右对称撑开
+        self.anchor_left_edge(old_height, self.height)
         self._head_pos = self._center_pos - QPointF(self.width/2.0,self.height/2.0)
         self._end_pos  = self._center_pos + QPointF(self.width/2.0,self.height/2.0)
         self._scene_size.setWidth(abs(self._end_pos.x()-self._head_pos.x()))
@@ -2292,7 +2349,7 @@ class text_element(base_element):
 
         
         angle =    self.sceneTransform().get_rotation_angle()
-        print(f"id:{self.id()}angle{angle}")
+        # print(f"id:{self.id()}angle{angle}")
         return {
             "id"   :self.id(),
             "name"   :self.get_name(),
@@ -2395,47 +2452,57 @@ class image_element(base_element):
         
         # 构建正确的图片路径
         
-        self.img_path = os.path.join(base_dir, "res", "H7.png")
+        # self.img_path = os.path.join(base_dir, "res", "H7.png")
+
+        self.img_file = "H7.png"
+        self.img_path = res_mng.get_img_path(self.img_file)
         
         self.set_actived( True)
         self.set_selected(False)
            
     def __del__(self):
-        print(f"销毁image图元 id:{self.id()} name：{self.get_name()}")
-    
+        _log_destroy("image", self)
+
     def image_path(self):
-        # return self.img_path
-        if getattr(sys, 'frozen', False):
+            return self.img_file
+    
+    def set_image_path(self,path):
+        self.img_file = path
+        self.img_path = res_mng.get_img_path(path)
+    
+    # def image_path(self):
+    #     # return self.img_path
+    #     if getattr(sys, 'frozen', False):
            
 
-            # 打包后的可执行文件路径（如 PyInstaller）
-            base_dir = os.path.dirname(sys.executable)
-        else:
-            # 脚本文件所在路径
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-        # 统一为正斜杠，保证在 macOS/Linux 下也能打开 Windows 保存的工程
-        return os.path.relpath(self.img_path,base_dir).replace(os.sep, "/") #相对路径
+    #         # 打包后的可执行文件路径（如 PyInstaller）
+    #         base_dir = os.path.dirname(sys.executable)
+    #     else:
+    #         # 脚本文件所在路径
+    #         base_dir = os.path.dirname(os.path.abspath(__file__))
+    #     # 统一为正斜杠，保证在 macOS/Linux 下也能打开 Windows 保存的工程
+    #     return os.path.relpath(self.img_path,base_dir).replace(os.sep, "/") #相对路径
 
-    def set_image_path(self,path):
-        """传入相对路径"""
-        if getattr(sys, 'frozen', False):
+    # def set_image_path(self,path):
+    #     """传入相对路径"""
+    #     if getattr(sys, 'frozen', False):
 
-            try:
-            # PyInstaller 创建的临时文件夹，包含所有添加的资源文件
-                base_dir = sys._MEIPASS
-            except AttributeError:
-                # 如果 _MEIPASS 不存在，回退到可执行文件目录
-                base_dir = os.path.dirname(sys.executable)
-            # 打包后的可执行文件路径（如 PyInstaller）
-            # base_dir = os.path.dirname(sys.executable)
-        else:
-            # 脚本文件所在路径
-            base_dir = os.path.dirname(os.path.abspath(__file__))
+    #         try:
+    #         # PyInstaller 创建的临时文件夹，包含所有添加的资源文件
+    #             base_dir = sys._MEIPASS
+    #         except AttributeError:
+    #             # 如果 _MEIPASS 不存在，回退到可执行文件目录
+    #             base_dir = os.path.dirname(sys.executable)
+    #         # 打包后的可执行文件路径（如 PyInstaller）
+    #         # base_dir = os.path.dirname(sys.executable)
+    #     else:
+    #         # 脚本文件所在路径
+    #         base_dir = os.path.dirname(os.path.abspath(__file__))
 
-        if path:
-            # JSON 中的路径可能带 Windows 反斜杠，先统一为正斜杠再拼接
-            path = path.replace("\\", "/")
-            self.img_path = os.path.normpath(os.path.join(base_dir, path))
+    #     if path:
+    #         # JSON 中的路径可能带 Windows 反斜杠，先统一为正斜杠再拼接
+    #         path = path.replace("\\", "/")
+    #         self.img_path = os.path.normpath(os.path.join(base_dir, path))
     
     def update_boundingRect(self):
         super().update_boundingRect()
@@ -2742,7 +2809,7 @@ class image_element(base_element):
 
         
         angle =    self.sceneTransform().get_rotation_angle()
-        print(f"id:{self.id()}angle{angle}")
+        # print(f"id:{self.id()}angle{angle}")
         return {
             "id"   :self.id(),
             "name"   :self.get_name(),
@@ -2850,7 +2917,7 @@ class triangle_element(rect_element):
             self._refresh_local_bounds()
 
     def __del__(self):
-        print(f"销毁triangle图元 id:{self.id()} name：{self.get_name()}")
+        _log_destroy("triangle", self)
 
     def _default_local_vertices(self, width, height) -> List[QPointF]:
         """Return the legacy apex-up triangle fitted into ``width``/``height``."""

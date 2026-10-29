@@ -2,8 +2,8 @@
 from threading import Lock
 from PySide6.QtCore import QRectF, QPointF
 
-from my_common import SceneMode
-from myGraphicsScene import myGraphicsScene, DEFAULT_BACKGROUND_COLOR
+from .my_common import SceneMode
+from .myGraphicsScene import myGraphicsScene, DEFAULT_BACKGROUND_COLOR, debug_log
 
 from PySide6.QtWidgets import QMainWindow, QApplication
 
@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF,Signal,QSize,QObject,QRect,QPoint
 from PySide6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack
 
 import json,sys,os,traceback
-from elements import (
+from .elements import (
     base_element,
     circle_element,
     group_element,
@@ -27,167 +27,11 @@ from elements import (
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtCore import QRegularExpression
 
-from rect_params_ui import Ui_Dialog
-from group_params_ui import Ui_Dialog as Group_params_Ui
-from agv_test_ui import Ui_Dialog as agv_test_Ui
-from property_set_ui import Ui_Dialog as property_set_Ui
-from mySnapSystem import SnapSystem
+
+from .mySnapSystem import SnapSystem
 import copy
 
-class property_set(QDialog):
-    # clean_timer =Signal()
-    def __init__(self,parent=None,rect_params=None):
-        super().__init__(parent)
-        self.ui = property_set_Ui()
-        self.ui.setupUi(self)
-
-        
-        self.rect_params_ref=rect_params
-    
-    def accept(self):
-        print("accept")
-        self.rect_params_ref["line_width"] = self.ui.spinBox_lineWidth.value()
-        self.rect_params_ref["font_size"]   = self.ui.spinBox_fontSize.value()
-        self.rect_params_ref["fill"]   = self.ui.checkBox_fill.isChecked()
-        if self.ui.radioButton_black.isChecked():
-            self.rect_params_ref["color"]   = QColor(0,0,0)
-        elif self.ui.radioButton_blue.isChecked():
-            self.rect_params_ref["color"]   = QColor(0,0,255)
-        elif self.ui.radioButton_green.isChecked():
-            self.rect_params_ref["color"]   = QColor(0,255,0)
-        elif self.ui.radioButton_yellow.isChecked():
-            self.rect_params_ref["color"]   = QColor(255,255,0)
-        elif self.ui.radioButton_red.isChecked():
-            self.rect_params_ref["color"]   = QColor(255,0,0)
-        
-        
-        return super().accept()
-    
-    def reject(self):
-       
-        return super().reject()
-    def closeEvent(self, arg__1):
-        
-        return super().closeEvent(arg__1)
-
-class rect_params_setup(QDialog):
-    # clean_timer =Signal()
-    def __init__(self,parent=None,rect_params=None):
-        super().__init__(parent)
-        self.ui = Ui_Dialog()
-        self.ui.setupUi(self)
-
-        regex = QRegularExpression("^[1-9]\\d*$")
-        validator = QRegularExpressionValidator(regex, self.ui.lineEdit_width)
-        self.ui.lineEdit_width.setValidator(validator)
-        self.ui.lineEdit_height.setValidator(validator)
-        self.ui.lineEdit_width.setText("200")
-        self.ui.lineEdit_height.setText("200")
-       
-   
-
-        self.rect_params_ref=rect_params
-    
-    def accept(self):
-        print("accept")
-       
-        self.rect_params_ref["height"] = int(self.ui.lineEdit_width.text())
-        self.rect_params_ref["width"] = int(self.ui.lineEdit_height.text())
-        
-        return super().accept()
-    def reject(self):
-        self.rect_params_ref = None
-        return super().reject()
-    def closeEvent(self, arg__1):
-        self.rect_params_ref = None
-        return super().closeEvent(arg__1)
-
-class group_params_setup(QDialog):
-    # clean_timer =Signal()
-    def __init__(self,parent=None,rect_params=None):
-        super().__init__(parent)
-        self.ui = Group_params_Ui()
-        self.ui.setupUi(self)
-
-        regex = QRegularExpression("^[1-9]\\d*$")
-        validator = QRegularExpressionValidator(regex, self.ui.lineEdit_group_id)
-        self.ui.lineEdit_group_id.setValidator(validator)
-        self.ui.lineEdit_group_id.setText("1")
-        self.rect_params_ref=rect_params
-    
-    def accept(self):
-        print("accept")
-        self.rect_params_ref["group_id"] = int(self.ui.lineEdit_group_id.text())
-        self.rect_params_ref["group_name"]   = self.ui.lineEdit_group_name.text()
-        return super().accept()
-    
-    def reject(self):
-        self.rect_params_ref = None
-        return super().reject()
-    def closeEvent(self, arg__1):
-        self.rect_params_ref = None
-        return super().closeEvent(arg__1)
-
-
-class agv_test(QDialog):
-    
-    def __init__(self,parent=None,manager =None):
-        super().__init__(parent)
-        self.ui = agv_test_Ui()
-        self.ui.setupUi(self)
-        self.parent =parent
-        self.ui.Slider_x.valueChanged.connect(self.update_data)
-        self.ui.Slider_y.valueChanged.connect(self.update_data)
-        self.ui.Slider_a.valueChanged.connect(self.update_data)
-        self.ui.Slider_angle_F.valueChanged.connect(self.update_data)
-        self.ui.Slider_angle_B.valueChanged.connect(self.update_data)
-       
-        self.scene_manager = manager
-        # self.rect_params_ref=rect_params
-
-    def update_data(self):
-        id =self.ui.spinBox_group_id.value()
-        x = self.ui.Slider_x.value()
-        y = self.ui.Slider_y.value()
-        a = self.ui.Slider_a.value()
-        angle_F =self.ui.Slider_angle_F.value()
-        angle_B =self.ui.Slider_angle_B.value()
-
-        if self.parent or True:
-           
-            element =   self.scene_manager.m_items[id]
-            element.move_to_pos(x,y)
-            element.rotate_to_ang(a)
-
-
-class circle_params_setup(QDialog):
-    # clean_timer =Signal()
-    def __init__(self,parent=None,rect_params=None):
-        super().__init__(parent)
-        self.ui = Ui_Dialog()
-        self.ui.setupUi(self)
-
-        regex = QRegularExpression("^[1-9]\\d*$")
-        validator = QRegularExpressionValidator(regex, self.ui.lineEdit_width)
-        self.ui.lineEdit_width.setValidator(validator)
-        self.ui.lineEdit_height.setValidator(validator)
-        self.ui.lineEdit_width.setText("200")
-        self.ui.lineEdit_height.setText("200")
-        self.ui.combo_color.addItems(["黑","绿","蓝"])
-        # self.ui.lineEdit_width.editingFinished.connect()
-
-        self.rect_params_ref=rect_params
-    
-    def accept(self):
-        print("accept")
-       
-        self.rect_params_ref["height"] = int(self.ui.lineEdit_width.text())
-        self.rect_params_ref["width"] = int(self.ui.lineEdit_height.text())
-        self.rect_params_ref["info"]   = self.ui.lineEdit_info.text()
-        self.rect_params_ref["color"]   =self.ui.combo_color.currentIndex()
-        self.rect_params_ref["fill"]   = self.ui.checkBox_isFill.isChecked()
-
-
+from res.designer_resource_manager import  resource_manager as res_mng
 
 class QuadtreeNode:
     def __init__(self, boundary: QRectF, capacity=4):
@@ -399,31 +243,70 @@ class QuadtreeNode:
 
 class SceneSerializer:
     @staticmethod
+    def _resource_dirs():
+        """按优先级返回查找场景文件的候选目录。
+
+        打包后 exe 的资源可能落在不同位置，取决于 ``--add-data`` 的目标路径：
+        直接放在解包根目录、放在 ``myDesigner/`` 子目录，或者被现场替换到
+        exe 同目录。单看 ``sys._MEIPASS`` 一处会漏，所以这里全部列出来逐个试。
+        """
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates = []
+
+        if getattr(sys, 'frozen', False):
+            # 1) exe 同目录：允许现场直接替换 data2.json，不必重新打包
+            candidates.append(os.path.dirname(os.path.abspath(sys.executable)))
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass:
+                # 2) --add-data 目标为根目录
+                candidates.append(meipass)
+                # 3) --add-data 目标为 myDesigner（打包工具按源相对路径放置）
+                candidates.append(os.path.join(meipass, 'myDesigner'))
+        else:
+            # 源码运行：data2.json 就在 myDesigner 包里
+            candidates.append(module_dir)
+            candidates.append(os.path.dirname(module_dir))
+
+        # 4) 兜底：当前工作目录
+        try:
+            candidates.append(os.getcwd())
+        except OSError:
+            pass
+
+        # 去重且保持顺序
+        seen, ordered = set(), []
+        for path in candidates:
+            if not path:
+                continue
+            key = os.path.normcase(os.path.abspath(path))
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered.append(path)
+        return ordered
+
+    @staticmethod
     def get_json_path(relative_path=""):
         """获取json文件路径
+
         Args:
-            relative_path: 相对于exe或脚本目录的子路径，如"config/data.json"
+            relative_path: 相对于资源根目录的子路径，如"config/data.json"。
+                为空时默认 "data.json"。
+
+        查找顺序见 :meth:`_resource_dirs`：取第一个真实存在的文件。
+        都不存在时返回第一候选（调用方按"空场景"处理，保存时也不会写到
+        临时解包目录里白白丢失）。
         """
-        if getattr(sys, 'frozen', False):
-            try:
-            # PyInstaller 创建的临时文件夹，包含所有添加的资源文件
-                base_dir = sys._MEIPASS
-            except AttributeError:
-                # 如果 _MEIPASS 不存在，回退到可执行文件目录
-                base_dir = os.path.dirname(sys.executable)
+        name = relative_path or "data.json"
+        if os.path.isabs(name):
+            return name
 
-
-
-            # 打包后的可执行文件路径（如 PyInstaller）
-            # base_dir = os.path.dirname(sys.executable)
-        else:
-            # 脚本文件所在路径
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # 处理相对路径
-        if relative_path:
-            return os.path.join(base_dir, relative_path)
-        return os.path.join(base_dir, "data.json")
+        dirs = SceneSerializer._resource_dirs()
+        for base_dir in dirs:
+            candidate = os.path.join(base_dir, name)
+            if os.path.isfile(candidate):
+                return candidate
+        return os.path.join(dirs[0], name)
     
 
 
@@ -499,7 +382,7 @@ class SceneSerializer:
         print(f"JSON 文件已保存至: {json_path}")
 
     @staticmethod
-    def deserialize_scene(scene: myGraphicsScene, filename: str):
+    def deserialize_scene(scene: myGraphicsScene, filename: str ,mode:SceneMode= SceneMode.Design):
         """从JSON文件反序列化场景"""
         def restore_relationship(id_item_map):
             # print(id_item_map)
@@ -509,8 +392,13 @@ class SceneSerializer:
                     # if isinstance(id_item_map[item.m_parent_id],group_element):
                     #     item.set_group_id(item.m_parent_id)
 
+        if mode == SceneMode.Design:
+            json_path=SceneSerializer.get_json_path(filename)
+        else:
+            json_path= res_mng.get_json_path(filename)
 
-        json_path=SceneSerializer.get_json_path(filename)
+
+
         if not os.path.isfile(json_path):
             # A brand-new design page has no file yet; treat it as empty
             # instead of aborting the application startup.
@@ -518,7 +406,6 @@ class SceneSerializer:
             return
         with open(json_path, "r", encoding="utf-8") as f:
             scene_data = json.load(f)  # 解析为 Python 字典或列表
-            print("提取的数据:", scene_data)
         
         # for item in scene.findChildren(base_element):
         #     item.deleteLater()
@@ -600,7 +487,7 @@ class SceneSerializer:
             scene.set_view_scene_rect(view_rect)
 
 
-        print(scene.scene_manager.m_name_items)
+        debug_log(scene.scene_manager.m_name_items)
         # for  id,item in      scene.scene_manager.m_items:
         #     if item.m_parent_id>0:
     
@@ -618,6 +505,7 @@ class QuadTreeScene(myGraphicsScene):
     action_set_group         =Signal(list)# 图元编辑成组
     scene_updated            =Signal()
     quadtree_updated         =Signal()
+
     
     item_GeometryChange      =Signal(base_element)
     item_DirtyChange         =Signal(base_element)
@@ -629,7 +517,7 @@ class QuadTreeScene(myGraphicsScene):
     # (variable_name, value, source_element, event_name)
     variable_written = Signal(str, object, object, str)
 
-    
+    double_clicked_without_group = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -673,7 +561,7 @@ class QuadTreeScene(myGraphicsScene):
 
         self.snapSys = SnapSystem(self,self.scene_units_per_grid_x/self.grid_size*self.scale_factor*10,self.map_scene_to_screen)
         self.snapSys.move_item_to_snap_pos.connect(self.move_item_to_snap_pos)
-        self.mouse_not_move_signal.connect(lambda:self.snapSys.move_cursor_to_snaped_pos_V2(self.snapSys.current_snap_pos,not self.menu_opened and self.cursor_inside_flag and self.is_show_grid()))
+        self.mouse_not_move_signal.connect(lambda:self.snapSys.move_cursor_to_snaped_pos_V2(self.snapSys.current_snap_pos,not self.menu_opened and self.cursor_inside_flag and self.is_show_grid() and self.snap_auto_enabled()))
 
         self.set_snap_sys_ref(self.snapSys)
 
@@ -687,9 +575,9 @@ class QuadTreeScene(myGraphicsScene):
         self.menu_opened =False
         self.update_callback         = None
         self.__load_done = False
-        
+
         # 提高渲染频率，减少拖影
-     
+
         self.render_timer.timeout.connect(self.on_render_frame)
         # # 确保拖动时也能及时更新
         # self.setRenderHint(QPainter.Antialiasing | QPainter.SmoothPixmapTransform | QPainter.TextAntialiasing)
@@ -699,7 +587,17 @@ class QuadTreeScene(myGraphicsScene):
         self.frame_count_timer.setTimerType(Qt.PreciseTimer)  # 高精度模式
         self.frame_count_timer.timeout.connect(self.handle_frame_count)
         self.frame_count_timer.start(1000)
+
         
+
+    def snap_auto_enabled(self) -> bool:
+        """鼠标停止移动时是否自动吸附到捕捉点。
+
+        运行模式保持自动吸附；设计模式（DesignScene）覆盖为 False，
+        只按快捷键 T 手动吸附。
+        """
+        return True
+
     def loadDone(self):
         return self.__load_done
     
@@ -816,7 +714,7 @@ class QuadTreeScene(myGraphicsScene):
         if manager is None or scene_pos is None:
             return None
 
-        for item in reversed(manager.m_sorted_items):
+        for item in reversed(getattr(manager, "m_sorted_items", [])):
             if not isinstance(item, group_element):
                 continue
             if not item.get_visibility():
@@ -824,9 +722,11 @@ class QuadTreeScene(myGraphicsScene):
             if not (
                 item.has_event_bindings()
                 or item.is_toggle_enabled()
+                or item.is_interactive()
             ):
                 continue
-            if item.contains_scene_pos(scene_pos):
+            rect = item.sceneBoundingRect()
+            if isinstance(rect, QRectF) and rect.contains(scene_pos):
                 return item
         return None
 
@@ -1102,6 +1002,12 @@ class QuadTreeScene(myGraphicsScene):
                     group.contains_scene_pos(self._event_scene_pos(event))
                 )
 
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        if event.button() == Qt.LeftButton and self._mode == SceneMode.Run:
+            group = self._find_event_group_at(self._event_scene_pos(event))
+            if group is None:
+                self.double_clicked_without_group.emit()
 
     def on_menu_closed(self):
         self.menu_opened = False
@@ -1729,11 +1635,23 @@ class QuadTreeScene(myGraphicsScene):
         SceneSerializer.serialize_scene(self, filename)
 
 
-    def load_element_info(self, filename="datas/data.json"):
+    def load_element_info(self, filename="page1.json"):
         self.delete_all_elements()
         SceneSerializer.deserialize_scene(self, filename)
         self.update()
         self.__load_done = True
+    # def load_element_info2(self, filename="scene2.json"):
+    #     self.delete_all_elements()
+    #     SceneSerializer.deserialize_scene(self, filename)
+    #     self.update()
+    #     self.__load_done = True
+
+
+    def load_element_info_run_mode(self, filename="scene1.json"):
+        self.delete_all_elements()
+        SceneSerializer.deserialize_scene(self, filename,mode= SceneMode.Run)
+        self.update()
+        self.__load_done = True    
     
     def right_alignment_for_selected(self):
         """右对齐"""
@@ -1997,7 +1915,7 @@ class SceneManager(QObject):
         construct_from_dict = arg[1]
         # 注册到管理容器
         self.m_items[item.id()] = item
-        print(self.m_items.keys())
+        debug_log(self.m_items.keys())
        
         self.m_scene.addItem(item)
 
@@ -2006,7 +1924,7 @@ class SceneManager(QObject):
         self.sort_items_by_zValue()
         
         
-        print(f"加入id:{item.id()}type:{item.type}到了场景")
+        debug_log(f"加入id:{item.id()}type:{item.type}到了场景")
 
     def re_addItem_to_tree(self,id):
         
@@ -2027,7 +1945,7 @@ class SceneManager(QObject):
             if item_id==item.id():
                 del self.m_name_items[item_name]
         self.sort_items_by_zValue()
-        print(self.m_items.keys() , self.m_name_items)
+        debug_log(self.m_items.keys(), self.m_name_items)
     
         
 
@@ -2036,7 +1954,11 @@ class SceneManager(QObject):
         return self.m_items.get(id, None)
 
 
-
+    def findItemByName(self, name):
+        item_id = self.m_name_items.get(name, None)
+        if item_id is not None:
+            return self.findItem(item_id)
+        return None
 
 
 

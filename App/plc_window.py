@@ -3,21 +3,24 @@ from PySide6.QtWidgets import (QWidget, QLabel,QHBoxLayout,QSpinBox,QComboBox,QP
 ,QLineEdit,QSizePolicy,QMessageBox,QGroupBox,QDialogButtonBox)
 from PySide6.QtCore import Qt,Signal,QTimer,QRect
 from PySide6.QtGui import QPalette,QColor,QPaintEvent,QPen,QPainter,QBrush
-from load_ui import LoadWidget,LoadDialog
-from resource_manager import resource_manager as res_mng
-from plc_manager import PLCManager
+from App.load_ui import LoadWidget,LoadDialog
+
+from App.plc_manager import PLCManager
 from snap7.util import *
-from data_broker import DataBroker
+from App.data_broker import DataBroker
 from typing import List
 # from common import NameValLabel
 from functools import partial
 
-from myDesigner import RackStoreWindow,RackStoresWindow
+# from myDesigner import RackStoreWindow,RackStoresWindow
+from Designer.modes.run import  RackStoreWindow,RackStoresWindow
 
-from global_config import global_cfg
+from App.global_config import global_cfg
 
-from flip_clock import FlipDigit_Time_display
+from App.flip_clock import FlipDigit_Time_display
 
+
+from res.resource_manager import resource_manager as res_mng
 
 
 SELECTED_COLOR =QColor(0,0,0)

@@ -1,6 +1,6 @@
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QWidget, QMainWindow, QDialog
-from uic_compat import loadUi as uic_loadUi
+from .uic_compat import loadUi as uic_loadUi
 
 
 

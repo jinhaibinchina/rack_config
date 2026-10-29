@@ -1003,7 +1003,7 @@ class RackStatusPanelModel(QObject):
 
         result = {"lamps": 0, "texts": 0}
 
-        if not self.group.get_visibility():
+        if self.group is None or not self.group.get_visibility():
             return result
         if data is None or len(data) < 34:
             self.warnings.append("DB12 数据为空或长度不足，已忽略")

@@ -28,12 +28,17 @@ class RackStoreWindow(QWidget):
         self.setLayout(layout)
 
     def update_rack_store_display(self,datas):
-        
-        status=[]
-        for data in datas:
-            status.append(data)
+        """按 8 个状态位刷新这一页的料仓显示。
+
+        图元是按名字找的，场景没加载到时（比如打包漏了 data.json）找回来是 None，
+        逐个跳过即可 —— 否则 PLC 每帧回调都会抛一次 KeyError 把控制台刷满。
+        """
+        status = list(datas)
         item_names = ('A库位空筒','A库位满料','B库位空筒','B库位满料','单库位空筒','单库位满料','双库托盘','单库托盘')
-        for i in range(8):
-            self.SceneManager.findItem(self.SceneManager.m_name_items[item_names[i]]).set_visibility(status[i])
+        for i, name in enumerate(item_names):
+            item = self.SceneManager.findItemByName(name)
+            if item is None:
+                continue
+            item.set_visibility(bool(status[i]) if i < len(status) else False)
 
         

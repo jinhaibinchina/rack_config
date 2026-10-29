@@ -5,17 +5,17 @@ from PySide6.QtCore import Qt, QObject, QEvent ,Signal,QTimer
 
 import sys
 import os
-from plc_manager import PLCManager
-from search_ip import scan_by_arp
-from load_ui import LoadMainWindow
+from App.plc_manager import PLCManager
+from App.search_ip import scan_by_arp
+from App.load_ui import LoadMainWindow
 
-from tabbed_wigdet import TabbedPlcWidget
-from resource_manager import resource_manager as res_mng
+from App.tabbed_wigdet import TabbedPlcWidget
+from res.resource_manager import resource_manager as res_mng
 
-from login_window import LoginWindow
-from global_config import global_cfg
+from App.login_window import LoginWindow
+from App.global_config import global_cfg
 
-from rcd_window import RcdWindow
+from App.rcd_window import RcdWindow
 
 VERSION = "V6.0.0"
 VERSION_INFO = f"版本:{VERSION}\n1,初版\n2,支持冷压1-50，模切1-50，预分切1-50,阴极冷压3+3 1-50\n3"

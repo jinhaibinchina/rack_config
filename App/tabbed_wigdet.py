@@ -6,9 +6,9 @@ from PySide6.QtCore import Signal, Slot, Qt,QObject
 from PySide6.QtGui import QCloseEvent,QIcon
 from typing import Dict, Optional
 
-from plc_window import ConfigWindow ,WindowContainer
-from plc_manager import PLCManager
-from data_broker import DataBroker
+from App.plc_window import ConfigWindow ,WindowContainer
+from App.plc_manager import PLCManager
+from App.data_broker import DataBroker
 
 
 # 主窗口类

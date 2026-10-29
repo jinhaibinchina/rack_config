@@ -46,7 +46,13 @@ class RackStoresWindow(QWidget):
         self.rack_process_model = RackProcessModel(self.SceneManager, self)
 
         if self.panel_status.warnings:
-            print("料仓状态面板：", self.panel_status.warnings)
+            if not self.SceneManager.m_items:
+                # 场景是空的：多半是打包后没把 myDesigner/data2.json 带上，
+                # 这时逐条列 9 个"缺少图元"没意义，直接提示根因。
+                print("场景为空（未加载到 data2.json）：料仓与状态面板均未绑定。"
+                      "打包时请把 myDesigner/data2.json 一起加进去。")
+            else:
+                print("料仓状态面板：", self.panel_status.warnings)
 
         # 点击某个仓位时高亮该仓位的编号（红色），其余仓位编号恢复黑色
         self.rack_store_model.slot_clicked.connect(self.on_slot_clicked)
@@ -101,15 +107,22 @@ class RackStoresWindow(QWidget):
         if rack_arrangements is not None:
             self.set_rack_arrangements(rack_arrangements)
 
+        # 场景可能没加载到图元（打包后 data2.json 没带进去），此时模型是空的。
+        # 每条链路都按"图元不存在就跳过"处理，不要抛 AttributeError 把界面顶掉。
+        rack_counts = list(rack_counts or ())
+        host_count = max(0, int(host_count or 0))
+
         for i in range(10):
-            
+
+            rack = self.rack_store_model.rack(i + 1)
             if i<=host_count-1:
-                
-                self.rack_store_model.rack(i+1).set_machine_number(f"{i+host_start_No}")
-                
+
+                if rack is not None:
+                    rack.set_machine_number(f"{i+host_start_No}")
+
                 self.rack_store_model.setVisible_rack(i+1, True)
             else:
-               
+
                 self.rack_store_model.setVisible_rack(i+1, False)
 
 
@@ -117,33 +130,42 @@ class RackStoresWindow(QWidget):
                 # rack_counts 比 host_count 短时按 0 个仓位处理，避免 IndexError
                 slot_count = rack_counts[i] if i < len(rack_counts) else 0
                 if i<=host_count-1 and j<slot_count:
-                    
-                    self.rack_store_model.setVisible_slot(i+1,j+1,True)                   
+
+                    self.rack_store_model.setVisible_slot(i+1,j+1,True)
                 else:
                     self.rack_store_model.setVisible_slot(i+1,j+1,False)
 
-        for key, (rack_no_A, rack_no_B) in (hmi_config or {}).items():
-            index = int(key.split("_")[1]) - 1
+        for key, value in (hmi_config or {}).items():
+            # key 形如 "HMI_1"，脏数据直接忽略，不要连累后面的配置
+            try:
+                index = int(str(key).split("_")[1]) - 1
+            except (IndexError, ValueError):
+                continue
+            if not (0 <= index < len(self.rack_hmi_config_models)):
+                continue
 
-            self.rack_hmi_config_models[index].set_text(key)
-            if 0 <= index < len(self.rack_hmi_config_models):
+            model = self.rack_hmi_config_models[index]
+            model.set_text(key)
 
-                if rack_no_A >0 and rack_no_B >0:
-                    pos = self.rack_store_model.rack(rack_no_A).label_position
-                    self.rack_hmi_config_models[index].move_endpos_of_line(1, pos)
-                    pos = self.rack_store_model.rack(rack_no_B).label_position
-                    self.rack_hmi_config_models[index].move_endpos_of_line(2, pos)
-                elif rack_no_A >0 :
-                    pos = self.rack_store_model.rack(rack_no_A).label_position
-                    self.rack_hmi_config_models[index].move_endpos_of_line(1, pos)
-                    self.rack_hmi_config_models[index].move_endpos_of_line(2, pos)
-                elif rack_no_B >0 :
-                    pos = self.rack_store_model.rack(rack_no_B).label_position
-                    self.rack_hmi_config_models[index].move_endpos_of_line(1, pos)
-                    self.rack_hmi_config_models[index].move_endpos_of_line(2, pos)
-                else:
-                    self.rack_hmi_config_models[index].hide_all()
-                   
+            try:
+                rack_no_A, rack_no_B = value
+            except (TypeError, ValueError):
+                rack_no_A = rack_no_B = 0
+
+            # 图元缺失时 rack() 返回 None，按"这条线不画"处理
+            rack_A = self.rack_store_model.rack(rack_no_A) if rack_no_A > 0 else None
+            rack_B = self.rack_store_model.rack(rack_no_B) if rack_no_B > 0 else None
+
+            if rack_A is not None and rack_B is not None:
+                model.move_endpos_of_line(1, rack_A.label_position)
+                model.move_endpos_of_line(2, rack_B.label_position)
+            elif rack_A is not None or rack_B is not None:
+                pos = (rack_A or rack_B).label_position
+                model.move_endpos_of_line(1, pos)
+                model.move_endpos_of_line(2, pos)
+            else:
+                model.hide_all()
+
     # ------------------------------------------------------------ 仓位排列方向
     def set_rack_arrangements(self, rack_arrangements) -> List[int]:
         """按每台料架的方向批量设置（0 正序 / 1 反序），返回实际翻转过的料架号。

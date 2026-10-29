@@ -3,6 +3,16 @@ from __future__ import annotations
 import copy
 import json
 import os,sys
+
+# 图元级调试输出总开关，默认关闭（见 myGraphicsScene.DEBUG_SCENE）
+DEBUG_SCENE = os.environ.get("RACK_DEBUG_SCENE", "") == "1"
+
+
+def debug_log(*args, **kwargs) -> None:
+    if DEBUG_SCENE:
+        print(*args, **kwargs)
+
+
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, 
     QTreeWidget, QTreeWidgetItem, QStackedWidget, QLabel, QFrame,QScrollArea,
@@ -14,11 +24,11 @@ from PySide6.QtCore import Qt, QTimer, QEvent,QObject,QRegularExpression,QPointF
 from math import sin,cos ,atan,pi,sqrt
 from typing import overload,Union,List,Optional,TYPE_CHECKING
 from PySide6.QtGui import QFont,QColor, QPainter, QTransform, QRegion,QAction, QRegularExpressionValidator, QPalette,QPen,QPainterPath,QPainterPathStroker,QFontMetrics,QPixmap
-from my_transform_v2 import Transform
+from .my_transform_v2 import Transform
 import time
-from my_common import SceneMode
+from .my_common import SceneMode
 if TYPE_CHECKING:
-    from elements import group_element
+    from .elements import group_element
 
 def is_group_element(item) -> bool:
     """判断图元是否为 group_element
@@ -26,7 +36,7 @@ def is_group_element(item) -> bool:
     element 与 elements 之间存在循环导入（elements 依赖 element），
     因此 group_element 只能在运行时延迟导入，不能放在模块顶层。
     """
-    from elements import group_element
+    from .elements import group_element
     return isinstance(item, group_element)
 
 def color_to_str(color: QColor, format: str = 'hex') -> str:
@@ -181,6 +191,21 @@ class base_element(QObject):
         self.m_this_frame_flag_2 = False
         self.m_veiw_dirty_region =QRegion()
 
+        self._interactive = False
+
+    def set_interactive(self, enable):
+        """运行态是否参与点击命中测试。
+
+        纯代码 ``clicked.connect(...)`` 不会产生事件绑定表，只有打开这个
+        开关，场景的 ``_find_event_group_at`` 才会把该图元当作可点击目标，
+        进而触发 pressed/released/clicked 信号。
+        """
+        self._interactive = bool(enable)
+
+    def is_interactive(self):
+        return self._interactive
+
+
     def set_dirty_region(self,dirty_region):
         self.m_veiw_dirty_region = dirty_region
   
@@ -264,6 +289,10 @@ class base_element(QObject):
 
     def _reset_moving_flag(self):
         self.__moving_flag = False
+        # 本帧绘制已经消费掉变换缓存，同步清掉 mapToScene() 记录的
+        # “正在移动”快照；否则 check_hover() 会把静止图元当成拖拽中，
+        # 永远拒绝命中，运行态点击图元（电柜等分组）就会没有反应。
+        self.__is_moving = False
     def is_moving(self):
         return self.__is_moving
     
@@ -362,7 +391,7 @@ class base_element(QObject):
     def reSetTransformOriginPoint(self,  *args):#group变动之后执行会出错
         """设置变换原点"""
         if self.m_parent is not None :
-            print("图元已存在父图元")
+            debug_log("图元已存在父图元")
             return
         pos = QPointF()
         if len(args)   == 1:    # QPoint输入
@@ -432,7 +461,7 @@ class base_element(QObject):
         self.m_pos_init =copy.deepcopy(self.m_pos)
         self.invalidate_transform_cache()
 
-        print("设置父对象")
+        debug_log("设置父对象")
         
         # print(self.m_pos,m_pos_in_parent)
        
@@ -444,7 +473,7 @@ class base_element(QObject):
 
 
 
-        print(parent.id(),parent.m_children)
+        debug_log(parent.id(), parent.m_children)
 
     def removeParentItem(self, force=False):
         """移除父图元后继承变换
@@ -635,7 +664,7 @@ class base_element(QObject):
        
         self.update_boundingRect()
       
-        print(f"图元{self.id()}构建完成,bound{self._sceneBoundingRect}")
+        debug_log(f"图元{self.id()}构建完成,bound{self._sceneBoundingRect}")
 
         
         self.m_scene_manager.completed_item_signal.emit(self,construct_from_dict)
