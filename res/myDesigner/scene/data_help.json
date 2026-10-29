@@ -1,0 +1,599 @@
+{
+    "sceneRect": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+    },
+    "items": [
+        {
+            "id": 828,
+            "name": "4",
+            "type": "image",
+            "image_path": "res\\2.3JSON配置修改.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1412.966,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": 1412.966,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 829,
+            "name": "2",
+            "type": "image",
+            "image_path": "res\\2.1开启车端NAP功能.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 9403.183,
+                "y": 2232.578
+            },
+            "origin_pos": {
+                "x": 9403.183,
+                "y": 2232.578
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 830,
+            "name": "7",
+            "type": "image",
+            "image_path": "res\\3.2修改服务器的ip.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -10586.537,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -10586.537,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 831,
+            "name": "1",
+            "type": "image",
+            "image_path": "res\\1.1安全方案说明.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 13403.846,
+                "y": 2232.111
+            },
+            "origin_pos": {
+                "x": 13403.846,
+                "y": 2232.111
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 832,
+            "name": "6",
+            "type": "image",
+            "image_path": "res\\3.1电柜配置.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -6584.023,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -6584.023,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 833,
+            "name": "5",
+            "type": "image",
+            "image_path": "res\\2.4安全模块ip设置.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2586.556,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -2586.556,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 834,
+            "name": "3",
+            "type": "image",
+            "image_path": "res\\2.2驱动参数设置.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 5403.365,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": 5403.365,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 835,
+            "name": "8",
+            "type": "image",
+            "image_path": "res\\3.3下载程序到PLC.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -14588.39,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -14588.39,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 836,
+            "name": "9",
+            "type": "image",
+            "image_path": "res\\3.4修改PLC的ip地址.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -18586.638,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -18586.638,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 837,
+            "name": "10",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -22588.448,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -22588.448,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 838,
+            "name": "11",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -26585.515,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -26585.515,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 839,
+            "name": "12",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -30584.808,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -30584.808,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 840,
+            "name": "13",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -34582.087,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -34582.087,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 841,
+            "name": "14",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -38586.008,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -38586.008,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 842,
+            "name": "15",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -42589.602,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -42589.602,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 843,
+            "name": "16",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -46589.275,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -46589.275,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 844,
+            "name": "17",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -50592.068,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -50592.068,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 845,
+            "name": "18",
+            "type": "image",
+            "image_path": "res\\H7.png",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -54592.979,
+                "y": 2232.781
+            },
+            "origin_pos": {
+                "x": -54592.979,
+                "y": 2232.781
+            },
+            "width": 4000.0,
+            "height": 4000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 828
+        },
+        {
+            "id": 846,
+            "name": "文本_84",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 15650.0,
+                "y": 2345.266
+            },
+            "origin_pos": {
+                "x": 15650.0,
+                "y": 2345.266
+            },
+            "width": 200.0,
+            "height": 568.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#ff0000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 29,
+                "opacity": 255
+            },
+            "context": " 到头了 ",
+            "zValue": 846
+        },
+        {
+            "id": 847,
+            "name": "文本_85",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -56800.857,
+                "y": 2187.7
+            },
+            "origin_pos": {
+                "x": -56800.857,
+                "y": 2187.7
+            },
+            "width": 200.0,
+            "height": 720.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 29,
+                "opacity": 255
+            },
+            "context": " 底线到了 ",
+            "zValue": 847
+        },
+        {
+            "id": 848,
+            "name": "矩形_194",
+            "type": "rect",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 13403.515,
+                "y": 2232.344
+            },
+            "origin_pos": {
+                "x": 13403.515,
+                "y": 2232.344
+            },
+            "width": 4000.663174172614,
+            "height": 3999.533410787901,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 848
+        }
+    ]
+}

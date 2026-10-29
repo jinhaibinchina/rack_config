@@ -22,7 +22,7 @@ class _ResourceManager:
         取 ``sys._MEIPASS``，于是拼出 ``<_MEIPASS>/App/ui/main.ui``，
         文件不存在 -> LoadMainWindow 里 ``sys.exit(1)``，表现为 exe "打不开"。
 
-        这里按优先级找出真正的资源根目录：以 ``App`` 子目录是否存在作为
+        这里按优先级找出真正的资源根目录：以 ``myDesigner`` 子目录是否存在作为
         判定依据，同时兼容"资源被放到 exe 同目录"的现场替换场景。
         """
         if not getattr(sys, 'frozen', False):
@@ -39,7 +39,7 @@ class _ResourceManager:
         candidates.append(exe_dir)
 
         for candidate in candidates:
-            if (candidate / 'App').is_dir():
+            if (candidate / 'myDesigner').is_dir():
                 return candidate
 
         # 都不存在时回退到打包约定位置，让后续报错路径可读

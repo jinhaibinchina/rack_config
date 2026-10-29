@@ -1,0 +1,7 @@
+# 运行本项目所需的三方依赖（.venv 已在 .gitignore 中，不随仓库提交）
+# 安装：python -m pip install -r requirements.txt
+
+PySide6==6.10.2
+pymodbus==3.16.1
+# 代码中 snap7 相关导入目前是注释状态，需要时再启用
+python-snap7==2.0.2

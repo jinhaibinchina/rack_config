@@ -15,14 +15,14 @@ class _ResourceManager:
         """获取资源文件的基础路径。
 
         源码运行：base 就是本文件所在目录（即 ``res/``），后续拼接
-        ``App/ui/xxx.ui`` 正好命中 ``res/App/ui/xxx.ui``。
+        ``App_SafetyCar/ui/xxx.ui`` 正好命中 ``res/App_SafetyCar/ui/xxx.ui``。
 
         打包运行：spec 里 ``datas=[('res', 'res')]`` 会把资源放到
         ``<_MEIPASS>/res/``，而不是 ``<_MEIPASS>/`` 根目录。早期这里直接
-        取 ``sys._MEIPASS``，于是拼出 ``<_MEIPASS>/App/ui/main.ui``，
+        取 ``sys._MEIPASS``，于是拼出 ``<_MEIPASS>/App_SafetyCar/ui/main.ui``，
         文件不存在 -> LoadMainWindow 里 ``sys.exit(1)``，表现为 exe "打不开"。
 
-        这里按优先级找出真正的资源根目录：以 ``App`` 子目录是否存在作为
+        这里按优先级找出真正的资源根目录：以 ``App_SafetyCar`` 子目录是否存在作为
         判定依据，同时兼容"资源被放到 exe 同目录"的现场替换场景。
         """
         if not getattr(sys, 'frozen', False):
@@ -39,7 +39,7 @@ class _ResourceManager:
         candidates.append(exe_dir)
 
         for candidate in candidates:
-            if (candidate / 'App').is_dir():
+            if (candidate / 'myDesigner').is_dir():
                 return candidate
 
         # 都不存在时回退到打包约定位置，让后续报错路径可读
@@ -78,28 +78,28 @@ class _ResourceManager:
     
     def get_icon_path(self, icon_name: str) -> str:
         """获取图标路径"""
-        return self.get_path(f"App/ico/{icon_name}")
+        return self.get_path(f"App_SafetyCar/ico/{icon_name}")
     
     def get_branch_icon_path(self, branch_icon_name: str) -> str:
         """获取图标路径"""
-        return self.get_path(f"App/ico/branch/{branch_icon_name}")
+        return self.get_path(f"App_SafetyCar/ico/branch/{branch_icon_name}")
     
     def get_config_path(self, config_name: str) -> str:
         """获取配置文件路径"""
-        return self.get_path(f"App/cfg/{config_name}")
+        return self.get_path(f"App_SafetyCar/cfg/{config_name}")
     
     def get_data_path(self, data_name: str) -> str:
         """获取数据文件路径"""
-        return self.get_path(f"App/data/{data_name}")
+        return self.get_path(f"App_SafetyCar/data/{data_name}")
     
     def get_ui_path(self, ui_name: str) -> str:
         """获取数据文件路径"""
         print(ui_name)
-        return self.get_path(f"App/ui/{ui_name}")
+        return self.get_path(f"App_SafetyCar/ui/{ui_name}")
     
     def get_template(self, template_name: str) -> str:
         """获取模板文件路径"""
-        return self.get_path(f"App/templates/{template_name}")
+        return self.get_path(f"App_SafetyCar/templates/{template_name}")
     
     def read_text(self, relative_path: str, encoding: str = 'utf-8') -> str:
         """读取文本文件内容"""

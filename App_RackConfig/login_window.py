@@ -1,7 +1,7 @@
 
 from PySide6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QMessageBox,QLabel,QLineEdit,QPushButton,QApplication
 import sys
-from App.global_config import global_cfg
+from App_RackConfig.global_config import global_cfg
 from PySide6.QtCore import Signal
 
 # class LoginWindow(QDialog):

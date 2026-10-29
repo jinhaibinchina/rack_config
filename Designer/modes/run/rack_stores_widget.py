@@ -28,7 +28,7 @@ class RackStoresWindow(QWidget):
         self.Scene.set_scene_mode(SceneMode.Run)
         self.SceneManager = SceneManager(self.Scene, parent=self)
         self.Scene.set_scene_manager(self.SceneManager)
-        self.Scene.load_element_info_run_mode('scene2.json')
+        self.Scene.load_element_info_run_mode('rack_config_scene2.json')
         # self.Scene.goto_sence_origin()
         layout =QVBoxLayout(self)
         layout.addWidget(self.Scene)

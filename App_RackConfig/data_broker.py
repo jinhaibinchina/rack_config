@@ -1,6 +1,6 @@
 from PySide6.QtCore import QThread, QMutex, QObject, Qt, Signal
 from snap7.util import *
-from App.plc_manager import PLCManager
+from App_RackConfig.plc_manager import PLCManager
 
 class DataBroker(QObject):
     # 定义信号（替代直接操作队列）
