@@ -12,16 +12,38 @@ class _ResourceManager:
         self._base_path = self._get_base_path()
     
     def _get_base_path(self) -> Path:
-        """获取资源文件的基础路径"""
-        # 如果是打包后的可执行文件
-        if getattr(sys, 'frozen', False):
-            # PyInstaller 创建的临时文件夹
-            base_path = Path(sys._MEIPASS)
-        else:
-            # 脚本文件所在路径
-            base_path = Path(__file__).parent
-        
-        return base_path
+        """获取资源文件的基础路径。
+
+        源码运行：base 就是本文件所在目录（即 ``res/``），后续拼接
+        ``App/ui/xxx.ui`` 正好命中 ``res/App/ui/xxx.ui``。
+
+        打包运行：spec 里 ``datas=[('res', 'res')]`` 会把资源放到
+        ``<_MEIPASS>/res/``，而不是 ``<_MEIPASS>/`` 根目录。早期这里直接
+        取 ``sys._MEIPASS``，于是拼出 ``<_MEIPASS>/App/ui/main.ui``，
+        文件不存在 -> LoadMainWindow 里 ``sys.exit(1)``，表现为 exe "打不开"。
+
+        这里按优先级找出真正的资源根目录：以 ``App`` 子目录是否存在作为
+        判定依据，同时兼容"资源被放到 exe 同目录"的现场替换场景。
+        """
+        if not getattr(sys, 'frozen', False):
+            return Path(__file__).parent
+
+        meipass = getattr(sys, '_MEIPASS', None)
+        exe_dir = Path(sys.executable).resolve().parent
+
+        candidates = []
+        if meipass:
+            candidates.append(Path(meipass) / 'res')
+            candidates.append(Path(meipass))
+        candidates.append(exe_dir / 'res')
+        candidates.append(exe_dir)
+
+        for candidate in candidates:
+            if (candidate / 'App').is_dir():
+                return candidate
+
+        # 都不存在时回退到打包约定位置，让后续报错路径可读
+        return (Path(meipass) / 'res') if meipass else (exe_dir / 'res')
     
     def _detect_package_name(self) -> str:
         """自动检测包名"""
