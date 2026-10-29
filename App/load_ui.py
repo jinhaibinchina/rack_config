@@ -18,6 +18,7 @@ class LoadWidget(QWidget):
             self.ui = uic_loadUi(ui_file, self)
         except Exception as e:
             print(f"Failed to load UI file: {str(e)}")
+            print(f"  ui_file = {ui_file} (exists={__import__('os').path.isfile(ui_file)})")
             sys.exit(1)
         # return
         # 设置QSS样式
@@ -45,6 +46,7 @@ class LoadDialog(QDialog):
             self.ui = uic_loadUi(ui_file, self)
         except Exception as e:
             print(f"Failed to load UI file: {str(e)}")
+            print(f"  ui_file = {ui_file} (exists={__import__('os').path.isfile(ui_file)})")
             sys.exit(1)
 
         # 设置QSS样式
@@ -66,6 +68,7 @@ class LoadMainWindow(QMainWindow):
             self.ui = uic_loadUi(ui_file, self)
         except Exception as e:
             print(f"Failed to load UI file: {str(e)}")
+            print(f"  ui_file = {ui_file} (exists={__import__('os').path.isfile(ui_file)})")
             sys.exit(1)
         # return
         # 设置QSS样式

@@ -262,6 +262,9 @@ class SceneSerializer:
                 candidates.append(meipass)
                 # 3) --add-data 目标为 myDesigner（打包工具按源相对路径放置）
                 candidates.append(os.path.join(meipass, 'myDesigner'))
+                # 4) spec 里 datas=[('res','res')] 把整包资源放在 res/ 下
+                candidates.append(os.path.join(meipass, 'res'))
+                candidates.append(os.path.join(meipass, 'res', 'myDesigner'))
         else:
             # 源码运行：data2.json 就在 myDesigner 包里
             candidates.append(module_dir)
