@@ -1066,6 +1066,425 @@ class rect_element(base_element):
         
     
 
+class checkbox_element(rect_element):
+    """复选框图元：设计时拖到画布布置，运行时点击切换勾选状态。
+
+    继承 ``rect_element`` 复用几何、变换、吸附、成组与大部分序列化逻辑，
+    只额外维护一个 ``checked`` 状态并重写绘制为「方框 + 对勾」。切换机制
+    复用基类 ``base_element`` 已内置的 ``_checked`` / ``_toggle_enabled`` /
+    ``toggle()`` / ``toggled`` 信号：默认开启 toggle，Run 模式点击时由场景
+    的鼠标事件路由调用 ``handle_mouse_release`` → ``toggle()`` 翻转状态。
+    """
+
+    count = 0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        checkbox_element.count += 1
+        self.type = "checkbox"
+        # checkbox 的语义就是可点击切换，默认开启 toggle；如需仅作状态
+        # 指示，可在属性面板关闭「可切换」。
+        self.set_toggle_enabled(True)
+
+    def __del__(self):
+        _log_destroy("checkbox", self)
+
+    def paint(self, painter: QPainter, shine_flag):
+        if self.get_visibility() is False:
+            super().paint(painter, shine_flag)
+            return
+        if not (self.m_veiw_dirty_region.intersects(self.viewBoundingRect().toRect())):
+            super().paint(painter, shine_flag)
+            return
+        if self._head_pos is None:
+            return
+
+        painter.save()
+
+        # 边框颜色：hover 时高亮，与 rect_element 保持一致。
+        color = self._color
+        if self.get_hover() or (self.is_in_group() and self._is_group_in_hover):
+            color = QColor(14, 248, 236)
+
+        center_pos_view = self.m_scene.sceneToView(self.get_scene_center_pos())
+        # 尺寸换算：场景单位 → 视图像素（沿用 rect_element 的 AGV 坐标约定，
+        # 场景 x 对应画笔 y、场景 y 对应画笔 x）。
+        h = self.scene_size.width() * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_x
+        w = self.scene_size.height() * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_y
+        bg_rect = QRectF(-w / 2.0, -h / 2.0, w, h)
+
+        painter.translate(center_pos_view)
+        angle = self.sceneTransform().get_rotation_angle()
+        painter.rotate(-angle)
+
+        fill_color = self._fill_color
+        if self.get_fill():
+            painter.setBrush(fill_color)
+        if self.get_line_width() > 0:
+            painter.setPen(QPen(color, self.get_line_width()))
+        else:
+            painter.setPen(QPen(fill_color, 0))
+
+        radius = self.get_corner_radius()
+        if radius > 0:
+            radius_x = radius * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_y
+            radius_y = radius * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_x
+            radius_x = min(radius_x, w / 2.0)
+            radius_y = min(radius_y, h / 2.0)
+            painter.drawRoundedRect(bg_rect, radius_x, radius_y)
+        else:
+            painter.drawRect(bg_rect)
+
+        # 勾选标记：方框内画一个对勾。尺寸相对方框短边缩放，避免过小图元
+        # 画出越界的勾。
+        if self.is_checked():
+            short = min(w, h)
+            if short > 4.0:
+                pen_w = max(2.0, short * 0.12)
+                painter.setPen(QPen(color, pen_w))
+                # 对勾从方框左上区域画到中下、再折向右上，占方框约 0.6 高。
+                s = short * 0.18
+                p1 = QPointF(-w * 0.28, h * 0.02)
+                p2 = QPointF(-w * 0.06, -h * 0.22)
+                p3 = QPointF(w * 0.30, h * 0.26)
+                path = QPainterPath(p1)
+                path.lineTo(p2)
+                path.lineTo(p3)
+                painter.drawPath(path)
+
+        painter.restore()
+        super().paint(painter, shine_flag)
+
+    def to_dict(self):
+        data = super().to_dict()
+        data["checked"] = self.is_checked()
+        # toggle 是否开启也应持久化，否则重新打开后勾选框无法交互。
+        data["toggleEnabled"] = self.is_toggle_enabled()
+        return data
+
+    @classmethod
+    def from_dict(cls, data):
+        item = super().from_dict(data)
+        item._checked = bool(data.get("checked", False))
+        item.set_toggle_enabled(bool(data.get("toggleEnabled", True)))
+        return item
+
+
+class widget_element(rect_element):
+    """嵌入式 QWidget 图元：在自绘场景中挂载一个真实的 Qt 控件。
+
+    本场景是纯自绘的 ``QWidget``（不是 QGraphicsView 体系），因此不能用
+    ``QGraphicsProxyWidget``。这里的做法是：图元持有一个真实的 QWidget
+    作为场景的子窗口，通过 ``sceneToView`` 把场景坐标映射到窗口坐标、
+    再乘以 ``scale_factor`` 得到像素尺寸，实时同步到 ``setGeometry``。
+
+    交互约定：
+    - **设计模式**：只显示占位框（真实 QWidget 隐藏），方便选中、拖动、
+      吸附、成组，与普通矩形图元行为一致。
+    - **运行模式**：隐藏占位框，显示真实 QWidget 并允许用户直接操作。
+
+    用法示例（自定义控件）：::
+
+        from PySide6.QtWidgets import QPushButton
+        elem = widget_element()
+        elem.set_widget_factory(lambda host: QPushButton("确定", host))
+
+    默认控件是一个 ``QLineEdit``，仅作演示，可按需替换成任意 QWidget。
+    """
+
+    count = 0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        widget_element.count += 1
+        self.type = "widget"
+
+        # 默认显示的文字（由默认 QLineEdit 承载；自定义控件可忽略）。
+        self._widget_text = ""
+
+        # 真实 QWidget 宿主。惰性创建：只有进入运行模式或显式调用
+        # ``attach_widget`` 时才实例化，避免设计模式白白创建一堆窗口。
+        self._host_widget = None
+        self._widget_factory = None
+
+        # 默认控件工厂：一个可编辑的单行输入框，用于演示。
+        self.set_widget_factory(self._default_widget_factory)
+
+    def __del__(self):
+        self._release_widget()
+        _log_destroy("widget", self)
+
+    # ------------------------------------------------------------------
+    # 禁用旋转：真实 QWidget 无法旋转，因此 widget_element 始终保持水平。
+    # 无论从 Ctrl+滚轮、属性面板还是代码调用，旋转操作都被忽略。
+    # ------------------------------------------------------------------
+    def setRotation(self, ang):
+        # no-op：widget 图元禁止旋转。
+        return
+
+    def rotate_to_ang(self, ang):
+        # no-op：widget 图元禁止旋转。
+        return
+
+    # ------------------------------------------------------------------
+    # 控件工厂
+    # ------------------------------------------------------------------
+    def _default_widget_factory(self, host) -> QWidget:
+        line = QLineEdit(host)
+        line.setPlaceholderText("请输入…")
+        line.setText(self._widget_text)
+        return line
+
+    def set_widget_factory(self, factory):
+        """设置控件工厂。``factory(host_widget) -> QWidget``。
+
+        调用后若已有宿主控件会重建，以保证工厂立即生效。
+        """
+        self._widget_factory = factory
+        if self._host_widget is not None:
+            self._rebuild_widget()
+
+    def set_widget_text(self, text: str):
+        """设置默认控件的文本内容（对自定义控件无效）。"""
+        self._widget_text = str(text)
+        if self._host_widget is not None and isinstance(
+            self._host_widget.child, QLineEdit
+        ):
+            self._host_widget.child.setText(self._widget_text)
+
+    def widget_text(self) -> str:
+        return self._widget_text
+
+    # ------------------------------------------------------------------
+    # 真实 QWidget 的挂载 / 释放
+    # ------------------------------------------------------------------
+    def _ensure_widget(self) -> QWidget:
+        """确保宿主控件存在（惰性创建），返回宿主 QWidget。"""
+        if self._host_widget is not None:
+            return self._host_widget
+        scene = self.m_scene
+        if scene is None:
+            return None
+        host = QWidget(scene)
+        host.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        # 不抢焦点、不进入 Tab 链，避免影响场景快捷键。
+        host.setFocusPolicy(Qt.NoFocus)
+        host.child = None
+        self._host_widget = host
+        self._rebuild_widget()
+        return host
+
+    def _rebuild_widget(self):
+        """按当前工厂重建子控件，替换旧的。"""
+        host = self._host_widget
+        if host is None:
+            return
+        old = host.child
+        if old is not None:
+            old.setParent(None)
+            old.deleteLater()
+            host.child = None
+        if self._widget_factory is not None:
+            child = self._widget_factory(host)
+            if child is not None:
+                child.setParent(host)
+                host.child = child
+        # 子控件铺满宿主，由宿主几何决定最终位置与大小。
+        self._relayout_widget()
+
+    def _relayout_widget(self):
+        host = self._host_widget
+        if host is None:
+            return
+        child = host.child
+        if child is not None:
+            child.setGeometry(0, 0, host.width(), host.height())
+            child.show()
+
+    def _release_widget(self):
+        """释放宿主控件（图元析构 / 被删除时调用）。"""
+        host = self._host_widget
+        if host is not None:
+            try:
+                host.setParent(None)
+                host.deleteLater()
+            except RuntimeError:
+                pass
+            self._host_widget = None
+
+    # ------------------------------------------------------------------
+    # 几何同步：场景坐标 → 窗口像素坐标
+    # ------------------------------------------------------------------
+    def sync_widget_geometry(self):
+        """把真实 QWidget 对齐到图元当前的场景包围盒。
+
+        由场景在缩放/平移/图元移动后统一调用。设计模式下宿主控件隐藏，
+        此方法仍会更新几何，保证切到运行模式时位置立即可用。
+
+        直接复用基类已验证的坐标换算链 ``viewBoundingRect``（场景包围盒 →
+        视图矩形，正确处理 AGV 的 x/y 交换）与 ``rect_viewToWindow``（视图
+        矩形 → 窗口像素矩形），避免自行重算坐标约定引入偏差。
+        """
+        host = self._host_widget
+        if host is None:
+            return
+        scene = self.m_scene
+        if scene is None:
+            return
+
+        view_rect = self.viewBoundingRect()
+        if view_rect.isNull() or view_rect.width() <= 0 or view_rect.height() <= 0:
+            host.hide()
+            return
+
+        win_rect = scene.rect_viewToWindow(view_rect)
+        pw = win_rect.width()
+        ph = win_rect.height()
+        if pw <= 1 or ph <= 1:
+            host.hide()
+            return
+        host.setGeometry(int(round(win_rect.x())), int(round(win_rect.y())),
+                         int(round(pw)), int(round(ph)))
+        self._relayout_widget()
+
+    def set_widget_visible(self, visible: bool):
+        """控制宿主控件的显隐（模式切换时由场景调用）。"""
+        if self._host_widget is None:
+            if visible:
+                self._ensure_widget()
+            else:
+                return
+        self.sync_widget_geometry()
+        self._host_widget.setVisible(visible)
+
+    # ------------------------------------------------------------------
+    # 几何变化钩子：拖动 / 移动后同步子窗口
+    # ------------------------------------------------------------------
+    def setPos(self, *args):
+        super().setPos(*args)
+        if self._host_widget is not None:
+            self.sync_widget_geometry()
+
+    def move_by(self, *args):
+        super().move_by(*args)
+        if self._host_widget is not None:
+            self.sync_widget_geometry()
+
+    def setSize(self, w, h):
+        super().setSize(w, h)
+        if self._host_widget is not None:
+            self.sync_widget_geometry()
+
+    # ------------------------------------------------------------------
+    # 绘制：设计模式画占位框，运行模式画轻量占位（真实控件盖在其上）
+    # ------------------------------------------------------------------
+    def paint(self, painter: QPainter, shine_flag):
+        if self.get_visibility() is False:
+            super().paint(painter, shine_flag)
+            return
+        if not (self.m_veiw_dirty_region.intersects(self.viewBoundingRect().toRect())):
+            super().paint(painter, shine_flag)
+            return
+        if self._head_pos is None:
+            return
+
+        painter.save()
+
+        color = self._color
+        if self.get_hover() or (self.is_in_group() and self._is_group_in_hover):
+            color = QColor(14, 248, 236)
+
+        center_pos_view = self.m_scene.sceneToView(self.get_scene_center_pos())
+        h = self.scene_size.width() * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_x
+        w = self.scene_size.height() * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_y
+        bg_rect = QRectF(-w / 2.0, -h / 2.0, w, h)
+
+        painter.translate(center_pos_view)
+        # widget 图元禁止旋转，因此不调用 painter.rotate()：占位框始终与
+        # 真实 QWidget（水平轴对齐）保持一致，避免出现"边框转了、控件没转"
+        # 的错位。旋转操作已在 setRotation/rotate_to_ang 里被忽略。
+
+        fill_color = self._fill_color
+        if self.get_fill():
+            painter.setBrush(fill_color)
+        if self.get_line_width() > 0:
+            painter.setPen(QPen(color, self.get_line_width()))
+        else:
+            painter.setPen(QPen(fill_color, 0))
+
+        radius = self.get_corner_radius()
+        if radius > 0:
+            radius_x = radius * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_y
+            radius_y = radius * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_x
+            radius_x = min(radius_x, w / 2.0)
+            radius_y = min(radius_y, h / 2.0)
+            painter.drawRoundedRect(bg_rect, radius_x, radius_y)
+        else:
+            painter.drawRect(bg_rect)
+
+        # 占位标识：中央画一个 "Widget" 字样，提示这是控件图元。
+        if w > 30 and h > 20:
+            painter.setPen(QPen(color, 1))
+            font = painter.font()
+            font.setPointSizeF(max(7.0, min(w, h) * 0.16))
+            painter.setFont(font)
+            painter.drawText(bg_rect, Qt.AlignCenter, "Widget")
+
+        painter.restore()
+        super().paint(painter, shine_flag)
+
+    # ------------------------------------------------------------------
+    # 序列化
+    # ------------------------------------------------------------------
+    def to_dict(self):
+        data = super().to_dict()
+        data["widgetText"] = self._widget_text
+        # 记录控件类型键，便于将来按类型恢复不同控件。
+        data["widgetType"] = getattr(self, "_widget_type_key", "lineedit")
+        return data
+
+    @classmethod
+    def from_dict(cls, data):
+        item = super().from_dict(data)
+        item._widget_text = str(data.get("widgetText", ""))
+        item._widget_type_key = str(data.get("widgetType", "lineedit"))
+        # widget 图元禁止旋转：即使旧数据里存了非零角度，也强制复位为水平。
+        if abs(item.sceneTransform().get_rotation_angle()) > 1e-6:
+            item.m_transform.rotate_around(
+                -item.sceneTransform().get_rotation_angle(), item.m_origin
+            )
+            item.invalidate_transform_cache()
+            item.m_angle = 0.0
+            item.m_angle_init = 0.0
+        return item
+
+    def clone(self):
+        cloned = widget_element()
+        cloned._name = self._name
+        cloned.m_pos = QPointF(self.m_pos)
+        cloned.set_line_width(self.get_line_width())
+        cloned.set_color(self.get_color())
+        cloned.set_fill(self.get_fill())
+        cloned.set_fill_color(self.get_fill_color())
+        cloned.set_opacity(self.get_opacity())
+        cloned.setSize(self.scene_size.width(), self.scene_size.height())
+        cloned.set_corner_radius(self.get_corner_radius())
+        cloned.setTransformOriginPoint(self.transformOriginPoint())
+        cloned.setTransform(Transform(self.transform().m))
+        cloned.m_angle = self.m_angle
+        cloned.m_angle_init = self.m_angle_init
+        cloned.m_pos_init = self.m_pos_init
+        cloned._widget_text = self._widget_text
+        cloned._widget_type_key = getattr(self, "_widget_type_key", "lineedit")
+        cloned.set_group_id(self.get_group_id())
+        cloned.set_zValue(self.zValue())
+        for child in self.childItems():
+            child_clone = child.clone()
+            child_clone.m_parent = cloned
+            cloned.m_children.add(child_clone)
+        return cloned
+
+
 class group_element(rect_element):
     count = 0
     def __init__(self,*args, parent: QObject = None):

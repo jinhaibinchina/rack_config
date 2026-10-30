@@ -9,12 +9,14 @@ from PySide6.QtCore import QPointF
 
 from Designer.Core.elements import (
     base_element,
+    checkbox_element,
     circle_element,
     image_element,
     line_element,
     rect_element,
     text_element,
     triangle_element,
+    widget_element,
 )
 from Designer.Core.myQuadTreeScene import SceneManager
 
@@ -42,6 +44,24 @@ TOOL_DEFINITIONS = [
         default_width=160.0,
         default_height=100.0,
         description="拖拽到画布，创建矩形区域",
+    ),
+    ToolDefinition(
+        key="checkbox",
+        label="复选框",
+        category="基本图元",
+        element_class=checkbox_element,
+        default_width=40.0,
+        default_height=40.0,
+        description="拖拽到画布，创建可切换勾选状态的复选框（运行时点击切换）",
+    ),
+    ToolDefinition(
+        key="widget",
+        label="控件",
+        category="基本图元",
+        element_class=widget_element,
+        default_width=160.0,
+        default_height=40.0,
+        description="拖拽到画布，嵌入一个真实 Qt 控件（运行时显示并可交互）",
     ),
     ToolDefinition(
         key="triangle",

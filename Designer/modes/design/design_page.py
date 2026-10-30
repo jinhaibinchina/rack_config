@@ -11,6 +11,7 @@ from PySide6.QtGui import QColor
 
 from Designer.Core.elements import (
     base_element,
+    checkbox_element,
     circle_element,
     group_element,
     image_element,
@@ -18,6 +19,7 @@ from Designer.Core.elements import (
     rect_element,
     text_element,
     triangle_element,
+    widget_element,
 )
 
 from Designer.Core.myQuadTreeScene import SceneManager, SceneSerializer

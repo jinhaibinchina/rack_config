@@ -24,6 +24,7 @@ def debug_log(*args, **kwargs) -> None:
         print(*args, **kwargs)
 from .elements import (
     base_element,
+    checkbox_element,
     circle_element,
     group_element,
     image_element,
@@ -31,6 +32,7 @@ from .elements import (
     rect_element,
     text_element,
     triangle_element,
+    widget_element,
 )
 # from my_elements_v2 import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
 from .mySnapSystem import SnapSystem

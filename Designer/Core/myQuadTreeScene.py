@@ -15,6 +15,7 @@ from PySide6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoC
 import json,sys,os,traceback,math
 from .elements import (
     base_element,
+    checkbox_element,
     circle_element,
     group_element,
     image_element,
@@ -22,6 +23,7 @@ from .elements import (
     rect_element,
     text_element,
     triangle_element,
+    widget_element,
 )
 # from my_elements_v2 import rect_element,line_element,circle_element ,base_element,group_element,text_element,image_element,triangle_element
 from PySide6.QtGui import QRegularExpressionValidator
@@ -504,6 +506,10 @@ class SceneSerializer:
                 item = rect_element.from_dict(item_data)
                 # print(f"rect{item._topLeft}")
                 # print(f"rect{item.get_scene_topLeft()}")
+            elif item_data["type"] == "checkbox":
+                item = checkbox_element.from_dict(item_data)
+            elif item_data["type"] == "widget":
+                item = widget_element.from_dict(item_data)
             elif item_data["type"] == "triangle":
                 item = triangle_element.from_dict(item_data)
             elif item_data["type"] == "circle":
@@ -681,7 +687,34 @@ class QuadTreeScene(myGraphicsScene):
             if self._event_pressed_group is not None:
                 self._event_pressed_group.cancel_mouse_press()
             self._event_pressed_group = None
+        # 嵌入式 QWidget 图元：运行模式显示真实控件，设计模式隐藏。
+        self._sync_embedded_widgets(mode == SceneMode.Run)
         self.run_mode_station_change.emit(mode)
+
+    # ------------------------------------------------------------------
+    # Embedded QWidget elements
+    # ------------------------------------------------------------------
+    def _sync_embedded_widgets(self, visible: bool):
+        """同步所有 ``widget_element`` 的真实控件几何与显隐。
+
+        运行模式下显示并可交互，设计模式下隐藏（占位框仍由 paint 绘制）。
+        缩放、平移、图元移动后也应调用（此时只刷新几何，不改显隐）。
+        """
+        for item in list(getattr(self.scene_manager, "m_items", {}).values()):
+            if isinstance(item, widget_element):
+                if visible:
+                    item._ensure_widget()
+                    item.set_widget_visible(True)
+                else:
+                    item.set_widget_visible(False)
+
+    def _sync_embedded_widgets_geometry(self):
+        """仅刷新已挂载控件的几何（缩放/平移后）。"""
+        for item in list(getattr(self.scene_manager, "m_items", {}).values()):
+            if isinstance(item, widget_element):
+                if item._host_widget is not None:
+                    item.sync_widget_geometry()
+
 
     # ------------------------------------------------------------------
     # Group event bindings (run mode)
@@ -775,13 +808,15 @@ class QuadTreeScene(myGraphicsScene):
         return self.viewToScene(view_pos)
 
     def _find_event_group_at(self, scene_pos):
-        """Topmost interactive group under ``scene_pos``."""
+        """Topmost interactive item (group or checkbox) under ``scene_pos``."""
         manager = getattr(self, "scene_manager", None)
         if manager is None or scene_pos is None:
             return None
 
         for item in reversed(getattr(manager, "m_sorted_items", [])):
-            if not isinstance(item, group_element):
+            # 运行时点击交互目前支持两类图元：组（绑定事件/可切换）和复选框
+            # （可勾选切换）。其余图元不参与点击事件路由。
+            if not (isinstance(item, group_element) or isinstance(item, checkbox_element)):
                 continue
             if not item.get_visibility():
                 continue
@@ -1009,6 +1044,8 @@ class QuadTreeScene(myGraphicsScene):
     def wheelEvent(self, event):
         super().wheelEvent( event)
         self.snapSys.set_snap_threshold(self.scene_units_per_grid_x/self.grid_size/self.scale_factor*10)
+        # 缩放改变了 sceneToView 映射，同步嵌入式控件几何。
+        self._sync_embedded_widgets_geometry()
         
 
     def mouseMoveEvent(self, event):
@@ -1019,6 +1056,9 @@ class QuadTreeScene(myGraphicsScene):
         # stop one event short of the actual position.
         super().mouseMoveEvent(event)
         self.on_mouse_move(self.sence_pos_mouse)
+        # 平移（self.offset 变化）会移动嵌入式控件，这里刷新其几何。
+        if self.panning:
+            self._sync_embedded_widgets_geometry()
        
     
     def mousePressEvent(self, event):
@@ -1921,6 +1961,16 @@ class SceneManager(QObject):
             name = "三角形_"
             while item.set_name(name + str(triangle_element.count))==False:
                 triangle_element.count+=1
+        elif isinstance(item,checkbox_element)  :
+            name = "复选框_"
+            while item.set_name(name + str(checkbox_element.count))==False:
+                checkbox_element.count+=1
+
+        elif isinstance(item,widget_element)  :
+            name = "控件_"
+            while item.set_name(name + str(widget_element.count))==False:
+                widget_element.count+=1
+
         elif isinstance(item,rect_element)  :
             name = "矩形_"
             while item.set_name(name + str(rect_element.count))==False:
