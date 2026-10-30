@@ -1,0 +1,4478 @@
+{
+    "sceneRect": {
+        "x": -2860.8949671218857,
+        "y": -4519.3181942011315,
+        "width": 5477.769142973746,
+        "height": 9684.361324524576
+    },
+    "backgroundColor": "#bee1f59b",
+    "items": [
+        {
+            "id": 154,
+            "name": "料架1",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                96,
+                76,
+                57,
+                134,
+                153,
+                38,
+                95,
+                115,
+                19
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1103.081,
+                "y": -1875.724
+            },
+            "origin_pos": {
+                "x": 1103.081,
+                "y": -1875.724
+            },
+            "width": 921.3496666666666,
+            "height": 7289.530720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 154.0
+        },
+        {
+            "id": 19,
+            "name": "料架1_仓位2",
+            "type": "group",
+            "parent_id": 154,
+            "children_ids": [
+                2,
+                10,
+                11,
+                13,
+                5,
+                1,
+                4,
+                7,
+                6,
+                15,
+                12,
+                14,
+                16,
+                17,
+                9,
+                8,
+                18,
+                3
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2313.65,
+                "y": -785.723
+            },
+            "origin_pos": {
+                "x": 2313.65,
+                "y": -785.723
+            },
+            "width": 921.3493333333333,
+            "height": 798.870720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 147.0
+        },
+        {
+            "id": 1,
+            "name": "料架1_仓位2_A库实料",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2181.828,
+                "y": -618.053
+            },
+            "origin_pos": {
+                "x": 2181.828,
+                "y": -618.053
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 107.0
+        },
+        {
+            "id": 2,
+            "name": "料架1_仓位2_托盘接近1",
+            "type": "circle",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2259.862,
+                "y": -1062.029
+            },
+            "origin_pos": {
+                "x": 2259.862,
+                "y": -1062.029
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 59.0
+        },
+        {
+            "id": 3,
+            "name": "料架1_仓位2_框1",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2555.397,
+                "y": -484.165
+            },
+            "origin_pos": {
+                "x": 2555.397,
+                "y": -484.165
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 3.0
+        },
+        {
+            "id": 4,
+            "name": "料架1_仓位2_Y气缸_缩回",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2531.388,
+                "y": -1006.611
+            },
+            "origin_pos": {
+                "x": 2531.388,
+                "y": -1006.611
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 43.0
+        },
+        {
+            "id": 5,
+            "name": "料架1_仓位2_框2",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2529.306,
+                "y": -1023.757
+            },
+            "origin_pos": {
+                "x": 2529.306,
+                "y": -1023.757
+            },
+            "width": 36.19793724868032,
+            "height": 794.6309081734098,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#828282",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 19.0
+        },
+        {
+            "id": 6,
+            "name": "料架1_仓位2_单库空筒",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2287.747,
+                "y": -722.602
+            },
+            "origin_pos": {
+                "x": 2287.747,
+                "y": -722.602
+            },
+            "width": 120.8,
+            "height": 330.0,
+            "rotate": -138.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 99.0
+        },
+        {
+            "id": 7,
+            "name": "料架1_仓位2_灯带",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1802.234,
+                "y": -775.394
+            },
+            "origin_pos": {
+                "x": 1802.234,
+                "y": -775.394
+            },
+            "width": 221.20468359782535,
+            "height": 52.58144118308962,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 131.0
+        },
+        {
+            "id": 8,
+            "name": "料架1_仓位2_框3",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1990.508,
+                "y": -992.913
+            },
+            "origin_pos": {
+                "x": 1990.508,
+                "y": -992.913
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 11.0
+        },
+        {
+            "id": 9,
+            "name": "料架1_仓位2_编号",
+            "type": "text",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2594.294,
+                "y": -1085.647
+            },
+            "origin_pos": {
+                "x": 2594.294,
+                "y": -1085.647
+            },
+            "width": 100.0,
+            "height": 224.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 13,
+                "opacity": 255
+            },
+            "context": "  编号  ",
+            "zValue": 139.0
+        },
+        {
+            "id": 10,
+            "name": "料架1_仓位2_X气缸_伸出",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2034.447,
+                "y": -959.865
+            },
+            "origin_pos": {
+                "x": 2034.447,
+                "y": -959.865
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#3b7d4b",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 35.0
+        },
+        {
+            "id": 11,
+            "name": "料架1_仓位2_X气缸_缩回",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2001.065,
+                "y": -989.64
+            },
+            "origin_pos": {
+                "x": 2001.065,
+                "y": -989.64
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 27.0
+        },
+        {
+            "id": 12,
+            "name": "料架1_仓位2_B库实料",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2372.355,
+                "y": -822.276
+            },
+            "origin_pos": {
+                "x": 2372.355,
+                "y": -822.276
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.99999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 115.0
+        },
+        {
+            "id": 13,
+            "name": "料架1_仓位2_B库空筒",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2368.586,
+                "y": -820.605
+            },
+            "origin_pos": {
+                "x": 2368.586,
+                "y": -820.605
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": 42.00000000000003,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 91.0
+        },
+        {
+            "id": 14,
+            "name": "料架1_仓位2_单库实料",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2283.116,
+                "y": -724.487
+            },
+            "origin_pos": {
+                "x": 2283.116,
+                "y": -724.487
+            },
+            "width": 320.9,
+            "height": 280.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 123.0
+        },
+        {
+            "id": 15,
+            "name": "料架1_仓位2_Y气缸_伸出",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2501.779,
+                "y": -975.709
+            },
+            "origin_pos": {
+                "x": 2501.779,
+                "y": -975.709
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#729649",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 51.0
+        },
+        {
+            "id": 16,
+            "name": "料架1_仓位2_托盘",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2278.325,
+                "y": -711.277
+            },
+            "origin_pos": {
+                "x": 2278.325,
+                "y": -711.277
+            },
+            "width": 631.6441170164284,
+            "height": 638.9675270687928,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#515151",
+                "opacity": 93,
+                "cornerRadius": 33.0
+            },
+            "zValue": 75.0
+        },
+        {
+            "id": 17,
+            "name": "料架1_仓位2_托盘接近2",
+            "type": "circle",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2293.009,
+                "y": -364.656
+            },
+            "origin_pos": {
+                "x": 2293.009,
+                "y": -364.656
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 67.0
+        },
+        {
+            "id": 18,
+            "name": "料架1_仓位2_A库空筒",
+            "type": "rect",
+            "parent_id": 19,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2186.0,
+                "y": -615.672
+            },
+            "origin_pos": {
+                "x": 2186.0,
+                "y": -615.672
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 83.0
+        },
+        {
+            "id": 38,
+            "name": "料架1_仓位3",
+            "type": "group",
+            "parent_id": 154,
+            "children_ids": [
+                23,
+                30,
+                31,
+                32,
+                22,
+                25,
+                34,
+                35,
+                21,
+                26,
+                28,
+                33,
+                37,
+                36,
+                29,
+                20,
+                24,
+                27
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1709.93,
+                "y": -1329.315
+            },
+            "origin_pos": {
+                "x": 1709.93,
+                "y": -1329.315
+            },
+            "width": 921.3493333333333,
+            "height": 798.870720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 148.0
+        },
+        {
+            "id": 20,
+            "name": "料架1_仓位3_A库空筒",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1582.28,
+                "y": -1159.264
+            },
+            "origin_pos": {
+                "x": 1582.28,
+                "y": -1159.264
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 84.0
+        },
+        {
+            "id": 21,
+            "name": "料架1_仓位3_托盘",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1674.606,
+                "y": -1254.868
+            },
+            "origin_pos": {
+                "x": 1674.606,
+                "y": -1254.868
+            },
+            "width": 631.6441170164284,
+            "height": 638.9675270687928,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#515151",
+                "opacity": 93,
+                "cornerRadius": 33.0
+            },
+            "zValue": 76.0
+        },
+        {
+            "id": 22,
+            "name": "料架1_仓位3_X气缸_缩回",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1397.345,
+                "y": -1533.232
+            },
+            "origin_pos": {
+                "x": 1397.345,
+                "y": -1533.232
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 28.0
+        },
+        {
+            "id": 23,
+            "name": "料架1_仓位3_框1",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1951.677,
+                "y": -1027.756
+            },
+            "origin_pos": {
+                "x": 1951.677,
+                "y": -1027.756
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 4.0
+        },
+        {
+            "id": 24,
+            "name": "料架1_仓位3_Y气缸_缩回",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1927.668,
+                "y": -1550.203
+            },
+            "origin_pos": {
+                "x": 1927.668,
+                "y": -1550.203
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 44.0
+        },
+        {
+            "id": 25,
+            "name": "料架1_仓位3_单库实料",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1679.397,
+                "y": -1268.079
+            },
+            "origin_pos": {
+                "x": 1679.397,
+                "y": -1268.079
+            },
+            "width": 320.9,
+            "height": 280.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 124.0
+        },
+        {
+            "id": 26,
+            "name": "料架1_仓位3_框3",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1386.788,
+                "y": -1536.504
+            },
+            "origin_pos": {
+                "x": 1386.788,
+                "y": -1536.504
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 12.0
+        },
+        {
+            "id": 27,
+            "name": "料架1_仓位3_X气缸_伸出",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1430.727,
+                "y": -1503.457
+            },
+            "origin_pos": {
+                "x": 1430.727,
+                "y": -1503.457
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#3b7d4b",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 36.0
+        },
+        {
+            "id": 28,
+            "name": "料架1_仓位3_B库空筒",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1764.866,
+                "y": -1364.197
+            },
+            "origin_pos": {
+                "x": 1764.866,
+                "y": -1364.197
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": 42.00000000000003,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 92.0
+        },
+        {
+            "id": 29,
+            "name": "料架1_仓位3_编号",
+            "type": "text",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1990.575,
+                "y": -1629.239
+            },
+            "origin_pos": {
+                "x": 1990.575,
+                "y": -1629.239
+            },
+            "width": 100.0,
+            "height": 224.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 13,
+                "opacity": 255
+            },
+            "context": "  编号  ",
+            "zValue": 140.0
+        },
+        {
+            "id": 30,
+            "name": "料架1_仓位3_单库空筒",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1684.028,
+                "y": -1266.194
+            },
+            "origin_pos": {
+                "x": 1684.028,
+                "y": -1266.194
+            },
+            "width": 120.8,
+            "height": 330.0,
+            "rotate": -138.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 100.0
+        },
+        {
+            "id": 31,
+            "name": "料架1_仓位3_Y气缸_伸出",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1898.059,
+                "y": -1519.3
+            },
+            "origin_pos": {
+                "x": 1898.059,
+                "y": -1519.3
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#729649",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 52.0
+        },
+        {
+            "id": 32,
+            "name": "料架1_仓位3_托盘接近2",
+            "type": "circle",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1689.29,
+                "y": -908.248
+            },
+            "origin_pos": {
+                "x": 1689.29,
+                "y": -908.248
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 68.0
+        },
+        {
+            "id": 33,
+            "name": "料架1_仓位3_B库实料",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1768.636,
+                "y": -1365.868
+            },
+            "origin_pos": {
+                "x": 1768.636,
+                "y": -1365.868
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.99999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 116.0
+        },
+        {
+            "id": 34,
+            "name": "料架1_仓位3_托盘接近1",
+            "type": "circle",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1656.143,
+                "y": -1605.621
+            },
+            "origin_pos": {
+                "x": 1656.143,
+                "y": -1605.621
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 60.0
+        },
+        {
+            "id": 35,
+            "name": "料架1_仓位3_A库实料",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1578.109,
+                "y": -1161.644
+            },
+            "origin_pos": {
+                "x": 1578.109,
+                "y": -1161.644
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 108.0
+        },
+        {
+            "id": 36,
+            "name": "料架1_仓位3_灯带",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1198.514,
+                "y": -1318.986
+            },
+            "origin_pos": {
+                "x": 1198.514,
+                "y": -1318.986
+            },
+            "width": 221.20468359782535,
+            "height": 52.58144118308962,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 132.0
+        },
+        {
+            "id": 37,
+            "name": "料架1_仓位3_框2",
+            "type": "rect",
+            "parent_id": 38,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1925.586,
+                "y": -1567.349
+            },
+            "origin_pos": {
+                "x": 1925.586,
+                "y": -1567.349
+            },
+            "width": 36.19793724868032,
+            "height": 794.6309081734098,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#828282",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 20.0
+        },
+        {
+            "id": 57,
+            "name": "料架1_仓位5",
+            "type": "group",
+            "parent_id": 154,
+            "children_ids": [
+                47,
+                53,
+                48,
+                46,
+                45,
+                51,
+                44,
+                43,
+                42,
+                49,
+                40,
+                54,
+                55,
+                50,
+                56,
+                39,
+                41,
+                52
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 502.49,
+                "y": -2416.499
+            },
+            "origin_pos": {
+                "x": 502.49,
+                "y": -2416.499
+            },
+            "width": 921.3493333333333,
+            "height": 798.870720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 150.0
+        },
+        {
+            "id": 39,
+            "name": "料架1_仓位5_Y气缸_伸出",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 690.619,
+                "y": -2606.484
+            },
+            "origin_pos": {
+                "x": 690.619,
+                "y": -2606.484
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#729649",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 54.0
+        },
+        {
+            "id": 40,
+            "name": "料架1_仓位5_单库空筒",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 476.588,
+                "y": -2353.378
+            },
+            "origin_pos": {
+                "x": 476.588,
+                "y": -2353.378
+            },
+            "width": 120.8,
+            "height": 330.0,
+            "rotate": -138.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 102.0
+        },
+        {
+            "id": 41,
+            "name": "料架1_仓位5_A库实料",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 370.669,
+                "y": -2248.828
+            },
+            "origin_pos": {
+                "x": 370.669,
+                "y": -2248.828
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 110.0
+        },
+        {
+            "id": 42,
+            "name": "料架1_仓位5_B库实料",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 561.196,
+                "y": -2453.052
+            },
+            "origin_pos": {
+                "x": 561.196,
+                "y": -2453.052
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.99999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 118.0
+        },
+        {
+            "id": 43,
+            "name": "料架1_仓位5_托盘",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 467.165,
+                "y": -2342.052
+            },
+            "origin_pos": {
+                "x": 467.165,
+                "y": -2342.052
+            },
+            "width": 631.6441170164284,
+            "height": 638.9675270687928,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#515151",
+                "opacity": 93,
+                "cornerRadius": 33.0
+            },
+            "zValue": 78.0
+        },
+        {
+            "id": 44,
+            "name": "料架1_仓位5_框2",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 718.146,
+                "y": -2654.533
+            },
+            "origin_pos": {
+                "x": 718.146,
+                "y": -2654.533
+            },
+            "width": 36.19793724868032,
+            "height": 794.6309081734098,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#828282",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 22.0
+        },
+        {
+            "id": 45,
+            "name": "料架1_仓位5_框3",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 179.348,
+                "y": -2623.688
+            },
+            "origin_pos": {
+                "x": 179.348,
+                "y": -2623.688
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 14.0
+        },
+        {
+            "id": 46,
+            "name": "料架1_仓位5_B库空筒",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 557.426,
+                "y": -2451.381
+            },
+            "origin_pos": {
+                "x": 557.426,
+                "y": -2451.381
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": 42.00000000000003,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 94.0
+        },
+        {
+            "id": 47,
+            "name": "料架1_仓位5_框1",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 744.237,
+                "y": -2114.94
+            },
+            "origin_pos": {
+                "x": 744.237,
+                "y": -2114.94
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 6.0
+        },
+        {
+            "id": 48,
+            "name": "料架1_仓位5_灯带",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -8.926,
+                "y": -2406.17
+            },
+            "origin_pos": {
+                "x": -8.926,
+                "y": -2406.17
+            },
+            "width": 221.20468359782535,
+            "height": 52.58144118308962,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 134.0
+        },
+        {
+            "id": 49,
+            "name": "料架1_仓位5_托盘接近1",
+            "type": "circle",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 448.702,
+                "y": -2692.805
+            },
+            "origin_pos": {
+                "x": 448.702,
+                "y": -2692.805
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 62.0
+        },
+        {
+            "id": 50,
+            "name": "料架1_仓位5_单库实料",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 471.956,
+                "y": -2355.263
+            },
+            "origin_pos": {
+                "x": 471.956,
+                "y": -2355.263
+            },
+            "width": 320.9,
+            "height": 280.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 126.0
+        },
+        {
+            "id": 51,
+            "name": "料架1_仓位5_Y气缸_缩回",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 720.228,
+                "y": -2637.387
+            },
+            "origin_pos": {
+                "x": 720.228,
+                "y": -2637.387
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 46.0
+        },
+        {
+            "id": 52,
+            "name": "料架1_仓位5_A库空筒",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 374.84,
+                "y": -2246.448
+            },
+            "origin_pos": {
+                "x": 374.84,
+                "y": -2246.448
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 86.0
+        },
+        {
+            "id": 53,
+            "name": "料架1_仓位5_托盘接近2",
+            "type": "circle",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 481.849,
+                "y": -1995.432
+            },
+            "origin_pos": {
+                "x": 481.849,
+                "y": -1995.432
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 70.0
+        },
+        {
+            "id": 54,
+            "name": "料架1_仓位5_编号",
+            "type": "text",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 783.134,
+                "y": -2716.423
+            },
+            "origin_pos": {
+                "x": 783.134,
+                "y": -2716.423
+            },
+            "width": 100.0,
+            "height": 224.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 13,
+                "opacity": 255
+            },
+            "context": "  编号  ",
+            "zValue": 142.0
+        },
+        {
+            "id": 55,
+            "name": "料架1_仓位5_X气缸_伸出",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 223.287,
+                "y": -2590.641
+            },
+            "origin_pos": {
+                "x": 223.287,
+                "y": -2590.641
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#3b7d4b",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 38.0
+        },
+        {
+            "id": 56,
+            "name": "料架1_仓位5_X气缸_缩回",
+            "type": "rect",
+            "parent_id": 57,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 189.905,
+                "y": -2620.416
+            },
+            "origin_pos": {
+                "x": 189.905,
+                "y": -2620.416
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 30.0
+        },
+        {
+            "id": 76,
+            "name": "料架1_仓位6",
+            "type": "group",
+            "parent_id": 154,
+            "children_ids": [
+                62,
+                66,
+                67,
+                74,
+                75,
+                63,
+                68,
+                60,
+                58,
+                64,
+                70,
+                65,
+                73,
+                59,
+                69,
+                71,
+                61,
+                72
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -101.23,
+                "y": -2960.09
+            },
+            "origin_pos": {
+                "x": -101.23,
+                "y": -2960.09
+            },
+            "width": 921.3493333333333,
+            "height": 798.870720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 151.0
+        },
+        {
+            "id": 58,
+            "name": "料架1_仓位6_托盘接近2",
+            "type": "circle",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -121.87,
+                "y": -2539.023
+            },
+            "origin_pos": {
+                "x": -121.87,
+                "y": -2539.023
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 71.0
+        },
+        {
+            "id": 59,
+            "name": "料架1_仓位6_X气缸_伸出",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -380.432,
+                "y": -3134.233
+            },
+            "origin_pos": {
+                "x": -380.432,
+                "y": -3134.233
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#3b7d4b",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 39.0
+        },
+        {
+            "id": 60,
+            "name": "料架1_仓位6_Y气缸_缩回",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 116.508,
+                "y": -3180.978
+            },
+            "origin_pos": {
+                "x": 116.508,
+                "y": -3180.978
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 47.0
+        },
+        {
+            "id": 61,
+            "name": "料架1_仓位6_B库空筒",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -46.294,
+                "y": -2994.972
+            },
+            "origin_pos": {
+                "x": -46.294,
+                "y": -2994.972
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": 42.00000000000003,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 95.0
+        },
+        {
+            "id": 62,
+            "name": "料架1_仓位6_框1",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 140.517,
+                "y": -2658.532
+            },
+            "origin_pos": {
+                "x": 140.517,
+                "y": -2658.532
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 7.0
+        },
+        {
+            "id": 63,
+            "name": "料架1_仓位6_灯带",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -612.646,
+                "y": -2949.762
+            },
+            "origin_pos": {
+                "x": -612.646,
+                "y": -2949.762
+            },
+            "width": 221.20468359782535,
+            "height": 52.58144118308962,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 135.0
+        },
+        {
+            "id": 64,
+            "name": "料架1_仓位6_B库实料",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -42.524,
+                "y": -2996.643
+            },
+            "origin_pos": {
+                "x": -42.524,
+                "y": -2996.643
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.99999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 119.0
+        },
+        {
+            "id": 65,
+            "name": "料架1_仓位6_框2",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 114.426,
+                "y": -3198.124
+            },
+            "origin_pos": {
+                "x": 114.426,
+                "y": -3198.124
+            },
+            "width": 36.19793724868032,
+            "height": 794.6309081734098,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#828282",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 23.0
+        },
+        {
+            "id": 66,
+            "name": "料架1_仓位6_Y气缸_伸出",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 86.899,
+                "y": -3150.076
+            },
+            "origin_pos": {
+                "x": 86.899,
+                "y": -3150.076
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#729649",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 55.0
+        },
+        {
+            "id": 67,
+            "name": "料架1_仓位6_A库实料",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -233.051,
+                "y": -2792.42
+            },
+            "origin_pos": {
+                "x": -233.051,
+                "y": -2792.42
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 111.0
+        },
+        {
+            "id": 68,
+            "name": "料架1_仓位6_托盘接近1",
+            "type": "circle",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -155.017,
+                "y": -3236.397
+            },
+            "origin_pos": {
+                "x": -155.017,
+                "y": -3236.397
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 63.0
+        },
+        {
+            "id": 69,
+            "name": "料架1_仓位6_编号",
+            "type": "text",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 179.415,
+                "y": -3260.015
+            },
+            "origin_pos": {
+                "x": 179.415,
+                "y": -3260.015
+            },
+            "width": 100.0,
+            "height": 224.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 13,
+                "opacity": 255
+            },
+            "context": "  编号  ",
+            "zValue": 143.0
+        },
+        {
+            "id": 70,
+            "name": "料架1_仓位6_X气缸_缩回",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -413.815,
+                "y": -3164.007
+            },
+            "origin_pos": {
+                "x": -413.815,
+                "y": -3164.007
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 31.0
+        },
+        {
+            "id": 71,
+            "name": "料架1_仓位6_托盘",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -136.554,
+                "y": -2885.644
+            },
+            "origin_pos": {
+                "x": -136.554,
+                "y": -2885.644
+            },
+            "width": 631.6441170164284,
+            "height": 638.9675270687928,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#515151",
+                "opacity": 93,
+                "cornerRadius": 33.0
+            },
+            "zValue": 79.0
+        },
+        {
+            "id": 72,
+            "name": "料架1_仓位6_单库空筒",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -127.132,
+                "y": -2896.969
+            },
+            "origin_pos": {
+                "x": -127.132,
+                "y": -2896.969
+            },
+            "width": 120.8,
+            "height": 330.0,
+            "rotate": -138.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 103.0
+        },
+        {
+            "id": 73,
+            "name": "料架1_仓位6_框3",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -424.371,
+                "y": -3167.28
+            },
+            "origin_pos": {
+                "x": -424.371,
+                "y": -3167.28
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 15.0
+        },
+        {
+            "id": 74,
+            "name": "料架1_仓位6_A库空筒",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -228.88,
+                "y": -2790.039
+            },
+            "origin_pos": {
+                "x": -228.88,
+                "y": -2790.039
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 87.0
+        },
+        {
+            "id": 75,
+            "name": "料架1_仓位6_单库实料",
+            "type": "rect",
+            "parent_id": 76,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -131.763,
+                "y": -2898.854
+            },
+            "origin_pos": {
+                "x": -131.763,
+                "y": -2898.854
+            },
+            "width": 320.9,
+            "height": 280.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 127.0
+        },
+        {
+            "id": 95,
+            "name": "料架1_仓位8",
+            "type": "group",
+            "parent_id": 154,
+            "children_ids": [
+                82,
+                86,
+                93,
+                94,
+                77,
+                80,
+                81,
+                91,
+                78,
+                83,
+                84,
+                85,
+                87,
+                89,
+                90,
+                79,
+                92,
+                88
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1308.669,
+                "y": -4047.274
+            },
+            "origin_pos": {
+                "x": -1308.669,
+                "y": -4047.274
+            },
+            "width": 921.3493333333333,
+            "height": 798.870720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 153.0
+        },
+        {
+            "id": 77,
+            "name": "料架1_仓位8_灯带",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1820.085,
+                "y": -4036.945
+            },
+            "origin_pos": {
+                "x": -1820.085,
+                "y": -4036.945
+            },
+            "width": 221.20468359782535,
+            "height": 52.58144118308962,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 137.0
+        },
+        {
+            "id": 78,
+            "name": "料架1_仓位8_X气缸_伸出",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1587.872,
+                "y": -4221.416
+            },
+            "origin_pos": {
+                "x": -1587.872,
+                "y": -4221.416
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#3b7d4b",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 41.0
+        },
+        {
+            "id": 79,
+            "name": "料架1_仓位8_编号",
+            "type": "text",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1028.025,
+                "y": -4347.198
+            },
+            "origin_pos": {
+                "x": -1028.025,
+                "y": -4347.198
+            },
+            "width": 100.0,
+            "height": 224.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 13,
+                "opacity": 255
+            },
+            "context": "  编号  ",
+            "zValue": 145.0
+        },
+        {
+            "id": 80,
+            "name": "料架1_仓位8_A库空筒",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1436.319,
+                "y": -3877.223
+            },
+            "origin_pos": {
+                "x": -1436.319,
+                "y": -3877.223
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 89.0
+        },
+        {
+            "id": 81,
+            "name": "料架1_仓位8_框1",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1066.922,
+                "y": -3745.715
+            },
+            "origin_pos": {
+                "x": -1066.922,
+                "y": -3745.715
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 9.0
+        },
+        {
+            "id": 82,
+            "name": "料架1_仓位8_框3",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1631.811,
+                "y": -4254.463
+            },
+            "origin_pos": {
+                "x": -1631.811,
+                "y": -4254.463
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 17.0
+        },
+        {
+            "id": 83,
+            "name": "料架1_仓位8_Y气缸_伸出",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1120.54,
+                "y": -4237.259
+            },
+            "origin_pos": {
+                "x": -1120.54,
+                "y": -4237.259
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#729649",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 57.0
+        },
+        {
+            "id": 84,
+            "name": "料架1_仓位8_托盘接近2",
+            "type": "circle",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1329.31,
+                "y": -3626.207
+            },
+            "origin_pos": {
+                "x": -1329.31,
+                "y": -3626.207
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 73.0
+        },
+        {
+            "id": 85,
+            "name": "料架1_仓位8_托盘接近1",
+            "type": "circle",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1362.457,
+                "y": -4323.58
+            },
+            "origin_pos": {
+                "x": -1362.457,
+                "y": -4323.58
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 65.0
+        },
+        {
+            "id": 86,
+            "name": "料架1_仓位8_B库空筒",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1253.733,
+                "y": -4082.156
+            },
+            "origin_pos": {
+                "x": -1253.733,
+                "y": -4082.156
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": 42.00000000000003,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 97.0
+        },
+        {
+            "id": 87,
+            "name": "料架1_仓位8_单库实料",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1339.203,
+                "y": -3986.038
+            },
+            "origin_pos": {
+                "x": -1339.203,
+                "y": -3986.038
+            },
+            "width": 320.9,
+            "height": 280.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 129.0
+        },
+        {
+            "id": 88,
+            "name": "料架1_仓位8_Y气缸_缩回",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1090.931,
+                "y": -4268.162
+            },
+            "origin_pos": {
+                "x": -1090.931,
+                "y": -4268.162
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 49.0
+        },
+        {
+            "id": 89,
+            "name": "料架1_仓位8_托盘",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1343.994,
+                "y": -3972.827
+            },
+            "origin_pos": {
+                "x": -1343.994,
+                "y": -3972.827
+            },
+            "width": 631.6441170164284,
+            "height": 638.9675270687928,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#515151",
+                "opacity": 93,
+                "cornerRadius": 33.0
+            },
+            "zValue": 81.0
+        },
+        {
+            "id": 90,
+            "name": "料架1_仓位8_B库实料",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1249.964,
+                "y": -4083.827
+            },
+            "origin_pos": {
+                "x": -1249.964,
+                "y": -4083.827
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.99999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 121.0
+        },
+        {
+            "id": 91,
+            "name": "料架1_仓位8_X气缸_缩回",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1621.254,
+                "y": -4251.191
+            },
+            "origin_pos": {
+                "x": -1621.254,
+                "y": -4251.191
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 33.0
+        },
+        {
+            "id": 92,
+            "name": "料架1_仓位8_框2",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1093.013,
+                "y": -4285.308
+            },
+            "origin_pos": {
+                "x": -1093.013,
+                "y": -4285.308
+            },
+            "width": 36.19793724868032,
+            "height": 794.6309081734098,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#828282",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 25.0
+        },
+        {
+            "id": 93,
+            "name": "料架1_仓位8_单库空筒",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1334.572,
+                "y": -3984.153
+            },
+            "origin_pos": {
+                "x": -1334.572,
+                "y": -3984.153
+            },
+            "width": 120.8,
+            "height": 330.0,
+            "rotate": -138.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 105.0
+        },
+        {
+            "id": 94,
+            "name": "料架1_仓位8_A库实料",
+            "type": "rect",
+            "parent_id": 95,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1440.491,
+                "y": -3879.603
+            },
+            "origin_pos": {
+                "x": -1440.491,
+                "y": -3879.603
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 113.0
+        },
+        {
+            "id": 96,
+            "name": "料架1_机台编号",
+            "type": "text",
+            "parent_id": 154,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3504.326,
+                "y": 372.405
+            },
+            "origin_pos": {
+                "x": 3504.326,
+                "y": 372.405
+            },
+            "width": 500.0,
+            "height": 712.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 73,
+                "opacity": 255
+            },
+            "context": "  #  ",
+            "zValue": 1.0
+        },
+        {
+            "id": 115,
+            "name": "料架1_仓位4",
+            "type": "group",
+            "parent_id": 154,
+            "children_ids": [
+                111,
+                98,
+                104,
+                108,
+                97,
+                100,
+                102,
+                103,
+                105,
+                107,
+                109,
+                110,
+                112,
+                99,
+                106,
+                113,
+                101,
+                114
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1106.21,
+                "y": -1872.906
+            },
+            "origin_pos": {
+                "x": 1106.21,
+                "y": -1872.906
+            },
+            "width": 921.3493333333333,
+            "height": 798.870720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 149.0
+        },
+        {
+            "id": 97,
+            "name": "料架1_仓位4_托盘接近1",
+            "type": "circle",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1052.423,
+                "y": -2149.213
+            },
+            "origin_pos": {
+                "x": 1052.423,
+                "y": -2149.213
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 61.0
+        },
+        {
+            "id": 98,
+            "name": "料架1_仓位4_X气缸_伸出",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 827.008,
+                "y": -2047.049
+            },
+            "origin_pos": {
+                "x": 827.008,
+                "y": -2047.049
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#3b7d4b",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 37.0
+        },
+        {
+            "id": 99,
+            "name": "料架1_仓位4_B库实料",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1164.916,
+                "y": -1909.459
+            },
+            "origin_pos": {
+                "x": 1164.916,
+                "y": -1909.459
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.99999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 117.0
+        },
+        {
+            "id": 100,
+            "name": "料架1_仓位4_X气缸_缩回",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 793.626,
+                "y": -2076.823
+            },
+            "origin_pos": {
+                "x": 793.626,
+                "y": -2076.823
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 29.0
+        },
+        {
+            "id": 101,
+            "name": "料架1_仓位4_A库空筒",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 978.56,
+                "y": -1702.855
+            },
+            "origin_pos": {
+                "x": 978.56,
+                "y": -1702.855
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 85.0
+        },
+        {
+            "id": 102,
+            "name": "料架1_仓位4_托盘",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1070.886,
+                "y": -1798.46
+            },
+            "origin_pos": {
+                "x": 1070.886,
+                "y": -1798.46
+            },
+            "width": 631.6441170164284,
+            "height": 638.9675270687928,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#515151",
+                "opacity": 93,
+                "cornerRadius": 33.0
+            },
+            "zValue": 77.0
+        },
+        {
+            "id": 103,
+            "name": "料架1_仓位4_Y气缸_伸出",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1294.34,
+                "y": -2062.892
+            },
+            "origin_pos": {
+                "x": 1294.34,
+                "y": -2062.892
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#729649",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 53.0
+        },
+        {
+            "id": 104,
+            "name": "料架1_仓位4_托盘接近2",
+            "type": "circle",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1085.57,
+                "y": -1451.839
+            },
+            "origin_pos": {
+                "x": 1085.57,
+                "y": -1451.839
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 69.0
+        },
+        {
+            "id": 105,
+            "name": "料架1_仓位4_框1",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1347.957,
+                "y": -1571.348
+            },
+            "origin_pos": {
+                "x": 1347.957,
+                "y": -1571.348
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 5.0
+        },
+        {
+            "id": 106,
+            "name": "料架1_仓位4_A库实料",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 974.389,
+                "y": -1705.236
+            },
+            "origin_pos": {
+                "x": 974.389,
+                "y": -1705.236
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 109.0
+        },
+        {
+            "id": 107,
+            "name": "料架1_仓位4_单库实料",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1075.677,
+                "y": -1811.67
+            },
+            "origin_pos": {
+                "x": 1075.677,
+                "y": -1811.67
+            },
+            "width": 320.9,
+            "height": 280.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 125.0
+        },
+        {
+            "id": 108,
+            "name": "料架1_仓位4_灯带",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 594.794,
+                "y": -1862.577
+            },
+            "origin_pos": {
+                "x": 594.794,
+                "y": -1862.577
+            },
+            "width": 221.20468359782535,
+            "height": 52.58144118308962,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 133.0
+        },
+        {
+            "id": 109,
+            "name": "料架1_仓位4_Y气缸_缩回",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1323.948,
+                "y": -2093.794
+            },
+            "origin_pos": {
+                "x": 1323.948,
+                "y": -2093.794
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 45.0
+        },
+        {
+            "id": 110,
+            "name": "料架1_仓位4_框3",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 783.069,
+                "y": -2080.096
+            },
+            "origin_pos": {
+                "x": 783.069,
+                "y": -2080.096
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 13.0
+        },
+        {
+            "id": 111,
+            "name": "料架1_仓位4_单库空筒",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1080.308,
+                "y": -1809.785
+            },
+            "origin_pos": {
+                "x": 1080.308,
+                "y": -1809.785
+            },
+            "width": 120.8,
+            "height": 330.0,
+            "rotate": -138.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 101.0
+        },
+        {
+            "id": 112,
+            "name": "料架1_仓位4_编号",
+            "type": "text",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1386.855,
+                "y": -2172.831
+            },
+            "origin_pos": {
+                "x": 1386.855,
+                "y": -2172.831
+            },
+            "width": 100.0,
+            "height": 224.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 13,
+                "opacity": 255
+            },
+            "context": "  编号  ",
+            "zValue": 141.0
+        },
+        {
+            "id": 113,
+            "name": "料架1_仓位4_B库空筒",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1161.147,
+                "y": -1907.788
+            },
+            "origin_pos": {
+                "x": 1161.147,
+                "y": -1907.788
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": 42.00000000000003,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 93.0
+        },
+        {
+            "id": 114,
+            "name": "料架1_仓位4_框2",
+            "type": "rect",
+            "parent_id": 115,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1321.867,
+                "y": -2110.94
+            },
+            "origin_pos": {
+                "x": 1321.867,
+                "y": -2110.94
+            },
+            "width": 36.19793724868032,
+            "height": 794.6309081734098,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#828282",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 21.0
+        },
+        {
+            "id": 134,
+            "name": "料架1_仓位1",
+            "type": "group",
+            "parent_id": 154,
+            "children_ids": [
+                119,
+                122,
+                131,
+                127,
+                130,
+                132,
+                118,
+                121,
+                126,
+                133,
+                117,
+                123,
+                125,
+                128,
+                129,
+                124,
+                120,
+                116
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2917.369,
+                "y": -242.131
+            },
+            "origin_pos": {
+                "x": 2917.369,
+                "y": -242.131
+            },
+            "width": 921.3493333333333,
+            "height": 798.870720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 146.0
+        },
+        {
+            "id": 116,
+            "name": "料架1_仓位1_框1",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3159.117,
+                "y": 59.427
+            },
+            "origin_pos": {
+                "x": 3159.117,
+                "y": 59.427
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 2.0
+        },
+        {
+            "id": 117,
+            "name": "料架1_仓位1_单库空筒",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2891.467,
+                "y": -179.01
+            },
+            "origin_pos": {
+                "x": 2891.467,
+                "y": -179.01
+            },
+            "width": 120.8,
+            "height": 330.0,
+            "rotate": -138.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 98.0
+        },
+        {
+            "id": 118,
+            "name": "料架1_仓位1_托盘",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2882.045,
+                "y": -167.685
+            },
+            "origin_pos": {
+                "x": 2882.045,
+                "y": -167.685
+            },
+            "width": 631.6441170164284,
+            "height": 638.9675270687928,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#515151",
+                "opacity": 93,
+                "cornerRadius": 33.0
+            },
+            "zValue": 74.0
+        },
+        {
+            "id": 119,
+            "name": "料架1_仓位1_Y气缸_缩回",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3135.108,
+                "y": -463.019
+            },
+            "origin_pos": {
+                "x": 3135.108,
+                "y": -463.019
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 42.0
+        },
+        {
+            "id": 120,
+            "name": "料架1_仓位1_编号",
+            "type": "text",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3198.014,
+                "y": -542.056
+            },
+            "origin_pos": {
+                "x": 3198.014,
+                "y": -542.056
+            },
+            "width": 100.0,
+            "height": 224.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 13,
+                "opacity": 255
+            },
+            "context": "  编号  ",
+            "zValue": 138.0
+        },
+        {
+            "id": 121,
+            "name": "料架1_仓位1_X气缸_伸出",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2638.167,
+                "y": -416.274
+            },
+            "origin_pos": {
+                "x": 2638.167,
+                "y": -416.274
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#3b7d4b",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 34.0
+        },
+        {
+            "id": 122,
+            "name": "料架1_仓位1_Y气缸_伸出",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3105.499,
+                "y": -432.117
+            },
+            "origin_pos": {
+                "x": 3105.499,
+                "y": -432.117
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#729649",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 50.0
+        },
+        {
+            "id": 123,
+            "name": "料架1_仓位1_A库空筒",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2789.72,
+                "y": -72.08
+            },
+            "origin_pos": {
+                "x": 2789.72,
+                "y": -72.08
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 82.0
+        },
+        {
+            "id": 124,
+            "name": "料架1_仓位1_B库空筒",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2972.306,
+                "y": -277.013
+            },
+            "origin_pos": {
+                "x": 2972.306,
+                "y": -277.013
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": 42.00000000000003,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 90.0
+        },
+        {
+            "id": 125,
+            "name": "料架1_仓位1_B库实料",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2976.075,
+                "y": -278.684
+            },
+            "origin_pos": {
+                "x": 2976.075,
+                "y": -278.684
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.99999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 114.0
+        },
+        {
+            "id": 126,
+            "name": "料架1_仓位1_A库实料",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2785.548,
+                "y": -74.461
+            },
+            "origin_pos": {
+                "x": 2785.548,
+                "y": -74.461
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 106.0
+        },
+        {
+            "id": 127,
+            "name": "料架1_仓位1_托盘接近2",
+            "type": "circle",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2896.729,
+                "y": 178.936
+            },
+            "origin_pos": {
+                "x": 2896.729,
+                "y": 178.936
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 66.0
+        },
+        {
+            "id": 128,
+            "name": "料架1_仓位1_框2",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3133.026,
+                "y": -480.165
+            },
+            "origin_pos": {
+                "x": 3133.026,
+                "y": -480.165
+            },
+            "width": 36.19793724868032,
+            "height": 794.6309081734098,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#828282",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 18.0
+        },
+        {
+            "id": 129,
+            "name": "料架1_仓位1_灯带",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2405.953,
+                "y": -231.802
+            },
+            "origin_pos": {
+                "x": 2405.953,
+                "y": -231.802
+            },
+            "width": 221.20468359782535,
+            "height": 52.58144118308962,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 130.0
+        },
+        {
+            "id": 130,
+            "name": "料架1_仓位1_框3",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2594.228,
+                "y": -449.321
+            },
+            "origin_pos": {
+                "x": 2594.228,
+                "y": -449.321
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 10.0
+        },
+        {
+            "id": 131,
+            "name": "料架1_仓位1_托盘接近1",
+            "type": "circle",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2863.582,
+                "y": -518.438
+            },
+            "origin_pos": {
+                "x": 2863.582,
+                "y": -518.438
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 58.0
+        },
+        {
+            "id": 132,
+            "name": "料架1_仓位1_单库实料",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2886.836,
+                "y": -180.895
+            },
+            "origin_pos": {
+                "x": 2886.836,
+                "y": -180.895
+            },
+            "width": 320.9,
+            "height": 280.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 122.0
+        },
+        {
+            "id": 133,
+            "name": "料架1_仓位1_X气缸_缩回",
+            "type": "rect",
+            "parent_id": 134,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2604.785,
+                "y": -446.048
+            },
+            "origin_pos": {
+                "x": 2604.785,
+                "y": -446.048
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 26.0
+        },
+        {
+            "id": 153,
+            "name": "料架1_仓位7",
+            "type": "group",
+            "parent_id": 154,
+            "children_ids": [
+                139,
+                138,
+                143,
+                146,
+                140,
+                151,
+                141,
+                144,
+                147,
+                150,
+                136,
+                137,
+                152,
+                145,
+                149,
+                148,
+                142,
+                135
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -704.95,
+                "y": -3503.682
+            },
+            "origin_pos": {
+                "x": -704.95,
+                "y": -3503.682
+            },
+            "width": 921.3493333333333,
+            "height": 798.870720591545,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 152.0
+        },
+        {
+            "id": 135,
+            "name": "料架1_仓位7_单库实料",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -735.483,
+                "y": -3442.446
+            },
+            "origin_pos": {
+                "x": -735.483,
+                "y": -3442.446
+            },
+            "width": 320.9,
+            "height": 280.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 128.0
+        },
+        {
+            "id": 136,
+            "name": "料架1_仓位7_托盘",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -740.274,
+                "y": -3429.236
+            },
+            "origin_pos": {
+                "x": -740.274,
+                "y": -3429.236
+            },
+            "width": 631.6441170164284,
+            "height": 638.9675270687928,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#515151",
+                "opacity": 93,
+                "cornerRadius": 33.0
+            },
+            "zValue": 80.0
+        },
+        {
+            "id": 137,
+            "name": "料架1_仓位7_框1",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -463.202,
+                "y": -3202.124
+            },
+            "origin_pos": {
+                "x": -463.202,
+                "y": -3202.124
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 8.0
+        },
+        {
+            "id": 138,
+            "name": "料架1_仓位7_B库空筒",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -650.013,
+                "y": -3538.564
+            },
+            "origin_pos": {
+                "x": -650.013,
+                "y": -3538.564
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": 42.00000000000003,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 96.0
+        },
+        {
+            "id": 139,
+            "name": "料架1_仓位7_Y气缸_缩回",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -487.211,
+                "y": -3724.57
+            },
+            "origin_pos": {
+                "x": -487.211,
+                "y": -3724.57
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 48.0
+        },
+        {
+            "id": 140,
+            "name": "料架1_仓位7_B库实料",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -646.244,
+                "y": -3540.235
+            },
+            "origin_pos": {
+                "x": -646.244,
+                "y": -3540.235
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.99999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 120.0
+        },
+        {
+            "id": 141,
+            "name": "料架1_仓位7_灯带",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1216.366,
+                "y": -3493.353
+            },
+            "origin_pos": {
+                "x": -1216.366,
+                "y": -3493.353
+            },
+            "width": 221.20468359782535,
+            "height": 52.58144118308962,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 136.0
+        },
+        {
+            "id": 142,
+            "name": "料架1_仓位7_单库空筒",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -730.852,
+                "y": -3440.561
+            },
+            "origin_pos": {
+                "x": -730.852,
+                "y": -3440.561
+            },
+            "width": 120.8,
+            "height": 330.0,
+            "rotate": -138.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 104.0
+        },
+        {
+            "id": 143,
+            "name": "料架1_仓位7_编号",
+            "type": "text",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -424.305,
+                "y": -3803.606
+            },
+            "origin_pos": {
+                "x": -424.305,
+                "y": -3803.606
+            },
+            "width": 100.0,
+            "height": 224.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "font_size": 13,
+                "opacity": 255
+            },
+            "context": "  编号  ",
+            "zValue": 144.0
+        },
+        {
+            "id": 144,
+            "name": "料架1_仓位7_A库空筒",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -832.599,
+                "y": -3333.631
+            },
+            "origin_pos": {
+                "x": -832.599,
+                "y": -3333.631
+            },
+            "width": 90.75048900246145,
+            "height": 260.0,
+            "rotate": -138.49999999999997,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 12.0
+            },
+            "zValue": 88.0
+        },
+        {
+            "id": 145,
+            "name": "料架1_仓位7_托盘接近1",
+            "type": "circle",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -758.737,
+                "y": -3779.989
+            },
+            "origin_pos": {
+                "x": -758.737,
+                "y": -3779.989
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 64.0
+        },
+        {
+            "id": 146,
+            "name": "料架1_仓位7_Y气缸_伸出",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -516.82,
+                "y": -3693.668
+            },
+            "origin_pos": {
+                "x": -516.82,
+                "y": -3693.668
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -137.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#729649",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 56.0
+        },
+        {
+            "id": 147,
+            "name": "料架1_仓位7_A库实料",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -836.771,
+                "y": -3336.012
+            },
+            "origin_pos": {
+                "x": -836.771,
+                "y": -3336.012
+            },
+            "width": 200.9475113625931,
+            "height": 262.52820032854885,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 112.0
+        },
+        {
+            "id": 148,
+            "name": "料架1_仓位7_框3",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1028.091,
+                "y": -3710.872
+            },
+            "origin_pos": {
+                "x": -1028.091,
+                "y": -3710.872
+            },
+            "width": 796.6666666666667,
+            "height": 36.000000000000455,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 16.0
+        },
+        {
+            "id": 149,
+            "name": "料架1_仓位7_托盘接近2",
+            "type": "circle",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -725.59,
+                "y": -3082.615
+            },
+            "origin_pos": {
+                "x": -725.59,
+                "y": -3082.615
+            },
+            "rotate": -47.999999999999986,
+            "radius_w": 35.20266069934483,
+            "radius_h": 35.20266069934483,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#ffff7f",
+                "opacity": 255
+            },
+            "zValue": 72.0
+        },
+        {
+            "id": 150,
+            "name": "料架1_仓位7_X气缸_缩回",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1017.534,
+                "y": -3707.599
+            },
+            "origin_pos": {
+                "x": -1017.534,
+                "y": -3707.599
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#282828",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 32.0
+        },
+        {
+            "id": 151,
+            "name": "料架1_仓位7_框2",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -489.293,
+                "y": -3741.716
+            },
+            "origin_pos": {
+                "x": -489.293,
+                "y": -3741.716
+            },
+            "width": 36.19793724868032,
+            "height": 794.6309081734098,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#828282",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 24.0
+        },
+        {
+            "id": 152,
+            "name": "料架1_仓位7_X气缸_伸出",
+            "type": "rect",
+            "parent_id": 153,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -984.152,
+                "y": -3677.824
+            },
+            "origin_pos": {
+                "x": -984.152,
+                "y": -3677.824
+            },
+            "width": 139.08304423682262,
+            "height": 50.0,
+            "rotate": -47.999999999999986,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": true,
+                "fill_color": "#3b7d4b",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 40.0
+        }
+    ]
+}

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import ( QToolTip)
 from PySide6.QtCore import Qt, QPointF, QRectF,Signal,QSize,QObject,QRect,QPoint,QTimer,QSizeF
 from PySide6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack
 
-import json,sys,os,traceback
+import json,sys,os,traceback,math
 from .elements import (
     base_element,
     circle_element,
@@ -332,6 +332,57 @@ class SceneSerializer:
         return data
 
     @staticmethod
+    def _items_bounding_rect(scene) -> QRectF:
+        """Return the union of every top-level item's scene bounding rect.
+
+        Group children are skipped: their scene position is already folded into
+        the parent group's bounding rect, and reading it twice would needlessly
+        expand the result when a child pokes out of its group.
+        """
+
+        result = QRectF()
+        manager = getattr(scene, "scene_manager", None)
+        items = manager.m_items.values() if manager is not None else []
+        for item in items:
+            if item.parentItem() is None and getattr(item, "m_parent", None) is None:
+                result = result.united(item.sceneBoundingRect())
+        return result
+
+    @staticmethod
+    def _view_rect_is_stale(scene, rect: QRectF) -> bool:
+        """True when the saved view range has drifted far from the content.
+
+        ``sceneRect`` records the range that was visible when the page was last
+        saved.  If items are later laid out far away from that range (for
+        example a whole rack layout placed tens of thousands of units off), the
+        centre of the saved range ends up far from the centre of the content,
+        so reopening the page would show an empty area and look like "all items
+        vanished".
+
+        The check compares the distance between the two centres against the
+        saved range's diagonal: beyond half a diagonal the range is considered
+        stale.  Normal pages keep the ratio around 0.2 or less; a drifted page
+        (measured on ``page_2``) reaches ~0.9.
+        """
+
+        if rect is None or rect.width() <= 0 or rect.height() <= 0:
+            return False
+        bounds = SceneSerializer._items_bounding_rect(scene)
+        if bounds.width() <= 0 or bounds.height() <= 0:
+            return False
+
+        view_center = rect.center()
+        content_center = bounds.center()
+        distance = math.hypot(
+            view_center.x() - content_center.x(),
+            view_center.y() - content_center.y(),
+        )
+        diagonal = math.hypot(rect.width(), rect.height())
+        if diagonal <= 0:
+            return False
+        return distance > diagonal * 0.5
+
+    @staticmethod
     def serialize_scene(scene: myGraphicsScene, filename: str):
         """将场景序列化为JSON文件"""
         # ``sceneRect`` stores the scene-coordinate rectangle that is currently
@@ -482,6 +533,18 @@ class SceneSerializer:
         restore_relationship(scene.scene_manager.m_items)
 
         if view_rect is not None:
+            # 防御性修复：sceneRect 记录的是"上次保存时的可见范围"，如果
+            # 之后图元被整体布置到很远的位置而视口没跟着走，保存下来的
+            # sceneRect 就会停留在旧位置，重新打开页面时视图对准一片空白，
+            # 大量图元看起来"不可见"。
+            #
+            # 这里在恢复视图前检测一次：若记录范围的几何中心已严重偏离
+            # 图元主体的中心（超过自身对角线的一半），说明该记录已过期，
+            # 改用全部图元的整体包围盒来适应视图，确保打开页面能看到内容。
+            if SceneSerializer._view_rect_is_stale(scene, view_rect):
+                fallback = SceneSerializer._items_bounding_rect(scene)
+                if fallback.width() > 0 and fallback.height() > 0:
+                    view_rect = fallback
             # Applied immediately for an already-visible scene, otherwise
             # deferred until showEvent() gives the widget its final size.
             scene.set_view_scene_rect(view_rect)

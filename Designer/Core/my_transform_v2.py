@@ -25,13 +25,25 @@ class Transform:
             if len(matrix) != 3 or any(len(row) != 3 for row in matrix):
                 raise ValueError("Matrix must be 3x3")
             self.m = matrix
+        # 旋转角度惰性缓存：以矩阵对象身份做键，矩阵整体替换时自动失效
+        self._rot_key = None
+        self._rot_angle = 0.0
 
     def get_matrix(self):
         return self.m
     
     def get_rotation_angle(self):
-        """从2D旋转矩阵获取角度(弧度)"""
-        return math.degrees(math.atan2(self.m[0][1], self.m[0][0]))
+        """从2D旋转矩阵获取角度(度)。
+
+        角度只依赖矩阵左上 2x2 的旋转分量。矩阵是通过整体赋值 ``self.m = ...``
+        更新的，因此以 ``id(self.m)`` 做缓存键，矩阵一旦换成新对象缓存即失效，
+        无需手动通知。
+        """
+        key = id(self.m)
+        if self._rot_key != key:
+            self._rot_key = key
+            self._rot_angle = math.degrees(math.atan2(self.m[0][1], self.m[0][0]))
+        return self._rot_angle
     
     def translate(self, *args):
         """在现有变换基础上叠加平移变换"""
@@ -180,9 +192,12 @@ class Transform:
     def map(self, point: QPointF):
         """应用变换到点（行主序）"""
         x, y = point.x(), point.y()
-        wx = self.m[0][0]*x + self.m[1][0]*y + self.m[2][0]
-        wy = self.m[0][1]*x + self.m[1][1]*y + self.m[2][1]
-        w  = self.m[0][2]*x + self.m[1][2]*y + self.m[2][2]
+        # 用局部变量展开矩阵，避免热路径上的重复 list 索引
+        m = self.m
+        r0, r1, r2 = m[0], m[1], m[2]
+        wx = r0[0]*x + r1[0]*y + r2[0]
+        wy = r0[1]*x + r1[1]*y + r2[1]
+        w  = r0[2]*x + r1[2]*y + r2[2]
         
         # 改进的归一化处理
         if abs(w) > 1e-10:

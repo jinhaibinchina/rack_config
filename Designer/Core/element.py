@@ -176,6 +176,9 @@ class base_element(QObject):
         self._tf_self_epoch   = 0      # 自身几何版本号（m_transform 变化时 +1）
         self._tf_item_cache   = None   # itemTransform() 缓存
         self._tf_item_key     = None   # (m_pos.x, m_pos.y, _tf_self_epoch)
+        self._tf_item_px      = None   # 生成缓存时 m_pos.x（标量，避免每帧 tuple 构造）
+        self._tf_item_py      = None   # 生成缓存时 m_pos.y
+        self._tf_epoch_prev   = -1     # 生成缓存时的 epoch（与 _tf_self_epoch 比较）
         self._tf_scene_cache  = None   # sceneTransform() 缓存
         self._tf_scene_parent = None   # 生成该缓存时父项返回的变换对象
         self._tf_scene_own    = None   # 生成该缓存时自身的 itemTransform 对象
@@ -287,6 +290,19 @@ class base_element(QObject):
     def childItems(self):
         return self.m_children
 
+    def _notify_children_geometry_change(self):
+        """父图元移动/变换后，递归同步子图元的场景包围盒。
+
+        子图元的 ``_sceneBoundingRect`` 依赖父链变换，且只在自己的
+        ``paint`` 里由 ``__check_position_change`` 惰性更新。一旦父图元
+        被拖出视口、子图元的 paint 被裁剪跳过，这个兜底就失效，拖回来
+        时子图元仍停在视口外的旧包围盒而被永久裁掉。这里在父移动后主动
+        递归刷新，补齐这条独立于 paint 的更新路径。
+        """
+        for child in self.m_children:
+            child.__check_position_change()
+            child._notify_children_geometry_change()
+
     def _reset_moving_flag(self):
         self.__moving_flag = False
         # 本帧绘制已经消费掉变换缓存，同步清掉 mapToScene() 记录的
@@ -343,6 +359,13 @@ class base_element(QObject):
             return
         self.m_pos =pos
         self.invalidate_transform_cache()
+        # 位置变化后立即同步场景包围盒，否则依赖 paint 的惰性兜底会让
+        # 被裁剪跳过的图元（如 Ctrl 拖出视口后再拖回）永远停在旧包围盒，
+        # 裁剪判断一直认为它在视口外，导致永久不可见。
+        self.__check_position_change()
+        # 同步组内子图元：子图元的包围盒依赖父链变换，父移动后必须级联刷新，
+        # 否则子图元同样会因为包围盒滞后而在拖回视口后被永久裁掉。
+        self._notify_children_geometry_change()
 
     def handle_parent_move(self):
         """父图元位置变化"""
@@ -587,17 +610,23 @@ class base_element(QObject):
         m_pos 用坐标值做键，所以任何直接给 m_pos 赋值的代码（move_by、
         change_position 等）都能被正确感知；m_transform 的原地修改需要
         调用 invalidate_transform_cache()。
+
+        缓存命中路径是每帧热路径（绘制时每个图元多次调用），这里用标量
+        快照做键，避免每次构造 tuple 以及重复的 C++ 属性访问。
         """
         pos = self.m_pos
-        key = (pos.x(), pos.y(), self._tf_self_epoch)
-        if self._tf_item_key != key:
+        px = pos.x()
+        py = pos.y()
+        if self._tf_item_px != px or self._tf_item_py != py or self._tf_epoch_prev != self._tf_self_epoch:
+            self._tf_item_px = px
+            self._tf_item_py = py
+            self._tf_epoch_prev = self._tf_self_epoch
             # 创建基础变换
             t = Transform()
             t = t.translate(pos)
             # 2. 应用局部变换
             t = t*self.m_transform 
             self._tf_item_cache = t
-            self._tf_item_key = key
         return self._tf_item_cache
     
     def sceneTransform(self):
@@ -686,6 +715,9 @@ class base_element(QObject):
         self.m_pos = self.m_pos + pos
         # 拖动/成组移动只改 m_pos，必须自己发脏区域，不能再依赖渲染定时器轮询
         self.invalidate_transform_cache()
+        # 同步场景包围盒，避免被裁剪跳过后包围盒停留在旧位置导致不可见
+        self.__check_position_change()
+        self._notify_children_geometry_change()
 
     def move_to_pos(self,*args):
         pos = QPointF()
