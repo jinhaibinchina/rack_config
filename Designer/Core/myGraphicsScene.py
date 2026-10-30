@@ -731,7 +731,7 @@ class watch_dog(QTimer):
         self.start(1000)
         
     def handle_timeout(self):
-        print("watchdog 超时")
+        debug_log("watchdog 超时")
         self.stop()
         self.callback()
 
@@ -1455,6 +1455,31 @@ class myGraphicsScene(grid_map_window):
     #     s=serialize_region(dirty_region)
     #     self.__dirtyRegion = deserialize_region(s)
   
+    def _scene_rect_for_region(self, repaint_view: QRegion) -> QRectF:
+        """把视图坐标下的重绘区域换算成场景坐标矩形。
+
+        ``refresh_dynamic_buffer`` 收到的区域来自 ``rect_windowToView``，即
+        ``sceneToView`` 的输出坐标系，所以用 ``viewToScene`` 反算即可。这里
+        **不能**走四叉树：运行态图元会随数据刷新移动/改尺寸，四叉树里的
+        记录并不总是最新的，用它判断可见性会让图元凭空消失。
+        """
+
+        rect = repaint_view.boundingRect()
+        if rect.isEmpty():
+            return QRectF()
+
+        top_left = self.viewToScene(QPointF(rect.left(), rect.top()))
+        bottom_right = self.viewToScene(QPointF(rect.right() + 1, rect.bottom() + 1))
+        scene_rect = QRectF(top_left, bottom_right).normalized()
+
+        # 描边宽度、悬停高亮、旋转后的包围盒都会略微超出 sceneBoundingRect，
+        # 按 40 个视图像素换算成场景单位外扩，避免边缘被裁掉。
+        grid_size = self.grid_size or 1.0
+        units_per_px = self.scene_units_per_grid_x / grid_size
+        margin = 40.0 * abs(units_per_px)
+        scene_rect.adjust(-margin, -margin, margin, margin)
+        return scene_rect
+
     def refresh_dynamic_buffer(self, repaint_view:QRegion):
         """刷新动态缓冲区，只包含图元"""
         
@@ -1469,11 +1494,25 @@ class myGraphicsScene(grid_map_window):
 
         dyn_painter.setClipRegion(repaint_view)
         dyn_painter.setClipping(True)  # 显式启用裁剪
-        
+
+        # 只调用与重绘区域相交的图元的 paint：区域外的图元即使被调用，
+        # painter 也会把结果裁掉，但坐标变换和 Python 调用照付。
+        #
+        # 注意 set_dirty_region 必须对**所有**图元调用：图元自己的 paint 开头
+        # 就用它做可见性判断，漏掉的图元会一直保持空脏区，之后即使移动或
+        # 切页进入视野也画不出来（表现为"部分图元不显示"）。
+        scene_rect = self._scene_rect_for_region(repaint_view)
+
         for child in  self.scene_manager.m_sorted_items:
-            # child.check_hover(self.sence_pos_mouse)
             child.set_dirty_region(repaint_view)
-            # child.paint(dyn_painter,self.shine_flag)
+            bound = child.sceneBoundingRect()
+            # 包围盒为空说明尺寸还没算出来，宁可多画一次也不能漏掉。
+            if (
+                not scene_rect.isNull()
+                and not bound.isNull()
+                and not bound.intersects(scene_rect)
+            ):
+                continue
             child.paint(dyn_painter,True)
         dyn_painter.end()
     
@@ -1542,7 +1581,7 @@ class myGraphicsScene(grid_map_window):
         # super().paintEvent(event)
     
         if event.region().isEmpty():
-            print("不重绘")
+            debug_log("不重绘")
             return
 
         update_region_view = QRegion()
@@ -2044,7 +2083,7 @@ class myGraphicsScene(grid_map_window):
 
 
         if event.button() == Qt.LeftButton:
-            print("松开鼠标左键")
+            debug_log("松开鼠标左键")
             self.frame_select.finish()
         
         super().mouseReleaseEvent( event)

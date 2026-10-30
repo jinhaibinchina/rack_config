@@ -34,10 +34,12 @@ import copy
 from res.designer_resource_manager import  resource_manager as res_mng
 
 class QuadtreeNode:
-    def __init__(self, boundary: QRectF, capacity=4):
+    def __init__(self, boundary: QRectF, capacity=4, max_depth=8, depth=0):
         self.boundary = boundary  # 节点边界（矩形区域）
         
         self.capacity = capacity  # 节点最大容量
+        self.max_depth = max_depth  # 最大深度，防止重叠图元导致无限分裂
+        self.depth = depth        # 当前节点深度
         self.items = []           # 存储的图形项
         self.divided = False      # 是否已分裂
         # 四个子节点
@@ -63,10 +65,10 @@ class QuadtreeNode:
         sw_rect = QRectF(x, y + h, w, h)
         se_rect = QRectF(x + w, y + h, w, h)
 
-        self.nw = QuadtreeNode(nw_rect, self.capacity)
-        self.ne = QuadtreeNode(ne_rect, self.capacity)
-        self.sw = QuadtreeNode(sw_rect, self.capacity)
-        self.se = QuadtreeNode(se_rect, self.capacity)
+        self.nw = QuadtreeNode(nw_rect, self.capacity, self.max_depth, self.depth + 1)
+        self.ne = QuadtreeNode(ne_rect, self.capacity, self.max_depth, self.depth + 1)
+        self.sw = QuadtreeNode(sw_rect, self.capacity, self.max_depth, self.depth + 1)
+        self.se = QuadtreeNode(se_rect, self.capacity, self.max_depth, self.depth + 1)
         self.divided = True
 
     # def insert(self, item: base_element) -> bool:
@@ -102,20 +104,21 @@ class QuadtreeNode:
         if not self.divided:
             self.items.append(item)
             # 超容量时分裂，但不迁移父节点数据
-            if len(self.items) > self.capacity:
+            if len(self.items) > self.capacity and self.depth < self.max_depth:
                 self.subdivide()
             return True
 
-        # 已分裂时，尝试插入到子节点
-        inserted = False
-        if self.nw.insert(item): inserted = True
-        if self.ne.insert(item): inserted = True
-        if self.sw.insert(item): inserted = True
-        if self.se.insert(item): inserted = True
+        # 已分裂时，只有完全落在某个子节点内部才下放。
+        # 旧实现用 intersects 判断并依次尝试四个子节点，只要相交就插入，
+        # 导致同一图元被同时存进多个子节点（实测 1610 图元产生 4974 条记录），
+        # 且没有深度上限，重叠图元会把树无限裂开。
+        item_rect = item.sceneBoundingRect()
+        for child in (self.nw, self.ne, self.sw, self.se):
+            if child.boundary.contains(item_rect):
+                return child.insert(item)
 
-        # 若子节点无法完全容纳，保留在父节点
-        if not inserted:
-            self.items.append(item)
+        # 跨子节点边界：保留在本节点，保证只存储一份。
+        self.items.append(item)
         return True
 
     
@@ -151,12 +154,9 @@ class QuadtreeNode:
         
     #     return removed
     def remove_all(self):
-        removed = False
-        
-        # 从当前节点删除
-        for item in self.items:
-            self.items.remove(item)
-            removed = True
+        # 旧实现在遍历中删除元素，会跳过一半条目；直接清空即可。
+        removed = bool(self.items)
+        self.items.clear()
             
         # 从子节点递归删除
         if self.divided:
@@ -532,6 +532,9 @@ class QuadTreeScene(myGraphicsScene):
         self.setFocusPolicy(Qt.StrongFocus)  # 允许接收事件
 
         self.quadtree = None
+        # 上一次鼠标移动时处于 hover 状态的图元，用于复位"刚离开"的图元，
+        # 避免每次都遍历全部图元（见 on_mouse_move）。
+        self._hover_items = set()
         self.boundingRect_old = {}
         self.dirtyBoundingRect_old = {}
         # self.dirtyRegion = QRegion()#脏区域集
@@ -843,10 +846,13 @@ class QuadTreeScene(myGraphicsScene):
 
     def addItem(self, item: base_element)->bool:
         """ 添加项到场景和四叉树 """
-        super().addItem(item)
+        # 基类会丢弃超出场景范围的图元（并 deleteLater），此时绝不能再
+        # 把它插入四叉树，否则树里会留下已销毁的对象。
+        if not super().addItem(item):
+            return False
         if self.quadtree:
             if not self.quadtree.boundary.intersects(item.sceneBoundingRect()):
-                print(f"超出边界了，因此没有添加进树{item.sceneBoundingRect()}")
+                debug_log(f"超出边界了，因此没有添加进树{item.sceneBoundingRect()}")
             return self.quadtree.insert(item)
         return True
     
@@ -878,26 +884,19 @@ class QuadTreeScene(myGraphicsScene):
         view_area = QRectF(view_center_pos.x()-a,view_center_pos.y()-a,a*2,a*2)
         scene_area = QRectF(self.viewToScene(view_area.topLeft()),self.viewToScene(view_area.bottomRight()))
     
-        if not hasattr(self,"area"):
-            setattr(self,"area",view_area)
         self.area =view_area
         items = self.items_in_area(scene_area)
 
         end_points = []
         center_points = []
 
-        for child in self.findChildren(base_element):
-            if  child in items:
-                child.check_hover(self.sence_pos_mouse)
-            else:
-                if child.is_in_group() or isinstance(child,group_element):
-                    self.hover_sta_change.emit(child)
-                child.set_hover(False)
-
-
+        # 只对查询区域内的图元做 hover 检测。
+        # 旧实现先遍历全部图元（1600 图元的页面每次移动都跑一遍），再对
+        # 区域外每一个"在组内"的图元无条件 emit hover_sta_change —— 实测
+        # 单次鼠标移动会发 1500+ 次信号，占该函数 77% 的耗时。
         for item in items:
-            # for child in  self.findChildren(base_element):
-            # item.check_hover(self.sence_pos_mouse)
+            item.check_hover(self.sence_pos_mouse)
+
             if not( item.get_selected() and  self.CTRL_pressed_flag ): 
                 if isinstance(item,line_element):
                     head_pos = item.get_scene_head_pos()
@@ -922,13 +921,19 @@ class QuadTreeScene(myGraphicsScene):
                     center_pos = item.get_scene_center_pos()
                     center_points.append(center_pos)
 
-        
+        # 复位"上一次在 hover、这次已离开"的图元。差集通常只有 0~2 个，
+        # 并且只在 hover 状态真的从 True 变 False 时才通知组。
+        for item in self._hover_items - items:
+            try:
+                if item.get_hover():
+                    item.set_hover(False)
+                    if item.is_in_group() or isinstance(item, group_element):
+                        self.hover_sta_change.emit(item)
+            except RuntimeError:
+                # 图元已删除，C++ 对象已销毁，直接跳过。
+                pass
+        self._hover_items = set(items)
 
-        
-        # self.statusBar.showMessage(f"区域内有 {len(items)} 个图形项")
-      
-
-        self.snapSys.update_grid(scene_area)
         self.snapSys.update_endpoints(end_points)
         self.snapSys.update_midpoints(center_points)
         self.snapSys.snap_to_point(pos)
@@ -974,16 +979,16 @@ class QuadTreeScene(myGraphicsScene):
                 # self.is_setting_group_pos = False
                 self.is_setting_father = False
                 self.is_setting_base_pos =False
-                print("不打开右键菜单")
+                debug_log("不打开右键菜单")
               
                 return  # 直接返回，确保不会继续处理
             else:
-                print("------------")
+                debug_log("------------")
                 self.setContextMenuPolicy(Qt.DefaultContextMenu)
         elif event.button() == Qt.MiddleButton:
             area = QRectF(QPointF(-50000.0,-50000.0),QPointF(50000.0,50000.0))
             items = self.items_in_area(area)
-            print(items)
+            debug_log(len(items))
 
       
     def mouseReleaseEvent(self, event):
@@ -1625,6 +1630,14 @@ class QuadTreeScene(myGraphicsScene):
         for child in self.findChildren(base_element):
             child.Delete()
         self.quadtree.remove_all()
+        # 图元已经全部销毁，管理容器和捕捉用的几何缓存必须同步清空：
+        # 否则重新加载页面时 m_items 会残留已销毁对象，切换页面越多次越脏。
+        if self.scene_manager is not None:
+            self.scene_manager.m_items.clear()
+            self.scene_manager.m_name_items.clear()
+            self.scene_manager.m_sorted_items = []
+        self.snapSys.clear_elements()
+        self._hover_items.clear()
         self.update()
     def save_element_info(self, filename="datas/data.json"):
         """Serialize the scene.
@@ -1935,7 +1948,7 @@ class SceneManager(QObject):
             # print(f'更新图元{id}在树的位置')
     # 删除图元
     def deleteItem(self, item:base_element):
-        print(f"准备删除id{item.id()}")
+        debug_log(f"准备删除id{item.id()}")
         self.m_items[item.id()] =None
         del self.m_items[item.id()]
         self.m_scene.deleteItem(item)
