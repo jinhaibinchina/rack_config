@@ -298,7 +298,10 @@ class DesignScene(QuadTreeScene):
             self.delete_selected_items()
             event.accept()
             return
-        if event.key() == Qt.Key_T and not has_ctrl:
+        # T 键吸附不要求松开 Ctrl：拖拽图元本身就是「Ctrl + 左键」，
+        # 用户在按住 Ctrl 拖动过程中按 T 应立即吸附。因此这里不做
+        # ``not has_ctrl`` 限制（Ctrl+T 当前无其它绑定，不会冲突）。
+        if event.key() == Qt.Key_T:
             self.snap_to_current_point()
             event.accept()
             return

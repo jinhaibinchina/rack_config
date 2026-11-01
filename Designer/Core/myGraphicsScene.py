@@ -2091,11 +2091,25 @@ class myGraphicsScene(grid_map_window):
         super().mouseReleaseEvent( event)
         
     def move_item_to_snap_pos(self,pos):
-        """拖拽图元时能吸附到捕捉点"""
+        """拖拽图元时能吸附到捕捉点。
+
+        吸附是一次「增量移动」：图元被拉到捕捉点后，必须把它的移动基准
+        (m_pos_init) 与鼠标基准 (sence_pos_mouse_save) 一起同步到吸附点，
+        否则下一帧 mouseMove 又会用旧的 sence_pos_mouse_save 重算偏移，
+        图元直接跳回吸附前的位置，吸附效果丢失。
+
+        同步后：吸附点成为新起点，之后鼠标移动多少，图元就相对吸附点
+        移动多少，不会再回跳。
+        """
         for child in self.findChildren(base_element):
             if child.get_selected() and not child.is_has_parent() and self.CTRL_pressed_flag and self.move_flag:
-                dpos = pos- self.sence_pos_mouse_save
+                dpos = pos - self.sence_pos_mouse_save
                 child.move_to_pos(dpos)
+                # 图元移动基准同步到吸附后位置，保证后续拖动从新位置累加。
+                child.set_m_pos_init(child.pos())
+        # 鼠标基准同步到吸附点，保证后续 handle_mouse_move 的偏移以吸附点为原点。
+        self.sence_pos_mouse_save = pos
+        self.sence_pos_mouse = pos
     
     def handle_mouse_move(self,event):
         if self._mode == SceneMode.Design:

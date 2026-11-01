@@ -77,6 +77,9 @@ class EmbeddedWidgetLayer(QObject):
         self._scale = 1.0
         self._angle = 0.0
         self._visible = False
+        # 只读模式：设计态下控件只作展示，鼠标事件穿透给场景，保证图元仍可
+        # 选中/拖动/缩放。运行时置 False 恢复可交互。
+        self._interactive = True
 
         view = QGraphicsView(host)
         view.setObjectName("embeddedWidgetView")
@@ -157,6 +160,7 @@ class EmbeddedWidgetLayer(QObject):
         self.proxy = proxy
         self.widget = widget
         self._apply_transform()
+        self._apply_interactive()
 
     def clear_widget(self):
         proxy = self.proxy
@@ -199,6 +203,37 @@ class EmbeddedWidgetLayer(QObject):
         else:
             self.view.hide()
 
+    def set_interactive(self, interactive: bool):
+        """控制控件是否可交互。
+
+        只读（``interactive=False``）时，视图与控件都设
+        ``WA_TransparentForMouseEvents``，鼠标事件穿透到场景，控件仅作展示；
+        同时关闭 eventFilter 的"左键拖动画布"延迟派发。切回可交互时恢复。
+        """
+        self._interactive = bool(interactive)
+        self._apply_interactive()
+
+    def _apply_interactive(self):
+        view = self.view
+        if view is not None:
+            view.setAttribute(Qt.WA_TransparentForMouseEvents, not self._interactive)
+            viewport = view.viewport()
+            if viewport is not None:
+                viewport.setAttribute(
+                    Qt.WA_TransparentForMouseEvents, not self._interactive
+                )
+        widget = self.widget
+        if widget is not None:
+            widget.setAttribute(
+                Qt.WA_TransparentForMouseEvents, not self._interactive
+            )
+            # 只读态再关掉键盘焦点策略，避免 Tab 焦点误入一个"看起来可交互"的控件。
+            widget.setFocusPolicy(
+                Qt.FocusPolicy.StrongFocus
+                if self._interactive
+                else Qt.FocusPolicy.NoFocus
+            )
+
     def raise_view(self):
         if self.view.isVisible():
             self.view.raise_()
@@ -211,6 +246,9 @@ class EmbeddedWidgetLayer(QObject):
     # ------------------------------------------------------------------
     def eventFilter(self, watched, event):
         if watched is not self._viewport or self._injecting:
+            return False
+        # 只读态（设计模式展示）：不拦截任何事件，让场景照常处理选中/拖动。
+        if not self._interactive:
             return False
 
         etype = event.type()

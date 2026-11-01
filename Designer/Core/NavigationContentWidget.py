@@ -1,14 +1,35 @@
+"""设计模式的属性 dock 主体。
+
+面板结构（自上而下）：
+
+    对象摘要条   —— 当前选中的是哪个图元（类型 / 名称 / ID / 所属组）
+    导航 + 内容  —— 左侧是属性分页索引，右侧是可滚动的属性表单
+
+具体分页内容由 ``myPropertyForElement`` 里的 ``*PropertyItem`` 提供，
+本模块只负责分派、布局和整体样式，以及“选中页面背景”时的页面属性。
+"""
+
 import sys
+
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QCheckBox,QSpinBox,
-    QTreeWidget, QTreeWidgetItem, QStackedWidget, QLabel, QFrame,QScrollArea,
-    QListWidget, QListWidgetItem, QPushButton, QGroupBox,QColorDialog,
-    QTextEdit, QStyleFactory
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QScrollArea,
+    QSplitter,
+    QStackedWidget,
+    QStyleFactory,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtGui import QFont,QColor
-from PySide6.QtCore import Qt,Signal
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
+
 from .elements import (
     base_element,
+    checkbox_element,
     circle_element,
     group_element,
     image_element,
@@ -16,320 +37,388 @@ from .elements import (
     rect_element,
     text_element,
     triangle_element,
+    widget_element,
 )
-# from my_elements_v2 import rect_element, triangle_element, line_element, circle_element, base_element, group_element, text_element,image_element
 from .myGraphicsScene import myGraphicsScene
-
-from .myPropertyForElement import TextPropertyItem,LinePropertyItem,RectPropertyItem,TrianglePropertyItem,CirclePropertyItem,GroupPropertyItem,ImagePropertyItem
+from .property_widgets import (
+    PROPERTY_PANEL_QSS,
+    ColorField,
+    EmptyState,
+    ObjectHeader,
+    PropertyPage,
+    SectionCard,
+    make_value_label,
+)
+from .myPropertyForElement import (
+    TYPE_LABELS,
+    CheckboxPropertyItem,
+    CirclePropertyItem,
+    GroupPropertyItem,
+    ImagePropertyItem,
+    LinePropertyItem,
+    RectPropertyItem,
+    TextPropertyItem,
+    TrianglePropertyItem,
+    WidgetPropertyItem,
+)
 from .run_property import CabinetPropertyItem
 from .my_common import SceneMode
 
-class NavigationContentWidget(QWidget):
-    destory_current =Signal()
-    def create_navigation_scroll(self):
-        """创建带滚动条的导航区域"""
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
-        
-        # 创建容器
-        container = QWidget()
-        scroll_area.setWidget(container)
-        
-        # 导航树布局
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.navigation_tree = self.create_navigation_tree()
-        layout.addWidget(self.navigation_tree)
-        
-        return scroll_area
-    
-    def create_content_scroll(self):
-        """创建带滚动条的内容区域"""
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
-        
-        # 创建容器
-        self.content_container = QWidget()
-        scroll_area.setWidget(self.content_container)
-        
-        # 内容布局
-        self.content_layout = QVBoxLayout(self.content_container)
-        self.content_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # 创建内容堆栈
-        self.content_stack = QStackedWidget()
-        self.content_layout.addWidget(self.content_stack)
-        
-        return scroll_area
-    
-    def apply_style(self):
-        # 应用现代样式
-        QApplication.setStyle(QStyleFactory.create("Fusion"))
-        
-        # 基础样式
-        base_style = """
-            QWidget {
-                font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-            }
-            QSplitter::handle {
-                background-color: #e0e0e0;
-                width: 3px;
-            }
-            QScrollArea {
-                background-color: #ffffff;
-                border: none;
-            }
-        """
-        
-        # 导航树样式
-        tree_style = """
-            QTreeWidget {
-                background-color: #f5f5f5;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                padding: 5px;
-            }
-            QTreeWidget::item {
-                height: 28px;
-                padding: 5px;
-            }
-            QTreeWidget::item:selected {
-                background-color: #e0f0ff;
-                color: #0066cc;
-                font-weight: bold;
-            }
-            QTreeWidget::item:hover {
-                background-color: #e8f4ff;
-            }
-        """
-        
-        # 内容区样式
-        content_style = """
-            QGroupBox {
-                font-weight: bold;
-                font-size: 14px;
-                padding-top: 10px;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                margin-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top center;
-                padding: 0 5px;
-                background-color: transparent;
-            }
-            QTextEdit {
-                background-color: #ffffff;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                padding: 10px;
-            }
-            QListWidget {
-                background-color: #ffffff;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                padding: 5px;
-            }
-            QListWidget::item {
-                padding: 8px;
-            }
-            QListWidget::item:selected {
-                background-color: #e0f0ff;
-                color: #0066cc;
-            }
-            QPushButton {
-                background-color: #4a86e8;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background-color: #3a76d8;
-            }
-            QPushButton:pressed {
-                background-color: #2a66c8;
-            }
-        """
-        
-        self.setStyleSheet(base_style + tree_style + content_style)
-    
-    def create_navigation_tree(self):
-        tree = QTreeWidget()
-        tree.setHeaderLabel("导航菜单")
-        tree.setColumnCount(1)
-        tree.header().setVisible(False)
-        
-        # 连接选择变更信号
-        tree.currentItemChanged.connect(self.on_navigation_changed)
 
-        return tree
-    
-    
-    def __init__(self, parent=None,scene=None):
+GLYPHS = {
+    "rect": "矩",
+    "checkbox": "复",
+    "widget": "控",
+    "triangle": "三",
+    "line": "线",
+    "circle": "圆",
+    "text": "文",
+    "image": "图",
+    "group": "组",
+}
+
+
+class NavigationContentWidget(QWidget):
+    destory_current = Signal()
+
+    def __init__(self, parent=None, scene=None):
         super().__init__(parent)
-        self.property_items = {}  # 存储属性项的字典
-        self._last_page_key = None  # 记录上一次停留的导航页
-        self.setWindowTitle("树状导航与内容视图")
-        # self.setMinimumSize(800, 600)
-   
-        # 主布局
-        main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
-        
-        # 创建分割器
-        self.splitter = QSplitter(Qt.Horizontal)
-        main_layout.addWidget(self.splitter)
-        
-        # 创建左侧导航树（带滚动条）
-        self.navigation_scroll = self.create_navigation_scroll()
-        self.splitter.addWidget(self.navigation_scroll)
-        
-        # 创建右侧内容堆栈（带滚动条）
-        self.content_scroll = self.create_content_scroll()
-        self.splitter.addWidget(self.content_scroll)
-        
-        # 设置分割器初始比例 (30:70)
-        self.splitter.setSizes([300, 700])
+        self.property_items = {}
+        self._last_page_keys = {}
+        self._current_namespace = "scene"
+        self._building_navigation = False
+        self._current_property_item = None
+        self._current_selected = None
+        self.setObjectName("designPropertyPanel")
 
         self.item = scene
         self.scene = scene
-        # 添加导航项和对应内容页
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        self.header = ObjectHeader(self)
+        main_layout.addWidget(self.header)
+
+        body = QWidget(self)
+        body.setObjectName("propBody")
+        body_layout = QHBoxLayout(body)
+        body_layout.setContentsMargins(8, 6, 8, 8)
+        body_layout.setSpacing(0)
+        main_layout.addWidget(body, 1)
+
+        self.splitter = QSplitter(Qt.Horizontal, body)
+        self.splitter.setChildrenCollapsible(False)
+        body_layout.addWidget(self.splitter)
+
+        self.navigation_scroll = self.create_navigation_scroll()
+        self.splitter.addWidget(self.navigation_scroll)
+
+        self.content_scroll = self.create_content_scroll()
+        self.splitter.addWidget(self.content_scroll)
+
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
+        self.splitter.setSizes([132, 900])
+
         self.add_navigation_items()
-        
-        # 设置样式
         self.apply_style()
 
-        # # 连接场景管理器的删除信号
-        # if hasattr(scene, 'scene_manager'):
-        #     scene.scene_manager.delete_item_signal.connect(self.on_item_deleted)
+    # ------------------------------------------------------------------
+    # 布局
+    # ------------------------------------------------------------------
+    def create_navigation_scroll(self):
+        """左侧分页索引（窄列，跟着内容一起滚动）。"""
 
-    # def on_item_deleted(self, item):
-    #     """当元素被删除时清理对应的属性项"""
-    #     item_id = item.id()
-    #     if item_id in self.property_items.keys():
-    #         prop_item = self.property_items.pop(item_id)
-    #         if hasattr(prop_item, 'deleteLater'):
-    #             prop_item.deleteLater()
+        scroll_area = QScrollArea()
+        scroll_area.setObjectName("propPageScroll")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setMinimumWidth(96)
+        scroll_area.setMaximumWidth(210)
 
-    def update_for_selected(self,selected_obj):
-        self.navigation_tree.clear()
-        self.clear_stacked_widget()
-      
-        # # 清理之前的属性项
-        # for item in self.property_items.values():
-        #     if hasattr(item, 'deleteLater'):
-        #         item.deleteLater()
-        # self.property_items.clear()
-        if self.scene.mode() == SceneMode.Design:
-            if isinstance(selected_obj,myGraphicsScene):
-                self.item = selected_obj
-                self.add_navigation_items()
-            elif isinstance(selected_obj,text_element):
-                TextPropertyItem(item=selected_obj).add_navigation_items(self)
-            
-            elif isinstance(selected_obj,line_element):
-                LinePropertyItem(item=selected_obj).add_navigation_items(self)
-                
-            elif isinstance(selected_obj,group_element):
-                GroupPropertyItem(item=selected_obj).add_navigation_items(self)
-            
-            elif isinstance(selected_obj,triangle_element):
-                TrianglePropertyItem(item=selected_obj).add_navigation_items(self)
+        container = QWidget()
+        container.setObjectName("propBody")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 8, 0)
+        layout.setSpacing(0)
 
-            elif isinstance(selected_obj,rect_element):
-                RectPropertyItem(item=selected_obj).add_navigation_items(self)
-            
-            elif isinstance(selected_obj,circle_element):
-                CirclePropertyItem(item=selected_obj).add_navigation_items(self)
-            
-            elif isinstance(selected_obj,image_element):
-                ImagePropertyItem(item=selected_obj).add_navigation_items(self)
-        else:
-            if isinstance(selected_obj,group_element):
-                CabinetPropertyItem(item=selected_obj).add_navigation_items(self)
-            # elif isinstance(selected_obj,myGraphicsScene):
-            #     self.item = selected_obj
-            #     self.add_navigation_items()
-        
-        
+        self.navigation_tree = self.create_navigation_tree()
+        layout.addWidget(self.navigation_tree)
+        layout.addStretch(1)
+        scroll_area.setWidget(container)
+        return scroll_area
 
-    def add_navigation_items(self):
-        
-        # 添加顶级项
-        categories = [
-            ("属性", "property", [
-                ("外观", "appearance"),
-                ("布局", "layout")
-            ])
-        ]
-        
-        for category, icon, items in categories:
-            category_item = QTreeWidgetItem([category])
-            category_item.setData(0, Qt.UserRole, f"category_{icon}")
-            self.navigation_tree.addTopLevelItem(category_item)
-            
-            for item_name, item_key in items:
-                item = QTreeWidgetItem([item_name])
-                item.setData(0, Qt.UserRole, item_key)
-                category_item.addChild(item)
-        
-        # 展开所有顶级项
-        for i in range(self.navigation_tree.topLevelItemCount()):
-            self.navigation_tree.topLevelItem(i).setExpanded(True)
-        
-   
-        
-    
-        
-        # 创建内容页面
-        self.create_content_pages()
-      
+    def create_content_scroll(self):
+        scroll_area = QScrollArea()
+        scroll_area.setObjectName("propPageScroll")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+
+        self.content_container = QWidget()
+        self.content_container.setObjectName("propBody")
+        scroll_area.setWidget(self.content_container)
+
+        self.content_layout = QVBoxLayout(self.content_container)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(0)
+
+        self.content_stack = QStackedWidget()
+        self.content_layout.addWidget(self.content_stack)
+        return scroll_area
+
+    def apply_style(self):
+        # Fusion 让自绘控件（滑块、微调框按钮）在各平台表现一致，
+        # 面板本身的配色再交给属性样式表覆盖。
+        QApplication.setStyle(QStyleFactory.create("Fusion"))
+        self.setStyleSheet(PROPERTY_PANEL_QSS)
+
+    def create_navigation_tree(self):
+        tree = QTreeWidget()
+        tree.setObjectName("propNavTree")
+        tree.setHeaderHidden(True)
+        tree.setColumnCount(1)
+        tree.setIndentation(8)
+        tree.setRootIsDecorated(False)
+        tree.setUniformRowHeights(True)
+        tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        tree.setFocusPolicy(Qt.NoFocus)
+        tree.currentItemChanged.connect(self.on_navigation_changed)
+        return tree
+
+    # ------------------------------------------------------------------
+    # 选中对象 → 分页
+    # ------------------------------------------------------------------
+    def update_for_selected(self, selected_obj):
+        # 分页记忆按「对象类别」隔离：页面背景（场景）与图元各用一套记忆，
+        # 避免场景页回退选中时把图元上次停留的分页冲掉。
+        self._current_namespace = self._namespace_for(selected_obj)
+        self._current_selected = selected_obj
+        self._current_property_item = None
+        # 重建分页时屏蔽导航树的自动选中，避免它把「上一次停留的页」覆盖成
+        # 第一个分页；构建完成后再用保存的 key 恢复用户之前停留的位置。
+        self._building_navigation = True
+        try:
+            self.navigation_tree.clear()
+            self.clear_stacked_widget()
+            self._populate_pages(selected_obj)
+        finally:
+            self._building_navigation = False
         self.select_preferred_page()
-    
+        self._refresh_header(selected_obj)
+
+    def _namespace_for(self, selected_obj):
+        if isinstance(selected_obj, myGraphicsScene):
+            return "scene"
+        return "element"
+
+    def _populate_pages(self, selected_obj):
+        if self.scene is not None and self.scene.mode() == SceneMode.Design:
+            if isinstance(selected_obj, myGraphicsScene):
+                self._show_scene_pages()
+            elif isinstance(selected_obj, text_element):
+                TextPropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, line_element):
+                LinePropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, group_element):
+                GroupPropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, triangle_element):
+                TrianglePropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, checkbox_element):
+                CheckboxPropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, widget_element):
+                WidgetPropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, rect_element):
+                RectPropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, circle_element):
+                CirclePropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, image_element):
+                ImagePropertyItem(item=selected_obj).add_navigation_items(self)
+            else:
+                self._show_empty_state(
+                    "未选择图元",
+                    "在画布上点选一个图元查看和编辑它的属性；点空白处可以编辑页面背景。",
+                )
+        else:
+            if isinstance(selected_obj, group_element):
+                CabinetPropertyItem(item=selected_obj).add_navigation_items(self)
+                if self.content_stack.count() == 0:
+                    self._show_empty_state(
+                        "无可用配置",
+                        "该分组没有对应的工位逻辑说明；选中名称里带电柜信息的分组再试。",
+                    )
+            else:
+                self._show_empty_state(
+                    "运行模式",
+                    "运行模式下属性面板只显示工作站逻辑说明，选中对应的电柜分组即可查看。",
+                )
+
+    def _show_scene_pages(self):
+        self.item = self.scene
+        self.add_navigation_items()
+
+    def _show_empty_state(self, title: str, hint: str) -> None:
+        page = EmptyState(title, hint, self)
+        scroll = QScrollArea()
+        scroll.setObjectName("propPageScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(page)
+        self.content_stack.addWidget(scroll)
+
+    def _refresh_header(self, selected_obj) -> None:
+        if isinstance(selected_obj, myGraphicsScene):
+            scene = selected_obj
+            manager = getattr(scene, "scene_manager", None)
+            count = len(manager.m_items) if manager is not None else 0
+            self.header.set_object(
+                "页",
+                "页面背景",
+                f"{scene.width()} x {scene.height()} 视图 · {count} 个图元",
+            )
+            return
+        if isinstance(selected_obj, base_element):
+            type_key = str(getattr(selected_obj, "type", "") or "")
+            type_label = TYPE_LABELS.get(type_key, type_key or "图元")
+            group_text = "未成组"
+            if isinstance(selected_obj, group_element):
+                group_text = f"{len(selected_obj.childItems())} 个成员"
+            elif selected_obj.is_has_parent():
+                parent = selected_obj.parentItem()
+                if parent is not None:
+                    group_text = f"组 {parent.get_name()}"
+            self.header.set_object(
+                GLYPHS.get(type_key, "图"),
+                selected_obj.get_name(),
+                f"{type_label} · ID {selected_obj.id()} · {group_text}",
+            )
+            return
+        self.header.set_object("—", "未选择图元", "在画布上点选一个图元查看属性")
+
+    # ------------------------------------------------------------------
+    # 页面背景（场景自身）
+    # ------------------------------------------------------------------
+    def add_navigation_items(self):
+        tree = self.navigation_tree
+        for title, key in (("页面背景", "appearance"), ("画布设置", "canvas")):
+            node = QTreeWidgetItem([title])
+            node.setData(0, Qt.UserRole, key)
+            tree.addTopLevelItem(node)
+
+        self.create_content_pages()
+        if not self._building_navigation:
+            self.select_preferred_page()
+
     def create_content_pages(self):
- 
-        self.add_page("appearance", "外观", self.create_appearance_page())
-        
+        self.add_page("appearance", "页面背景", self.create_appearance_page())
+        self.add_page("canvas", "画布设置", self.create_canvas_page())
+
+    def create_appearance_page(self):
+        page = PropertyPage()
+        card = SectionCard("页面背景")
+
+        current = self.item.get_bg_color() if self.item is not None else QColor("#ffffff")
+        self.bg_color_btn = ColorField(current)
+        self.bg_color_btn.colorChanged.connect(self._apply_bg_color)
+        card.add_row(("背景色", self.bg_color_btn))
+        card.add_hint("背景色会随页面一起保存，运行态沿用它作为画布底色。")
+        page.add_card(card)
+        return page
+
+    def create_canvas_page(self):
+        page = PropertyPage()
+        scene = self.item
+
+        grid_size = getattr(scene, "grid_size", 0) or 0
+        units_x = getattr(scene, "scene_units_per_grid_x", 0) or 0
+        units_y = getattr(scene, "scene_units_per_grid_y", 0) or 0
+        scale = getattr(scene, "scale_factor", 1.0) or 1.0
+        agv = bool(getattr(scene, "is_use_for_agv_map", False))
+
+        view = SectionCard("视图")
+        view.add_row(
+            ("画布尺寸", make_value_label(f"{scene.width()} x {scene.height()}")),
+            ("缩放", make_value_label(f"{scale:.2f}x")),
+        )
+        view.add_row(
+            ("虚线网格", make_value_label(f"{grid_size:.0f} px")),
+            ("坐标系", make_value_label("AGV（x/y 互换）" if agv else "标准（Y 向上）")),
+        )
+        page.add_card(view)
+
+        grid = SectionCard("比例尺")
+        grid.add_row(
+            ("每格 X", make_value_label(f"{units_x:g} 单位")),
+            ("每格 Y", make_value_label(f"{units_y:g} 单位")),
+        )
+        grid.add_row(
+            ("1 屏幕格", make_value_label(f"{units_x:g} x {units_y:g} 单位")),
+            ("原点", make_value_label("画布中心")),
+        )
+        grid.add_hint(
+            "比例尺决定场景单位与像素的换算，运行态必须与设计态一致；"
+            "这里只读展示，避免改比例尺后历史坐标整体偏移。"
+        )
+        page.add_card(grid)
+
+        stats = SectionCard("图元统计")
+        items = []
+        manager = getattr(scene, "scene_manager", None)
+        if manager is not None:
+            items = list(manager.m_items.values())
+        groups = [item for item in items if isinstance(item, group_element)]
+        top_level = [item for item in items if not item.is_has_parent()]
+        stats.add_row(
+            ("图元总数", make_value_label(str(len(items)))),
+            ("组合组", make_value_label(str(len(groups)))),
+        )
+        stats.add_row(
+            ("顶层图元", make_value_label(str(len(top_level)))),
+            ("组内图元", make_value_label(str(len(items) - len(top_level)))),
+        )
+        page.add_card(stats)
+        return page
+
+    # ------------------------------------------------------------------
+    # 导航与堆栈
+    # ------------------------------------------------------------------
     def add_page(self, page_id, title, widget):
-        # 为每个页面添加滚动支持
         scroll_widget = QScrollArea()
+        scroll_widget.setObjectName("propPageScroll")
         scroll_widget.setWidget(widget)
         scroll_widget.setWidgetResizable(True)
+        scroll_widget.setFrameShape(QFrame.NoFrame)
+        # 导航按 objectName 匹配页面，这里必须保留页面标识
         scroll_widget.setObjectName(page_id)
-        
         self.content_stack.addWidget(scroll_widget)
 
     def clear_stacked_widget(self):
-        # 方法1：逐个移除并删除（推荐）
         while self.content_stack.count() > 0:
-            widget = self.content_stack.widget(0)  # 获取第一个widget
-            self.content_stack.removeWidget(widget)  # 从stackedWidget移除
-            widget.deleteLater()  # 安全删除widget
+            widget = self.content_stack.widget(0)
+            self.content_stack.removeWidget(widget)
+            widget.deleteLater()
         self.destory_current.emit()
-    
+
     def on_navigation_changed(self, current, previous):
         if current is not None:
             page_id = current.data(0, Qt.UserRole)
             if page_id:
-                # 查找对应页面
                 for i in range(self.content_stack.count()):
                     if self.content_stack.widget(i).objectName() == page_id:
                         self.content_stack.setCurrentIndex(i)
-                        # 记录用户停留的页面，切换图元时恢复
-                        if not str(page_id).startswith("category_"):
-                            self._last_page_key = page_id
+                        # 构建期间（clear/addTopLevelItem 触发的自动选中）不记录停留页，
+                        # 否则会把用户上次停留的位置覆盖成第一个分页。
+                        if not self._building_navigation and not str(page_id).startswith("category_"):
+                            self._last_page_keys[self._current_namespace] = page_id
                         return
 
     def select_preferred_page(self):
         """选中上一次停留的导航页，不存在时回退到第一项。"""
-        if self._last_page_key and self._select_navigation_key(self._last_page_key):
+
+        preferred = self._last_page_keys.get(self._current_namespace)
+        if preferred and self._select_navigation_key(preferred):
             return
         tree = self.navigation_tree
         if tree.topLevelItemCount() == 0:
@@ -341,11 +430,6 @@ class NavigationContentWidget(QWidget):
             tree.setCurrentItem(first_category)
 
     def _select_navigation_key(self, page_key):
-        """在导航树中按页面标识定位并选中节点。
-
-        只有已经创建了对应内容页的节点才会被选中，避免树上的高亮
-        与右侧内容不一致（例如背景场景没有“布局”页）。
-        """
         tree = self.navigation_tree
         for i in range(tree.topLevelItemCount()):
             category_item = tree.topLevelItem(i)
@@ -360,76 +444,28 @@ class NavigationContentWidget(QWidget):
         return False
 
     def _has_page(self, page_key):
-        """判断内容堆栈中是否已存在对应的页面。"""
         for i in range(self.content_stack.count()):
             if self.content_stack.widget(i).objectName() == page_key:
                 return True
         return False
-                    
-    # 以下是各内容页面的创建函数
-    def create_appearance_page(self):
-        page   = QWidget()
-        layout = QVBoxLayout(page)
-        bg_color_layout   = QHBoxLayout()
-        appearance        = QGroupBox("外观")
-        appearance_layout = QVBoxLayout()
 
-        bg_color_layout.addWidget(QLabel("背景颜色"))
-        
+    # ------------------------------------------------------------------
+    # 图元几何变化 → 增量刷新
+    # ------------------------------------------------------------------
+    def on_item_geometry_changed(self, item):
+        """场景里某个图元的几何变化后回调；只刷新当前选中图元的字段。"""
 
-        self.bg_color_btn   = self.create_color_button(self.item.get_bg_color())
-        self.bg_color_btn.clicked.connect(lambda: self.select_bg_color(page))
-        bg_color_layout.addWidget(self.bg_color_btn)
+        if item is None or self._current_property_item is None:
+            return
+        if item is not self._current_selected:
+            return
+        self._current_property_item.refresh_geometry()
 
-        if self.item:
-            self.update_bg_color_ui()
-        appearance_layout.addLayout(bg_color_layout)
-        appearance.setLayout(appearance_layout)
-        layout.addWidget(appearance)
-        
-        return page
-
-    def create_color_button(self, color):
-        """创建颜色选择按钮"""
-        btn = QPushButton()
-        btn.setFixedSize(30, 30)
-        
-        # 确保 color 是 QColor 类型
-        if isinstance(color, str):
-            color = QColor(color)
-        elif isinstance(color, int):
-            color = QColor(color)
-        elif not isinstance(color, QColor):
-            color = QColor("#000000")  # 默认黑色
-            
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color.name()};
-                border: 1px solid #adb5bd;
-                border-radius: 4px;
-            }}
-        """)
-        return btn
-    
-    def update_bg_color_ui(self):
-        """从对象更新字体颜色UI"""
-        color = self.item.get_bg_color()
-        color_code = color.name() if isinstance(color, QColor) else "#000000"
-        self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-        
-          
-    def select_bg_color(self,parent):
-        current_color = self.item.get_bg_color()
-        color = QColorDialog.getColor(current_color, parent)
-        if color.isValid():
-            self.item.set_bg_color(color) 
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-                
-    
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = NavigationContentWidget()
-    window.show()
-    sys.exit(app.exec())
+    # ------------------------------------------------------------------
+    # 背景色
+    # ------------------------------------------------------------------
+    def _apply_bg_color(self, color: QColor) -> None:
+        if self.item is None:
+            return
+        self.item.set_bg_color(color)
+        self.item.update()

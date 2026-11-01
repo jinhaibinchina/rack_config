@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, 
     QTreeWidget, QTreeWidgetItem, QStackedWidget, QLabel, QFrame,QScrollArea,
     QListWidget, QListWidgetItem, QPushButton, QGroupBox,QColorDialog,QCheckBox,
-    QTextEdit, QStyleFactory,QLineEdit
+    QTextEdit, QStyleFactory,QLineEdit,QPlainTextEdit,QComboBox,QSpinBox
 )
 from PySide6.QtCore import Qt, QTimer, QEvent,QObject,QRegularExpression,QPointF,QPoint,QRect,Signal,QPropertyAnimation,QEasingCurve,Property,QSize,QRectF,QSizeF
 

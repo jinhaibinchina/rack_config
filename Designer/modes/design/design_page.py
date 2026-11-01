@@ -221,7 +221,7 @@ class DesignPage(QObject):
     # ------------------------------------------------------------------
     # Interactive drawing (right-click menu and toolbox click)
     # ------------------------------------------------------------------
-    def begin_draw_element(self, element_class):
+    def begin_draw_element(self, element_class, widget_type: str | None = None):
         """Create ``element_class`` in the legacy click-to-draw state.
 
         Both the inherited right-click "绘制..." commands and the toolbox
@@ -231,7 +231,10 @@ class DesignPage(QObject):
 
         self._discard_pending_draw()
         self.scene.setFocus()
-        return self.manager.createItem(element_class)
+        item = self.manager.createItem(element_class)
+        if widget_type and isinstance(item, widget_element):
+            item.set_widget_type(widget_type)
+        return item
 
     def begin_draw_tool(self, tool_key: str):
         """Start drawing the toolbox element identified by ``tool_key``."""
@@ -240,7 +243,7 @@ class DesignPage(QObject):
         if definition is None:
             print(f"未知的设计控件: {tool_key}")
             return None
-        return self.begin_draw_element(definition.element_class)
+        return self.begin_draw_element(definition.element_class, definition.widget_type)
 
     def _discard_pending_draw(self) -> None:
         """Remove an unfinished element left over from a previous draw command."""

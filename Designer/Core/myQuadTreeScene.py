@@ -497,43 +497,48 @@ class SceneSerializer:
 
         max_id =0
         # 反序列化图元
-        for item_data in scene_data["items"]:
-            item = None
+        manager = scene.scene_manager
+        manager.begin_batch()
+        try:
+            for item_data in scene_data["items"]:
+                item = None
 
-            if  item_data["type"] == "line":
-                item = line_element.from_dict(item_data)
-            elif item_data["type"] == "rect":
-                item = rect_element.from_dict(item_data)
-                # print(f"rect{item._topLeft}")
-                # print(f"rect{item.get_scene_topLeft()}")
-            elif item_data["type"] == "checkbox":
-                item = checkbox_element.from_dict(item_data)
-            elif item_data["type"] == "widget":
-                item = widget_element.from_dict(item_data)
-            elif item_data["type"] == "triangle":
-                item = triangle_element.from_dict(item_data)
-            elif item_data["type"] == "circle":
-                item = circle_element.from_dict(item_data)
-            elif item_data["type"] == "text":
-                item = text_element.from_dict(item_data)
+                if  item_data["type"] == "line":
+                    item = line_element.from_dict(item_data)
+                elif item_data["type"] == "rect":
+                    item = rect_element.from_dict(item_data)
+                    # print(f"rect{item._topLeft}")
+                    # print(f"rect{item.get_scene_topLeft()}")
+                elif item_data["type"] == "checkbox":
+                    item = checkbox_element.from_dict(item_data)
+                elif item_data["type"] == "widget":
+                    item = widget_element.from_dict(item_data)
+                elif item_data["type"] == "triangle":
+                    item = triangle_element.from_dict(item_data)
+                elif item_data["type"] == "circle":
+                    item = circle_element.from_dict(item_data)
+                elif item_data["type"] == "text":
+                    item = text_element.from_dict(item_data)
 
-            elif item_data["type"] == "image":
-                item = image_element.from_dict(item_data)
-               
-            elif item_data["type"] == "group":
-                item = group_element.from_dict(item_data)
-       
+                elif item_data["type"] == "image":
+                    item = image_element.from_dict(item_data)
+                   
+                elif item_data["type"] == "group":
+                    item = group_element.from_dict(item_data)
+           
 
-            if item:
-                item.set_scene_ref(scene)
-                item.set_scene_manager_ref(scene.scene_manager)
-                id =item.id()
-                item.completed(True)
-                item.apply_event_bindings(
-                    item_data.get("events") or item_data.get("event_bindings")
-                )
-                if id>max_id:
-                    max_id = id
+                if item:
+                    item.set_scene_ref(scene)
+                    item.set_scene_manager_ref(scene.scene_manager)
+                    id =item.id()
+                    item.completed(True)
+                    item.apply_event_bindings(
+                        item_data.get("events") or item_data.get("event_bindings")
+                    )
+                    if id>max_id:
+                        max_id = id
+        finally:
+            manager.end_batch()
 
         scene.scene_manager.m_idGenerator.updateAfterLoad(max_id)
         restore_relationship(scene.scene_manager.m_items)
@@ -547,10 +552,10 @@ class SceneSerializer:
             # 这里在恢复视图前检测一次：若记录范围的几何中心已严重偏离
             # 图元主体的中心（超过自身对角线的一半），说明该记录已过期，
             # 改用全部图元的整体包围盒来适应视图，确保打开页面能看到内容。
-            if SceneSerializer._view_rect_is_stale(scene, view_rect):
-                fallback = SceneSerializer._items_bounding_rect(scene)
-                if fallback.width() > 0 and fallback.height() > 0:
-                    view_rect = fallback
+            # if SceneSerializer._view_rect_is_stale(scene, view_rect):
+            #     fallback = SceneSerializer._items_bounding_rect(scene)
+            #     if fallback.width() > 0 and fallback.height() > 0:
+            #         view_rect = fallback
             # Applied immediately for an already-visible scene, otherwise
             # deferred until showEvent() gives the widget its final size.
             scene.set_view_scene_rect(view_rect)
@@ -687,17 +692,21 @@ class QuadTreeScene(myGraphicsScene):
             if self._event_pressed_group is not None:
                 self._event_pressed_group.cancel_mouse_press()
             self._event_pressed_group = None
-        # 嵌入式 QWidget 图元：运行模式显示真实控件，设计模式隐藏。
-        self._sync_embedded_widgets(mode == SceneMode.Run)
+        # 嵌入式 QWidget 图元：两种模式都显示真实控件，区别在是否可交互
+        # （运行模式可交互，设计模式只读、鼠标穿透，图元仍可选中/拖动）。
+        self._sync_embedded_widgets(True, readonly=(mode != SceneMode.Run))
         self.run_mode_station_change.emit(mode)
 
     # ------------------------------------------------------------------
     # Embedded QWidget elements
     # ------------------------------------------------------------------
-    def _sync_embedded_widgets(self, visible: bool):
-        """同步所有 ``widget_element`` 的真实控件几何与显隐。
+    def _sync_embedded_widgets(self, visible: bool, readonly: bool = False):
+        """同步所有 ``widget_element`` 的真实控件几何、显隐与只读态。
 
-        运行模式下显示并可交互，设计模式下隐藏（占位框仍由 paint 绘制）。
+        - ``visible=True``：显示真实控件；``readonly=True`` 时控件只读展示
+          （设计模式），否则可交互（运行模式）。
+        - ``visible=False``：隐藏真实控件。
+
         缩放、平移、图元移动后也应调用（此时只刷新几何，不改显隐）。
         """
         widget_items = [
@@ -706,6 +715,7 @@ class QuadTreeScene(myGraphicsScene):
             if isinstance(item, widget_element)
         ]
         for item in widget_items:
+            item.set_widget_readonly(readonly)
             # set_widget_visible(True) 内部会惰性创建承载层，False 时只隐藏。
             item.set_widget_visible(visible)
         if visible:
@@ -1733,21 +1743,30 @@ class QuadTreeScene(myGraphicsScene):
                 return
 
 
-        for child in self.findChildren(base_element):
-            child.set_selected(True)
-        #移除父项
-        for child in self.findChildren(base_element):
+        # 批量删除：跳过每个图元 Delete() 里触发的全量排序（O(N log N)），
+        # 下面统一清空 m_items/m_sorted_items，删除过程中的排序纯属浪费。
+        manager = self.scene_manager
+        if manager is not None:
+            manager.begin_batch()
+        try:
+            for child in self.findChildren(base_element):
+                child.set_selected(True)
+            #移除父项
+            for child in self.findChildren(base_element):
+                
+                remove_parent_item(child)
             
-            remove_parent_item(child)
-        
-        # for child in self.findChildren(base_element):
-        #     if isinstance(child,group_element):
-        #         child.free_group()
-        #     child.removeChildsItem() if child.is_has_child() else None
+            # for child in self.findChildren(base_element):
+            #     if isinstance(child,group_element):
+            #         child.free_group()
+            #     child.removeChildsItem() if child.is_has_child() else None
 
-        for child in self.findChildren(base_element):
-            child.Delete()
-        self.quadtree.remove_all()
+            for child in self.findChildren(base_element):
+                child.Delete()
+            self.quadtree.remove_all()
+        finally:
+            if manager is not None:
+                manager.end_batch()
         # 图元已经全部销毁，管理容器和捕捉用的几何缓存必须同步清空：
         # 否则重新加载页面时 m_items 会残留已销毁对象，切换页面越多次越脏。
         if self.scene_manager is not None:
@@ -1770,6 +1789,11 @@ class QuadTreeScene(myGraphicsScene):
         self.delete_all_elements()
         SceneSerializer.deserialize_scene(self, filename)
         self.update()
+        # 设计模式加载完同样要补一次承载层同步：否则 widget 图元的 overlay
+        # 视图永不创建，画面里只剩占位框（看起来就是"控件没显示出来"）。
+        # 与 load_element_info_run_mode 的运行分支对称，这里固定只读。
+        if self.mode() == SceneMode.Design:
+            self._sync_embedded_widgets(True, readonly=True)
         self.__load_done = True
     # def load_element_info2(self, filename="scene2.json"):
     #     self.delete_all_elements()
@@ -1948,8 +1972,28 @@ class SceneManager(QObject):
         self.m_idGenerator = IDGenerator()
         self.m_scene = scene        # QuadTreeScene实例
         self.m_undoStack = undo_stack  # QUndoStack实例
+        # 批量加载/删除期间暂停排序：addItem/deleteItem 每个图元都调一次
+        # sort_items_by_zValue（O(N log N)），反序列化 N 个图元就是 O(N² log N)，
+        # 是撤销/重做在图元多时卡顿的主因。批量期间只置脏，结束时统一排一次。
+        self._suspend_sort = False
+        self._sort_dirty = False
         self.delete_item_signal.connect(self.deleteItem,Qt.UniqueConnection)
         self.completed_item_signal.connect(self.addItem,Qt.UniqueConnection)
+
+    # -- 批量排序 ----------------------------------------------------
+    def begin_batch(self):
+        """进入批量模式：跳过每次 addItem/deleteItem 的全量排序。"""
+
+        self._suspend_sort = True
+        self._sort_dirty = False
+
+    def end_batch(self):
+        """退出批量模式并补一次排序。"""
+
+        self._suspend_sort = False
+        if self._sort_dirty:
+            self._sort_dirty = False
+            self.sort_items_by_zValue()
         
     # # 创建图元
     # def createItem(self, item_class, *args, **kwargs):
@@ -2049,6 +2093,10 @@ class SceneManager(QObject):
     
     def sort_items_by_zValue(self):
         """根据Z值从小到大排序"""
+
+        if self._suspend_sort:
+            self._sort_dirty = True
+            return
         items = [value for value in self.m_items.values()]
         self.m_sorted_items = sorted(items, key=lambda item: item.zValue())
     
@@ -2071,6 +2119,14 @@ class SceneManager(QObject):
         item.construct_name_items()    if  construct_from_dict else None
         self.sort_items_by_zValue()
         
+        # widget 控件：交互式创建（点击绘制 / 拖放）时，此刻图元尺寸已由
+        # ``completed()`` 确定、``m_scene`` 已赋值，立刻挂载真实控件并按当前
+        # 模式决定是否只读。反序列化批量加载走 ``load_element_info*`` 末尾的
+        # ``_sync_embedded_widgets`` 统一处理，这里只补交互创建这一条路径。
+        if isinstance(item, widget_element) and not construct_from_dict:
+            readonly = self.m_scene.mode() != SceneMode.Run
+            item.set_widget_readonly(readonly)
+            item.set_widget_visible(True)
         
         debug_log(f"加入id:{item.id()}type:{item.type}到了场景")
 
@@ -2088,10 +2144,13 @@ class SceneManager(QObject):
         del self.m_items[item.id()]
         self.m_scene.deleteItem(item)
         self.m_scene.current_element = None
-        dic = copy.copy(self.m_name_items)
-        for item_name,item_id in  dic.items():
-            if item_id==item.id():
-                del self.m_name_items[item_name]
+        # 批量删除（delete_all_elements）结束时统一 clear m_name_items，
+        # 这里逐条遍历整个 name 表是 O(N²)，批量模式下跳过。
+        if not self._suspend_sort:
+            dic = copy.copy(self.m_name_items)
+            for item_name,item_id in  dic.items():
+                if item_id==item.id():
+                    del self.m_name_items[item_name]
         self.sort_items_by_zValue()
         debug_log(self.m_items.keys(), self.m_name_items)
     

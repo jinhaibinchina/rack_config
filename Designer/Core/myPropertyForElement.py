@@ -1,17 +1,43 @@
-# from my_elements_v2 import rect_element, triangle_element, line_element, circle_element, base_element, group_element, text_element
+"""设计模式下各类图元的属性面板。
+
+每个 ``*PropertyItem`` 负责一类图元的分页内容：把图元的读写接口接到
+``property_widgets`` 提供的控件上。分页统一为
+
+    常规 / 外观 / 布局            （文本另有「文本内容」，组另有「事件绑定」）
+
+字段在编辑完成（回车或失焦）后立即写回图元，与旧实现的行为一致；颜色、
+不透明度这类改动额外补一次 ``prepareDirtyChange``，让画布立刻重绘。
+
+``add_navigation_items(navigation)`` 是外部唯一入口，签名与旧实现相同，
+``NavigationContentWidget`` 不需要感知这里的分页结构。
+"""
+
+from __future__ import annotations
+
 import json
+import math
 import os
+
+from PySide6.QtCore import Property, QObject, QPointF, QSizeF, Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, 
-    QTreeWidget, QTreeWidgetItem, QStackedWidget, QLabel, QFrame,QScrollArea,QFileDialog,
-    QListWidget, QListWidgetItem, QPushButton, QGroupBox,QColorDialog,QCheckBox,
-    QTextEdit, QStyleFactory,QLineEdit,QSpinBox,QSpacerItem,QSizePolicy,QComboBox
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSpinBox,
+    QTextEdit,
+    QTreeWidgetItem,
+    QWidget,
 )
-from PySide6.QtGui import QFont,QColor
-from PySide6.QtCore import Qt,QObject,Property,QPointF,QSizeF
-# from my_elements_v2 import base_element,text_element,line_element,rect_element,triangle_element,image_element
+
 from .elements import (
     base_element,
+    checkbox_element,
     circle_element,
     group_element,
     image_element,
@@ -19,35 +45,106 @@ from .elements import (
     rect_element,
     text_element,
     triangle_element,
+    widget_element,
+)
+from .property_widgets import (
+    FIELD_HEIGHT,
+    ColorField,
+    OpacityField,
+    PropertyPage,
+    SectionCard,
+    make_check,
+    make_double,
+    make_int,
+    make_line,
+    make_textarea,
+    make_value_label,
 )
 
+
+TYPE_LABELS = {
+    "rect": "矩形",
+    "checkbox": "复选框",
+    "widget": "控件",
+    "triangle": "三角形",
+    "line": "直线",
+    "circle": "圆形",
+    "text": "文本",
+    "image": "图片",
+    "group": "组合组",
+}
+
+
+def _fmt(value: float, digits: int = 1) -> str:
+    return f"{float(value):.{digits}f}"
+
+
 class PropertyItem(QObject):
-    """文本属性窗口 - 优化布局"""
-    def __init__(self, parent=None,item:base_element=None):
+    """一类图元的属性页基类。"""
+
+    def __init__(self, parent=None, item: base_element = None):
         super().__init__()
         self.item = item
-    
+        self.navi = None
+        # 几何字段注册表：geo_key -> (控件, 取值回调)。图元在画布上被拖动/缩放时，
+        # 场景发出 item_GeometryChange，属性面板据此增量刷新这些字段，而不重建整页
+        # （重建会打断正在编辑的输入框、并跳回上次停留的分页）。
+        self._geometry_widgets = []
+
+    # ------------------------------------------------------------------
+    # 几何字段增量刷新
+    # ------------------------------------------------------------------
+    def _bind_geo(self, widget, value_fn):
+        """注册一个几何字段控件及其取值回调，供 refresh_geometry() 增量更新。"""
+
+        self._geometry_widgets.append((widget, value_fn))
+
+    def refresh_geometry(self):
+        """图元几何变化后，把已注册字段的最新值写回控件（不触发写回信号）。"""
+
+        if self.item is None:
+            return
+        for widget, value_fn in self._geometry_widgets:
+            try:
+                value = value_fn()
+            except Exception:
+                continue
+            widget.blockSignals(True)
+            try:
+                if isinstance(widget, (QDoubleSpinBox, QSpinBox)):
+                    widget.setValue(float(value))
+                else:
+                    widget.setText(str(value))
+            finally:
+                widget.blockSignals(False)
+
+    # ------------------------------------------------------------------
+    # Qt 属性：内部分页通过 setattr(self, "xxx", v) 调用
+    # ------------------------------------------------------------------
     @Property(float)
     def sizeHeight(self):
         return self.item.getSize().height()
+
     @sizeHeight.setter
     def sizeHeight(self, val):
         if self.item.getSize().height() != val:
             w = self.item.getSize().width()
-            self.item.change_size(w,val)
+            self.item.change_size(w, val)
 
     @Property(float)
     def sizeWidth(self):
         return self.item.getSize().width()
+
     @sizeWidth.setter
     def sizeWidth(self, val):
         if self.item.getSize().width() != val:
             h = self.item.getSize().height()
-            self.item.change_size(val,h)
+            self.item.change_size(val, h)
 
     @Property(QSizeF)
     def size(self):
         return self.item.getSize()
+
     @size.setter
     def size(self, size):  # 接收一个QSizeF对象
         if self.item.getSize() != size:  # 直接比较QSizeF对象
@@ -56,32 +153,56 @@ class PropertyItem(QObject):
     @Property(float)
     def posX(self):
         return self.item.pos().x()
+
     @posX.setter
     def posX(self, val):
         if self.item.pos().x() != val:
             y = self.item.pos().y()
-            self.item.setPos(val,y)
-    
+            self.item.setPos(val, y)
+
     @Property(float)
     def posY(self):
         return self.item.pos().y()
+
     @posY.setter
     def posY(self, val):
         if self.item.pos().y() != val:
             x = self.item.pos().x()
-            self.item.setPos(x,val)
-         
+            self.item.setPos(x, val)
+
+    @Property(float)
+    def head_posX(self):
+        return self.item.get_scene_head_pos().x()
+
+    @head_posX.setter
+    def head_posX(self, val):
+        current = self.item.get_scene_head_pos()
+        if current.x() != val:
+            self.item.change_position(QPointF(val, current.y()))
+
+    @Property(float)
+    def head_posY(self):
+        return self.item.get_scene_head_pos().y()
+
+    @head_posY.setter
+    def head_posY(self, val):
+        current = self.item.get_scene_head_pos()
+        if current.y() != val:
+            self.item.change_position(QPointF(current.x(), val))
+
     @Property(int)
     def lineWidth(self):
         return self.item.get_line_width()
+
     @lineWidth.setter
     def lineWidth(self, val):
         if self.item.get_line_width() != val:
             self.item.set_line_width(val)
-    
+
     @Property(int)
     def opacity(self):
         return self.item.get_opacity()
+
     @opacity.setter
     def opacity(self, val):
         if self.item.get_opacity() != val:
@@ -90,10 +211,14 @@ class PropertyItem(QObject):
     @Property(str)
     def name(self):
         return self.item.get_name()
+
     @name.setter
     def name(self, str):
         self.item.set_name(str)
 
+    # ------------------------------------------------------------------
+    # 名称编辑
+    # ------------------------------------------------------------------
     def apply_name_edit(self, name_edit) -> bool:
         """把输入框里的名字应用到图元，失败时恢复显示。
 
@@ -112,7 +237,7 @@ class PropertyItem(QObject):
         if manager is not None:
             owner = manager.findItem(manager.m_name_items.get(requested, 0))
         if owner is not None:
-            kind = getattr(owner, "type", "")
+            kind = TYPE_LABELS.get(getattr(owner, "type", ""), getattr(owner, "type", ""))
             message = f"名称“{requested}”已被图元 {owner.id()}（{kind}）占用"
         else:
             message = f"名称“{requested}”不可用"
@@ -124,544 +249,230 @@ class PropertyItem(QObject):
             status_bar.showMessage(f"{message}，仍为“{current}”", 4000)
         return False
 
+    # ------------------------------------------------------------------
+    # 描述性文本
+    # ------------------------------------------------------------------
+    def type_key(self) -> str:
+        return str(getattr(self.item, "type", "") or "")
 
-class TextPropertyItem(PropertyItem):
-    """文本属性窗口 - 优化布局"""
+    def type_label(self) -> str:
+        key = self.type_key()
+        return TYPE_LABELS.get(key, key or "图元")
 
-    @Property(float)
-    def head_posX(self):
-        return self.item.get_scene_head_pos().x()
-    @head_posX.setter
-    def head_posX(self, val):
-        if self.item.get_scene_head_pos().x() != val:
-            y = self.item.get_scene_head_pos().y()
-            self.item.change_position(QPointF(val,y))
-    
-    @Property(float)
-    def head_posY(self):
-        return self.item.get_scene_head_pos().y()
-    @head_posY.setter
-    def head_posY(self, val):
-        if self.item.get_scene_head_pos().y() != val:
-            x = self.item.get_scene_head_pos().x()
-            self.item.change_position(QPointF(x,val))
-    
-    def __init__(self, parent=None,item:text_element=None):
-        super().__init__(item=item)
-        self.navi = None
-     
-    def add_navigation_items(self,navigation):
-        # 添加顶级项
-        categories = [
-            ("常规", "normal", [
-                ("文本", "context")
-            ]),
-            ("属性", "property", [
-                ("外观", "appearance"),
-                ("布局", "layout"),
-                ("其它", "others")
-            ])
-        ]
-        for category, icon, items in categories:
-            category_item = QTreeWidgetItem([category])
-            category_item.setData(0, Qt.UserRole, f"category_{icon}")
-            navigation.navigation_tree.addTopLevelItem(category_item)
-            
-            for item_name, item_key in items:
-                item = QTreeWidgetItem([item_name])
-                item.setData(0, Qt.UserRole, item_key)
-                category_item.addChild(item)
-        
-        # 展开所有顶级项
-        for i in range(navigation.navigation_tree.topLevelItemCount()):
-            navigation.navigation_tree.topLevelItem(i).setExpanded(True)
-            # 创建内容页面
+    def group_label(self) -> str:
+        if isinstance(self.item, group_element):
+            return f"组合组 · {len(self.item.childItems())} 个成员"
+        parent = self.item.parentItem() if self.item.is_has_parent() else None
+        if parent is None:
+            return "未成组"
+        return f"{parent.get_name()}（{parent.id()}）"
+
+    def visibility_label(self) -> str:
+        return "可见" if self.item.get_visibility() else "已隐藏"
+
+    # ------------------------------------------------------------------
+    # 导航
+    # ------------------------------------------------------------------
+    def navigation_items(self):
+        """左侧导航的顶层项：``[(标题, 页面 key), ...]``。"""
+
+        return [("常规", "general"), ("外观", "appearance"), ("布局", "layout")]
+
+    def add_navigation_items(self, navigation):
+        tree = navigation.navigation_tree
+        for title, key in self.navigation_items():
+            node = QTreeWidgetItem([title])
+            node.setData(0, Qt.UserRole, key)
+            tree.addTopLevelItem(node)
+
         self.create_content_pages(navigation)
-        navigation.select_preferred_page()
+        if not navigation._building_navigation:
+            navigation.select_preferred_page()
         navigation.destory_current.connect(self.on_destory_current)
         self.navi = navigation
+        # 把当前属性页对象登记到面板，供几何变化时的增量刷新使用。
+        navigation._current_property_item = self
 
-        
     def on_destory_current(self):
-        self.item =None
-        self.navi.destory_current.disconnect(self.on_destory_current)
-    
-    def create_content_pages(self,navi):
-        # 创建内容页面
-        navi.add_page("context", "文本"   , self.create_context_page()   )
+        self.item = None
+        if self.navi is not None:
+            try:
+                self.navi.destory_current.disconnect(self.on_destory_current)
+            except (RuntimeError, TypeError):
+                pass
+
+    def create_content_pages(self, navi):
+        navi.add_page("general", "常规", self.create_general_page())
         navi.add_page("appearance", "外观", self.create_appearance_page())
-        navi.add_page("layout", "布局"    , self.create_layout_page()    )
-        navi.add_page("others",     "其它"    , self.create_others_page()    )
-    
-        
-    
-    def create_context_page(self):
-        
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        
-        # 目录
-        toc = QGroupBox("文本")
-        toc_layout = QVBoxLayout()
-        detail = QTextEdit()
-        detail.setText(self.item.context)
-        detail.textChanged.connect(lambda:setattr(self.item,"context" ,detail.toPlainText()) )
-        toc_layout.addWidget(detail)
-        toc.setLayout(toc_layout)
-        layout.addWidget(toc)
+        navi.add_page("layout", "布局", self.create_layout_page())
+
+    # ------------------------------------------------------------------
+    # 卡片：常规
+    # ------------------------------------------------------------------
+    def create_general_page(self):
+        page = PropertyPage()
+        page.add_card(self._basic_card())
+        page.add_card(self._state_card())
+        extra = self._general_extra_cards()
+        for card in extra:
+            page.add_card(card)
         return page
-    
+
+    def _general_extra_cards(self):
+        return []
+
+    def _basic_card(self) -> SectionCard:
+        card = SectionCard("基本信息")
+        name_edit = make_line(
+            self.item.get_name(),
+            tooltip="图元名称用于变量绑定与模板引用，必须全局唯一",
+        )
+        name_edit.editingFinished.connect(lambda: self.apply_name_edit(name_edit))
+        card.add_row(("名称", name_edit), ("类型", make_value_label(self.type_label())))
+        card.add_row(
+            ("图元 ID", make_value_label(str(self.item.id()))),
+            (self._group_field_label(), make_value_label(self._group_field_value())),
+        )
+        return card
+
+    def _group_field_label(self) -> str:
+        return "所属组"
+
+    def _group_field_value(self) -> str:
+        return self.group_label()
+
+    def _state_card(self) -> SectionCard:
+        card = SectionCard("显示与层级")
+        card.add_row(
+            ("层级 Z", make_value_label(f"{self.item.zValue():g}")),
+            ("可见性", make_value_label(self.visibility_label())),
+        )
+        card.add_row(
+            ("可选中", make_value_label("是" if self.item.get_selectable() else "否")),
+            ("中心点", make_value_label(self._center_text())),
+        )
+        card.add_hint("层级与可见性由场景和分组统一维护，这里只做展示，避免误操作把图元藏起来。")
+        return card
+
+    def _center_text(self) -> str:
+        center = self.item.get_scene_center_pos()
+        if center is None:
+            return "—"
+        return f"{_fmt(center.x())}, {_fmt(center.y())}"
+
+    # ------------------------------------------------------------------
+    # 卡片：外观
+    # ------------------------------------------------------------------
     def create_appearance_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        
-        appearance        = QGroupBox("外观")
-        appearance_layout = QVBoxLayout()
-        text_color_layout = QHBoxLayout()
-        bg_color_layout   = QHBoxLayout()
-        fill_checkbox     = QCheckBox(parent=page,text="是否填充")
-        fill_checkbox.setChecked(self.item.get_fill())
-        fill_checkbox.clicked.connect(lambda:self.item.set_fill(fill_checkbox.isChecked()))
-        text_color_layout.addWidget(QLabel("文本颜色"))
-        bg_color_layout.addWidget(QLabel("背景颜色"))
-        # 字体颜色
-        self.font_color_btn = self.create_color_button(self.item.get_color())
-        self.font_color_btn.clicked.connect(lambda: self.select_font_color(page,False))
-        self.bg_color_btn   = self.create_color_button(self.item.get_color())
-        self.bg_color_btn.clicked.connect(lambda: self.select_font_color(page,True))
-        self.update_font_color_ui(False)
-        self.update_font_color_ui(True)
-
-        # self.add_property_row("字体颜色", self.font_color_btn)
-
-        self.line_width_spinBox     = QSpinBox()
-        self.line_width_spinBox.valueChanged.connect(lambda:setattr(self,"lineWidth" ,self.line_width_spinBox.value()) )
-        self.line_width_spinBox.setValue(self.lineWidth)
-
-        text_color_layout.addWidget(self.font_color_btn)
-        text_color_layout.addWidget(QLabel("线宽："))
-        text_color_layout.addWidget(self.line_width_spinBox)
-
-        self.opacity_spinBox     = QSpinBox()
-        self.opacity_spinBox.setRange(0,255)
-        self.opacity_spinBox.valueChanged.connect(lambda:setattr(self,"opacity" ,self.opacity_spinBox.value()) )
-        self.opacity_spinBox.setValue(self.opacity)
-        bg_color_layout.addWidget(self.bg_color_btn)
-        bg_color_layout.addWidget(QLabel("透明度："))
-        bg_color_layout.addWidget(self.opacity_spinBox)
-        appearance_layout.addWidget(fill_checkbox)
-        appearance_layout.addLayout(text_color_layout)
-        appearance_layout.addLayout(bg_color_layout)
-
-        appearance.setLayout(appearance_layout)
-        layout.addWidget(appearance)
-        
+        page = PropertyPage()
+        page.add_card(self._appearance_card())
         return page
 
-    def create_color_button(self, color):
-        """创建颜色选择按钮"""
-        btn = QPushButton()
-        btn.setFixedSize(30, 30)
-        
-        # 确保 color 是 QColor 类型
-        if isinstance(color, str):
-            color = QColor(color)
-        elif isinstance(color, int):
-            color = QColor(color)
-        elif not isinstance(color, QColor):
-            color = QColor("#000000")  # 默认黑色
-            
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color.name()};
-                border: 1px solid #adb5bd;
-                border-radius: 4px;
-            }}
-        """)
-        return btn
-    
-    def update_font_color_ui(self,is_bg_color):
-        """从对象更新字体颜色UI"""
-        if not is_bg_color:
-            color = self.item.get_color() 
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.font_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
+    def _appearance_card(self) -> SectionCard:
+        card = SectionCard("描边与填充")
+
+        stroke = ColorField(self.item.get_color())
+        stroke.colorChanged.connect(self._apply_stroke_color)
+        line_width = make_int(
+            self.item.get_line_width(),
+            0,
+            64,
+            tooltip="描边宽度，0 表示不描边",
+        )
+        line_width.valueChanged.connect(lambda value: setattr(self, "lineWidth", int(value)))
+        card.add_row(("描边色", stroke), ("线宽", line_width))
+
+        fill_color = ColorField(self.item.get_fill_color())
+        fill_color.colorChanged.connect(self._apply_fill_color)
+        fill_check = make_check("启用", self.item.get_fill(), tooltip="关闭时只画描边，内部透明")
+        fill_check.toggled.connect(self._apply_fill)
+        card.add_row(("填充色", fill_color), ("填充", fill_check))
+
+        opacity = OpacityField(self.item.get_opacity())
+        opacity.valueChanged.connect(self._apply_opacity)
+        card.add_row(("不透明度", opacity))
+
+        self._appearance_extra_rows(card)
+        card.add_hint("不透明度作用于整个图元，描边与填充同时生效。")
+        return card
+
+    def _appearance_extra_rows(self, card: SectionCard) -> None:
+        """子类追加外观行（例如矩形的圆角）。"""
+
+    def _apply_stroke_color(self, color: QColor) -> None:
+        self.item.set_color(color)
+        self.item.prepareDirtyChange()
+
+    def _apply_fill_color(self, color: QColor) -> None:
+        self.item.set_fill_color(color)
+        self.item.prepareDirtyChange()
+
+    def _apply_fill(self, enabled: bool) -> None:
+        self.item.set_fill(bool(enabled))
+        self.item.prepareDirtyChange()
+
+    def _apply_opacity(self, value: int) -> None:
+        # set_opacity 只改画笔/填充的 alpha，不推导脏区，这里补一次重绘通知
+        self.item.set_opacity(int(value))
+        self.item.prepareDirtyChange()
+
+    # ------------------------------------------------------------------
+    # 卡片：布局
+    # ------------------------------------------------------------------
+    def create_layout_page(self):
+        page = PropertyPage()
+        page.add_card(self._geometry_card())
+        extra = self._layout_extra_cards()
+        for card in extra:
+            page.add_card(card)
+        return page
+
+    def _layout_extra_cards(self):
+        return []
+
+    def _geometry_card(self, height_editable: bool = True) -> SectionCard:
+        card = SectionCard("位置与尺寸")
+
+        pos = self.item.get_scene_head_pos() or QPointF(0, 0)
+        x_box = make_double(pos.x(), step=1.0, tooltip="场景坐标，向右为正")
+        y_box = make_double(pos.y(), step=1.0, tooltip="场景坐标，向上为正")
+        x_box.valueChanged.connect(lambda value: setattr(self, "head_posX", float(value)))
+        y_box.valueChanged.connect(lambda value: setattr(self, "head_posY", float(value)))
+        self._bind_geo(x_box, lambda: self.item.get_scene_head_pos().x())
+        self._bind_geo(y_box, lambda: self.item.get_scene_head_pos().y())
+        card.add_row(("X", x_box), ("Y", y_box))
+
+        size = self.item.getSize()
+        w_box = make_double(size.width(), 0.0, 1.0e6, step=1.0)
+        h_box = make_double(size.height(), 0.0, 1.0e6, step=1.0)
+        w_box.valueChanged.connect(lambda value: setattr(self, "sizeWidth", float(value)))
+        if height_editable:
+            h_box.valueChanged.connect(lambda value: setattr(self, "sizeHeight", float(value)))
         else:
-            color = self.item.get_fill_color()
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-        
-        
-        
-    def select_font_color(self,parent,is_bg_color):
-        current_color = self.item.get_color()
-        color = QColorDialog.getColor(current_color, parent)
-        if color.isValid():
-            self.item.set_color(color) if not is_bg_color else self.item.set_fill_color(color)
-            if not is_bg_color:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.font_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-            else:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-    
-    def create_layout_page(self):
-        page = QWidget()
-        layout  = QVBoxLayout(page)
-        layout1 = QHBoxLayout()
-       
-        # 目录
-        position_GroupBox = QGroupBox("位置")
-        position_layout = QVBoxLayout(position_GroupBox)
-        positionX_layout = QHBoxLayout()
-        positionX_layout.addWidget(QLabel("X:"))
-        positionX = QLineEdit()
-        positionX_layout.addWidget(positionX)
-        positionY_layout = QHBoxLayout()
-        positionY_layout.addWidget(QLabel("Y:"))
-        positionY = QLineEdit()
-        positionY_layout.addWidget(positionY)
-        position_layout.addLayout(positionX_layout)
-        position_layout.addLayout(positionY_layout)
-        size_GroupBox = QGroupBox("尺寸")
-        size_layout = QVBoxLayout(size_GroupBox)
-        width_layout = QHBoxLayout()
-        width_layout.addWidget(QLabel("W:"))
-        width = QLineEdit()
-        width_layout.addWidget(width)
-        height_layout = QHBoxLayout()
-        height_layout.addWidget(QLabel("H:"))
-        height = QLineEdit()
-        height_layout.addWidget(height)
-        size_layout.addLayout(width_layout)
-        size_layout.addLayout(height_layout)
-        layout1.addWidget(position_GroupBox)
-        layout1.addWidget(size_GroupBox)
-        layout.addLayout(layout1)
+            h_box.setReadOnly(True)
+            h_box.setToolTip("文本高度随内容自动计算")
+        self._bind_geo(w_box, lambda: self.item.getSize().width())
+        self._bind_geo(h_box, lambda: self.item.getSize().height())
+        card.add_row(("宽 W", w_box), ("高 H", h_box))
 
-        # positionX.setText( f"{self.item.pos().x():.1f}")
-        # positionY.setText( f"{self.item.pos().y():.1f}")
-        # positionX.editingFinished.connect(lambda:setattr(self,"posX" , float(positionX.text())) )
-        # positionY.editingFinished.connect(lambda:setattr(self,"posY" , float(positionY.text())) )
-        positionX.setText( f"{self.item.get_scene_head_pos().x():.1f}")
-        positionY.setText( f"{self.item.get_scene_head_pos().y():.1f}")
-        positionX.editingFinished.connect(lambda:setattr(self,"head_posX" , float(positionX.text())) )
-        positionY.editingFinished.connect(lambda:setattr(self,"head_posY" , float(positionY.text())) )
-
-        width.setText( f"{self.sizeWidth:.1f}")
-        height.setText( f"{self.sizeHeight:.1f}")
-        height.setEnabled(False)
-
-        width.editingFinished.connect(lambda:setattr(self,"sizeWidth" , float(width.text())) )
-        
-        # height.editingFinished.connect(lambda:setattr(self,"sizeHeight" , float(height.text())) )
-
-        
-
-        return page
-
-    def create_others_page(self):
-        page    = QWidget()
-        layout  = QVBoxLayout(page)
-        layout_row1 = QHBoxLayout()
-
-        others_GroupBox = QGroupBox("其它")
-        others_layout  = QVBoxLayout(others_GroupBox)
-
-        group_layout_row1 = QHBoxLayout()
-        group_layout_row1.addWidget(QLabel("Z值："))
-        self.zValue_spinBox  = QSpinBox()
-        self.zValue_spinBox.setRange(0,9999)
-        group_layout_row1.addWidget(self.zValue_spinBox)
-        self.zValue_spinBox.setEnabled(False)
-        self.zValue_spinBox.setValue(self.item.zValue())
-
-        group_layout_row2 = QHBoxLayout()
-        group_layout_row2.addWidget(QLabel("id："))
-        self.id_spinBox  = QSpinBox()
-        self.id_spinBox.setRange(0,9999)
-        group_layout_row2.addWidget(self.id_spinBox)
-        self.id_spinBox.setEnabled(False)
-        self.id_spinBox.setValue(self.item.id())
-
-        group_layout_row3 = QHBoxLayout()
-        group_layout_row3.addWidget(QLabel("名称："))
-        name_edit  = QLineEdit()
-        group_layout_row3.addWidget(name_edit)
-        name_edit.setText(self.item.get_name())
-        name_edit.editingFinished.connect(lambda: self.apply_name_edit(name_edit))
-
-        others_layout.addLayout(group_layout_row1)
-        others_layout.addLayout(group_layout_row2)
-        others_layout.addLayout(group_layout_row3)
-
-        layout_row1.addWidget(others_GroupBox)
-
-        h_spacer = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Preferred)
-        v_spacer = QSpacerItem(20, 20, QSizePolicy.Preferred, QSizePolicy.Expanding)
-        layout_row1.addSpacerItem(h_spacer)
-
-        layout.addLayout(layout_row1)
-
-        layout.addSpacerItem(v_spacer)
-        return page
-
-
-
-
-class LinePropertyItem(PropertyItem):
-    """文本属性窗口 - 优化布局"""
-    def __init__(self, parent=None,item:line_element=None):
-        super().__init__(item=item)
-        self.navi =None
-      
-    @Property(float)
-    def head_posX(self):
-        return self.item.get_scene_head_pos().x()
-    @head_posX.setter
-    def head_posX(self, val):
-        if self.item.get_scene_head_pos().x() != val:
-            y = self.item.get_scene_head_pos().y()
-            self.item.change_head_pos(QPointF(val,y))
-    
-    @Property(float)
-    def head_posY(self):
-        return self.item.get_scene_head_pos().y()
-    @head_posY.setter
-    def head_posY(self, val):
-        if self.item.get_scene_head_pos().y() != val:
-            x = self.item.get_scene_head_pos().x()
-            self.item.change_head_pos(QPointF(x,val))
-    
-    @Property(float)
-    def end_posX(self):
-        return self.item.get_scene_head_pos().x()
-    @end_posX.setter
-    def end_posX(self, val):
-        if self.item.get_scene_end_pos().x() != val:
-            y = self.item.get_scene_end_pos().y()
-            self.item.change_end_pos(QPointF(val,y))
-    
-    @Property(float)
-    def end_posY(self):
-        return self.item.get_scene_end_pos().y()
-    @end_posY.setter
-    def end_posY(self, val):
-        if self.item.get_scene_end_pos().y() != val:
-            x = self.item.get_scene_end_pos().x()
-            self.item.change_end_pos(QPointF(x,val))
-         
-    def add_navigation_items(self,navigation):
-        # 添加顶级项
-        categories = [
-            ("属性", "property", [
-                ("外观", "appearance"),
-                ("布局", "layout"),
-                ("其它", "others")
-            ])
-        ]
-        for category, icon, items in categories:
-            category_item = QTreeWidgetItem([category])
-            category_item.setData(0, Qt.UserRole, f"category_{icon}")
-            navigation.navigation_tree.addTopLevelItem(category_item)
-            
-            for item_name, item_key in items:
-                item = QTreeWidgetItem([item_name])
-                item.setData(0, Qt.UserRole, item_key)
-                category_item.addChild(item)
-        
-        # 展开所有顶级项
-        for i in range(navigation.navigation_tree.topLevelItemCount()):
-            navigation.navigation_tree.topLevelItem(i).setExpanded(True)
-            # 创建内容页面
-        self.create_content_pages(navigation)
-        navigation.select_preferred_page()
-        navigation.destory_current.connect(self.on_destory_current)
-        self.navi = navigation
-
-        
-    def on_destory_current(self):
-        self.item =None
-        self.navi.destory_current.disconnect(self.on_destory_current)
-    
-    def create_content_pages(self,navi):
-        # 创建内容页面
-        navi.add_page("appearance", "外观", self.create_appearance_page())
-        navi.add_page("layout",     "布局"    , self.create_layout_page())
-        navi.add_page("others",     "其它"    , self.create_others_page()    )
-    
-    
-    def create_appearance_page(self):
-        page   = QWidget()
-        layout = QVBoxLayout(page)
-        appearance        = QGroupBox("外观")
-        appearance_layout = QVBoxLayout()
-        
-        line_color_layout = QHBoxLayout()
-        line_color_layout.addWidget(QLabel("颜色："))
-        # 字体颜色
-        self.line_color_btn = self.create_color_button(self.item.get_color())
-        self.line_color_btn.clicked.connect(lambda: self.select_line_color(page,False))
-        self.update_line_color_ui(False)
-
-        self.line_width_spinBox     = QSpinBox()
-        self.line_width_spinBox.valueChanged.connect(lambda:setattr(self,"lineWidth" ,self.line_width_spinBox.value()) )
-        self.line_width_spinBox.setValue(self.lineWidth)
-        self.opacity_spinBox     = QSpinBox()
-        self.opacity_spinBox.setRange(0,255)
-        self.opacity_spinBox.valueChanged.connect(lambda:setattr(self,"opacity" ,self.opacity_spinBox.value()) )
-        self.opacity_spinBox.setValue(self.opacity)
-
-        line_color_layout.addWidget(self.line_color_btn)
-        line_color_layout.addWidget(QLabel("线宽："))
-        line_color_layout.addWidget(self.line_width_spinBox)
-
-        line_color_layout.addWidget(QLabel("透明度："))
-        line_color_layout.addWidget(self.opacity_spinBox)
-
-
-        appearance_layout.addLayout(line_color_layout)
-        appearance.setLayout(appearance_layout)
-        layout.addWidget(appearance)
-        
-        return page
-
-    def create_color_button(self, color):
-        """创建颜色选择按钮"""
-        btn = QPushButton()
-        btn.setFixedSize(30, 30)
-        
-        # 确保 color 是 QColor 类型
-        if isinstance(color, str):
-            color = QColor(color)
-        elif isinstance(color, int):
-            color = QColor(color)
-        elif not isinstance(color, QColor):
-            color = QColor("#000000")  # 默认黑色
-            
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color.name()};
-                border: 1px solid #adb5bd;
-                border-radius: 4px;
-            }}
-        """)
-        return btn
-    
-    def update_line_color_ui(self,is_bg_color):
-        """从对象更新字体颜色UI"""
-        if not is_bg_color:
-            color = self.item.get_color() 
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.line_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-        
-    def select_line_color(self,parent,is_bg_color):
-        current_color = self.item.get_color()
-        color = QColorDialog.getColor(current_color, parent)
-        if color.isValid():
-            self.item.set_color(color) 
-            if not is_bg_color:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.line_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-           
-    
-    def create_layout_page(self):
-        page = QWidget()
-        layout  = QVBoxLayout(page)
-        layout1 = QHBoxLayout()
-        # 目录
-        start_position_GroupBox = QGroupBox("起始点")
-        start_position_layout  = QVBoxLayout(start_position_GroupBox)
-        start_positionX_layout = QHBoxLayout()
-        start_positionX_layout.addWidget(QLabel("X:"))
-        start_positionX = QLineEdit()
-        start_positionX_layout.addWidget(start_positionX)
-        start_positionY_layout = QHBoxLayout()
-        start_positionY_layout.addWidget(QLabel("Y:"))
-        start_positionY = QLineEdit()
-        start_positionY_layout.addWidget(start_positionY)
-        start_position_layout.addLayout(start_positionX_layout)
-        start_position_layout.addLayout(start_positionY_layout)
-
-        end_position_GroupBox = QGroupBox("结束点")
-        end_position_layout  = QVBoxLayout(end_position_GroupBox)
-        end_positionX_layout = QHBoxLayout()
-        end_positionX_layout.addWidget(QLabel("X:"))
-        end_positionX = QLineEdit()
-        end_positionX_layout.addWidget(end_positionX)
-        end_positionY_layout = QHBoxLayout()
-        end_positionY_layout.addWidget(QLabel("Y:"))
-        end_positionY = QLineEdit()
-        end_positionY_layout.addWidget(end_positionY)
-        end_position_layout.addLayout(end_positionX_layout)
-        end_position_layout.addLayout(end_positionY_layout)
-        
-        layout1.addWidget(start_position_GroupBox)
-        layout1.addWidget(end_position_GroupBox)
-        layout.addLayout(layout1)
-
-        start_positionX.setText( f"{self.item.get_scene_head_pos().x():.1f}")
-        start_positionY.setText( f"{self.item.get_scene_head_pos().y():.1f}")
-        start_positionX.editingFinished.connect(lambda:setattr(self,"head_posX" , float(start_positionX.text())) )
-        start_positionY.editingFinished.connect(lambda:setattr(self,"head_posY" , float(start_positionY.text())) )
-
-        end_positionX.setText( f"{self.item.get_scene_end_pos().x():.1f}")
-        end_positionY.setText( f"{self.item.get_scene_end_pos().y():.1f}")
-        end_positionX.editingFinished.connect(lambda:setattr(self,"end_posX" , float(end_positionX.text())) )
-        end_positionY.editingFinished.connect(lambda:setattr(self,"end_posY" , float(end_positionY.text())) )
-        return page
-    def create_others_page(self):
-        page    = QWidget()
-        layout  = QVBoxLayout(page)
-        layout_row1 = QHBoxLayout()
-
-        others_GroupBox = QGroupBox("其它")
-        others_layout  = QVBoxLayout(others_GroupBox)
-
-        group_layout_row1 = QHBoxLayout()
-        group_layout_row1.addWidget(QLabel("Z值："))
-        self.zValue_spinBox  = QSpinBox()
-        self.zValue_spinBox.setRange(0,9999)
-        group_layout_row1.addWidget(self.zValue_spinBox)
-        self.zValue_spinBox.setEnabled(False)
-        self.zValue_spinBox.setValue(self.item.zValue())
-
-        group_layout_row2 = QHBoxLayout()
-        group_layout_row2.addWidget(QLabel("id："))
-        self.id_spinBox  = QSpinBox()
-        self.id_spinBox.setRange(0,9999)
-        group_layout_row2.addWidget(self.id_spinBox)
-        self.id_spinBox.setEnabled(False)
-        self.id_spinBox.setValue(self.item.id())
-
-        group_layout_row3 = QHBoxLayout()
-        group_layout_row3.addWidget(QLabel("名称："))
-        name_edit  = QLineEdit()
-        group_layout_row3.addWidget(name_edit)
-        name_edit.setText(self.item.get_name())
-        name_edit.editingFinished.connect(lambda: self.apply_name_edit(name_edit))
-
-        others_layout.addLayout(group_layout_row1)
-        others_layout.addLayout(group_layout_row2)
-        others_layout.addLayout(group_layout_row3)
-
-        layout_row1.addWidget(others_GroupBox)
-
-        h_spacer = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Preferred)
-        v_spacer = QSpacerItem(20, 20, QSizePolicy.Preferred, QSizePolicy.Expanding)
-        layout_row1.addSpacerItem(h_spacer)
-
-        layout.addLayout(layout_row1)
-
-        layout.addSpacerItem(v_spacer)
-        return page
+        angle = self.item.get_angle()
+        angle_label = make_value_label(f"{_fmt(angle)}°")
+        center_label = make_value_label(self._center_text())
+        self._bind_geo(angle_label, lambda: f"{_fmt(self.item.get_angle())}°")
+        self._bind_geo(center_label, self._center_text)
+        card.add_row(
+            ("旋转", angle_label),
+            ("中心点", center_label),
+        )
+        card.add_hint("坐标为场景坐标（Y 轴向上为正）；尺寸与描边宽度使用同一场景单位。")
+        return card
 
 
 class RectPropertyItem(PropertyItem):
-    """文本属性窗口 - 优化布局"""
-    def __init__(self, parent=None,item:rect_element=None):
-        super().__init__(item=item)
-        self.navi = None
+    """矩形、复选框、控件、三角形的公共实现。"""
+
+    def __init__(self, parent=None, item: rect_element = None):
+        super().__init__(parent=parent, item=item)
 
     @Property(float)
     def cornerRadius(self):
@@ -671,498 +482,360 @@ class RectPropertyItem(PropertyItem):
     def cornerRadius(self, val):
         if self.item.get_corner_radius() != val:
             self.item.set_corner_radius(val)
-      
-    @Property(float)
-    def head_posX(self):
-        return self.item.get_scene_head_pos().x()
-    @head_posX.setter
-    def head_posX(self, val):
-        if self.item.get_scene_head_pos().x() != val:
-            y = self.item.get_scene_head_pos().y()
-            self.item.change_position(QPointF(val,y))
-    
-    @Property(float)
-    def head_posY(self):
-        return self.item.get_scene_head_pos().y()
-    @head_posY.setter
-    def head_posY(self, val):
-        if self.item.get_scene_head_pos().y() != val:
-            x = self.item.get_scene_head_pos().x()
-            self.item.change_position(QPointF(x,val))
-    
-    
-         
-    def add_navigation_items(self,navigation):
-        # 添加顶级项
-        categories = [
-            ("属性", "property", [
-                ("外观", "appearance"),
-                ("布局", "layout"),
-                ("其它", "others")
-            ])
-        ]
-        for category, icon, items in categories:
-            category_item = QTreeWidgetItem([category])
-            category_item.setData(0, Qt.UserRole, f"category_{icon}")
-            navigation.navigation_tree.addTopLevelItem(category_item)
-            
-            for item_name, item_key in items:
-                item = QTreeWidgetItem([item_name])
-                item.setData(0, Qt.UserRole, item_key)
-                category_item.addChild(item)
-        
-        # 展开所有顶级项
-        for i in range(navigation.navigation_tree.topLevelItemCount()):
-            navigation.navigation_tree.topLevelItem(i).setExpanded(True)
-            # 创建内容页面
-        self.create_content_pages(navigation)
-        navigation.select_preferred_page()
-        navigation.destory_current.connect(self.on_destory_current)
-        self.navi = navigation
 
-
-    def on_destory_current(self):
-        self.item =None
-        self.navi.destory_current.disconnect(self.on_destory_current)
-
-    def create_content_pages(self,navi):
-        # 创建内容页面
-        navi.add_page("appearance", "外观"    , self.create_appearance_page())
-        navi.add_page("layout",     "布局"    , self.create_layout_page()    )
-        navi.add_page("others",     "其它"    , self.create_others_page()    )
-    
-
-    
-    def create_appearance_page(self):
-        page   = QWidget()
-        layout = QVBoxLayout(page)
-        bg_color_layout   = QHBoxLayout()
-        appearance        = QGroupBox("外观")
-        appearance_layout = QVBoxLayout()
-        line_color_layout = QHBoxLayout()
-        line_color_layout.addWidget(QLabel("颜色："))
-        fill_checkbox     = QCheckBox(parent=page,text="是否填充")
-        fill_checkbox.setChecked(self.item.get_fill())
-        fill_checkbox.clicked.connect(lambda:self.item.set_fill(fill_checkbox.isChecked()))
-        # 字体颜色
-        self.line_color_btn = self.create_color_button(self.item.get_color())
-        self.line_color_btn.clicked.connect(lambda: self.select_line_color(page,False))
-        bg_color_layout.addWidget(QLabel("背景颜色"))
-        self.update_line_color_ui(False)
-
-        self.bg_color_btn   = self.create_color_button(self.item.get_fill_color())
-        self.bg_color_btn.clicked.connect(lambda: self.select_line_color(page,True))
-
-        self.line_width_spinBox     = QSpinBox()
-        self.line_width_spinBox.valueChanged.connect(lambda:setattr(self,"lineWidth" ,self.line_width_spinBox.value()) )
-        self.line_width_spinBox.setValue(self.lineWidth)
-
-        line_color_layout.addWidget(self.line_color_btn)
-        line_color_layout.addWidget(QLabel("线宽："))
-        line_color_layout.addWidget(self.line_width_spinBox)
-        bg_color_layout.addWidget(self.bg_color_btn)
-
-        self.opacity_spinBox     = QSpinBox()
-        self.opacity_spinBox.setRange(0,255)
-        self.opacity_spinBox.valueChanged.connect(lambda:setattr(self,"opacity" ,self.opacity_spinBox.value()) )
-        
-        self.opacity_spinBox.setValue(self.opacity)
-        
-        bg_color_layout.addWidget(QLabel("透明度："))
-        bg_color_layout.addWidget(self.opacity_spinBox)
-
-        if not isinstance(self.item, triangle_element):
-            corner_layout = QHBoxLayout()
-            corner_layout.addWidget(QLabel("圆角："))
-            self.corner_radius_spinBox = QSpinBox()
-            max_radius = int(min(self.item.getSize().width(), self.item.getSize().height()) / 2.0)
-            self.corner_radius_spinBox.setRange(0, max(0, max_radius))
-            self.corner_radius_spinBox.setToolTip("圆角半径，单位与图元宽高一致；最大为短边的一半")
-            self.corner_radius_spinBox.setValue(int(round(self.item.get_corner_radius())))
-            self.corner_radius_spinBox.valueChanged.connect(
-                lambda: setattr(self, "cornerRadius", float(self.corner_radius_spinBox.value()))
-            )
-            corner_layout.addWidget(self.corner_radius_spinBox)
-            appearance_layout.addLayout(corner_layout)
-
-        appearance_layout.addWidget(fill_checkbox)
-        appearance_layout.addLayout(line_color_layout)
-        appearance_layout.addLayout(bg_color_layout)
-        appearance.setLayout(appearance_layout)
-        layout.addWidget(appearance)
-        
-        return page
-
-    def create_color_button(self, color):
-        """创建颜色选择按钮"""
-        btn = QPushButton()
-        btn.setFixedSize(30, 30)
-        
-        # 确保 color 是 QColor 类型
-        if isinstance(color, str):
-            color = QColor(color)
-        elif isinstance(color, int):
-            color = QColor(color)
-        elif not isinstance(color, QColor):
-            color = QColor("#000000")  # 默认黑色
-            
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color.name()};
-                border: 1px solid #adb5bd;
-                border-radius: 4px;
-            }}
-        """)
-        return btn
-    
-    def update_line_color_ui(self,is_bg_color):
-        """从对象更新字体颜色UI"""
-        if not is_bg_color:
-            color = self.item.get_color() 
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.line_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-        else:
-            color = self.item.get_fill_color()
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-        
-        
-        
-    def select_line_color(self,parent,is_bg_color):
-        current_color = self.item.get_color()
-        color = QColorDialog.getColor(current_color, parent)
-        if color.isValid():
-            self.item.set_color(color) if not is_bg_color else self.item.set_fill_color(color)
-            if not is_bg_color:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.line_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-            else:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-    
-    def create_layout_page(self):
-        page = QWidget()
-        layout  = QVBoxLayout(page)
-        layout1 = QHBoxLayout()
-        # 目录
-        start_position_GroupBox = QGroupBox("位置")
-        start_position_layout  = QVBoxLayout(start_position_GroupBox)
-        start_positionX_layout = QHBoxLayout()
-        start_positionX_layout.addWidget(QLabel("X:"))
-        start_positionX = QLineEdit()
-        start_positionX_layout.addWidget(start_positionX)
-        start_positionY_layout = QHBoxLayout()
-        start_positionY_layout.addWidget(QLabel("Y:"))
-        start_positionY = QLineEdit()
-        start_positionY_layout.addWidget(start_positionY)
-        start_position_layout.addLayout(start_positionX_layout)
-        start_position_layout.addLayout(start_positionY_layout)
-
-        size_GroupBox = QGroupBox("尺寸")
-        size_layout = QVBoxLayout(size_GroupBox)
-        width_layout = QHBoxLayout()
-        width_layout.addWidget(QLabel("W:"))
-        width = QLineEdit()
-        width_layout.addWidget(width)
-        height_layout = QHBoxLayout()
-        height_layout.addWidget(QLabel("H:"))
-        height = QLineEdit()
-        height_layout.addWidget(height)
-        size_layout.addLayout(width_layout)
-        size_layout.addLayout(height_layout)
-        
-        layout1.addWidget(start_position_GroupBox)
-        layout1.addWidget(size_GroupBox)
-       
-        layout.addLayout(layout1)
-        start_positionX.setText( f"{self.item.get_scene_head_pos().x():.1f}")
-        start_positionY.setText( f"{self.item.get_scene_head_pos().y():.1f}")
-        start_positionX.editingFinished.connect(lambda:setattr(self,"head_posX" , float(start_positionX.text())) )
-        start_positionY.editingFinished.connect(lambda:setattr(self,"head_posY" , float(start_positionY.text())) )
-
-        width.setText( f"{self.sizeWidth:.1f}")
-        height.setText( f"{self.sizeHeight:.1f}")
-       
-
-        width.editingFinished.connect(lambda:setattr(self,"sizeWidth" , float(width.text())) )
-        
-        height.editingFinished.connect(lambda:setattr(self,"sizeHeight" , float(height.text())) )
-
-
-        
-        return page
-
-    def create_others_page(self):
-        page    = QWidget()
-        layout  = QVBoxLayout(page)
-        layout_row1 = QHBoxLayout()
-
-        others_GroupBox = QGroupBox("其它")
-        others_layout  = QVBoxLayout(others_GroupBox)
-
-        group_layout_row1 = QHBoxLayout()
-        group_layout_row1.addWidget(QLabel("Z值："))
-        self.zValue_spinBox  = QSpinBox()
-        self.zValue_spinBox.setRange(0,9999)
-        group_layout_row1.addWidget(self.zValue_spinBox)
-        self.zValue_spinBox.setEnabled(False)
-        self.zValue_spinBox.setValue(self.item.zValue())
-
-        group_layout_row2 = QHBoxLayout()
-        group_layout_row2.addWidget(QLabel("id："))
-        self.id_spinBox  = QSpinBox()
-        group_layout_row2.addWidget(self.id_spinBox)
-        self.id_spinBox.setEnabled(False)
-        self.id_spinBox.setValue(self.item.id())
-
-        group_layout_row3 = QHBoxLayout()
-        group_layout_row3.addWidget(QLabel("名称："))
-        name_edit  = QLineEdit()
-        group_layout_row3.addWidget(name_edit)
-        name_edit.setText(self.item.get_name())
-        name_edit.editingFinished.connect(lambda: self.apply_name_edit(name_edit))
-
-        others_layout.addLayout(group_layout_row1)
-        others_layout.addLayout(group_layout_row2)
-        others_layout.addLayout(group_layout_row3)
-
-        layout_row1.addWidget(others_GroupBox)
-
-        h_spacer = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Preferred)
-        v_spacer = QSpacerItem(20, 20, QSizePolicy.Preferred, QSizePolicy.Expanding)
-        layout_row1.addSpacerItem(h_spacer)
-
-        layout.addLayout(layout_row1)
-
-        layout.addSpacerItem(v_spacer)
-        return page
+    def _appearance_extra_rows(self, card: SectionCard) -> None:
+        if not hasattr(self.item, "get_corner_radius"):
+            return
+        if isinstance(self.item, triangle_element):
+            # 三角形按顶点路径绘制，圆角对其无效
+            return
+        size = self.item.getSize()
+        max_radius = int(min(size.width(), size.height()) / 2.0)
+        radius = make_int(
+            int(round(self.item.get_corner_radius())),
+            0,
+            max(0, max_radius),
+            tooltip="圆角半径，单位为场景坐标；上限是短边的一半",
+        )
+        radius.valueChanged.connect(lambda value: setattr(self, "cornerRadius", float(value)))
+        card.add_row(("圆角", radius))
 
 
 class TrianglePropertyItem(RectPropertyItem):
-    """三角形属性项，编辑位置和三个顶点坐标。"""
+    """三角形：位置 + 三个顶点。"""
 
-    def __init__(self, parent=None, item: triangle_element=None):
+    def __init__(self, parent=None, item: triangle_element = None):
         super().__init__(parent=parent, item=item)
 
-    def _apply_vertex(self, index, x_edit, y_edit):
-        try:
-            x = float(x_edit.text())
-            y = float(y_edit.text())
-        except (TypeError, ValueError):
-            return
+    def _layout_extra_cards(self):
+        card = SectionCard("顶点坐标")
+        vertices = self.item.get_scene_vertices()
+        for index, label in enumerate(("A", "B", "C")):
+            point = vertices[index] if index < len(vertices) else QPointF(0, 0)
+            x_box = make_double(point.x(), step=1.0)
+            y_box = make_double(point.y(), step=1.0)
+            x_box.valueChanged.connect(
+                lambda value, i=index: self._apply_vertex_axis(i, x=float(value))
+            )
+            y_box.valueChanged.connect(
+                lambda value, i=index: self._apply_vertex_axis(i, y=float(value))
+            )
+            self._bind_geo(
+                x_box,
+                lambda i=index: (
+                    self.item.get_scene_vertices()[i].x()
+                    if i < len(self.item.get_scene_vertices())
+                    else 0.0
+                ),
+            )
+            self._bind_geo(
+                y_box,
+                lambda i=index: (
+                    self.item.get_scene_vertices()[i].y()
+                    if i < len(self.item.get_scene_vertices())
+                    else 0.0
+                ),
+            )
+            card.add_row((f"顶点 {label} X", x_box), ("Y", y_box))
+        card.add_hint("三个顶点决定三角形形状；改动顶点不会同时移动整体位置。")
+        return [card]
+
+    def _apply_vertex_axis(self, index: int, x=None, y=None) -> None:
         vertices = self.item.get_scene_vertices()
         if len(vertices) != 3:
             return
-        vertices[index] = QPointF(x, y)
+        point = QPointF(vertices[index])
+        if x is not None:
+            point.setX(x)
+        if y is not None:
+            point.setY(y)
+        vertices[index] = point
         self.item.set_scene_vertices(vertices)
 
-    def create_layout_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
 
-        position_GroupBox = QGroupBox("位置")
-        position_layout = QVBoxLayout(position_GroupBox)
-        positionX_layout = QHBoxLayout()
-        positionX_layout.addWidget(QLabel("X:"))
-        positionX = QLineEdit()
-        positionX_layout.addWidget(positionX)
-        positionY_layout = QHBoxLayout()
-        positionY_layout.addWidget(QLabel("Y:"))
-        positionY = QLineEdit()
-        positionY_layout.addWidget(positionY)
-        position_layout.addLayout(positionX_layout)
-        position_layout.addLayout(positionY_layout)
+class CirclePropertyItem(PropertyItem):
+    """圆形：外观 + 直径 / 半径。"""
 
-        vertices_GroupBox = QGroupBox("顶点")
-        vertices_layout = QVBoxLayout(vertices_GroupBox)
-        vertices = self.item.get_scene_vertices()
-        for index, label in enumerate(("A", "B", "C")):
-            row = QHBoxLayout()
-            row.addWidget(QLabel(f"{label} X:"))
-            x_edit = QLineEdit()
-            row.addWidget(x_edit)
-            row.addWidget(QLabel("Y:"))
-            y_edit = QLineEdit()
-            row.addWidget(y_edit)
-            if index < len(vertices):
-                point = vertices[index]
-                x_edit.setText(f"{point.x():.1f}")
-                y_edit.setText(f"{point.y():.1f}")
-            x_edit.editingFinished.connect(
-                lambda i=index, xe=x_edit, ye=y_edit: self._apply_vertex(i, xe, ye)
-            )
-            y_edit.editingFinished.connect(
-                lambda i=index, xe=x_edit, ye=y_edit: self._apply_vertex(i, xe, ye)
-            )
-            vertices_layout.addLayout(row)
+    def __init__(self, parent=None, item: circle_element = None):
+        super().__init__(parent=parent, item=item)
 
-        head_pos = self.item.get_scene_head_pos()
-        if head_pos is not None:
-            positionX.setText(f"{head_pos.x():.1f}")
-            positionY.setText(f"{head_pos.y():.1f}")
-        positionX.editingFinished.connect(
-            lambda: setattr(self, "head_posX", float(positionX.text()))
+    def _layout_extra_cards(self):
+        size = self.item.getSize()
+        short_edge = min(size.width(), size.height())
+        card = SectionCard("尺寸换算")
+        dw_label = make_value_label(_fmt(size.width()))
+        dh_label = make_value_label(_fmt(size.height()))
+        radius_label = make_value_label(_fmt(short_edge / 2.0))
+        perimeter_label = make_value_label(_fmt(math.pi * short_edge))
+        self._bind_geo(dw_label, lambda: _fmt(self.item.getSize().width()))
+        self._bind_geo(dh_label, lambda: _fmt(self.item.getSize().height()))
+        self._bind_geo(radius_label, lambda: _fmt(min(self.item.getSize().width(), self.item.getSize().height()) / 2.0))
+        self._bind_geo(perimeter_label, lambda: _fmt(math.pi * min(self.item.getSize().width(), self.item.getSize().height())))
+        card.add_row(
+            ("直径 W", dw_label),
+            ("直径 H", dh_label),
         )
-        positionY.editingFinished.connect(
-            lambda: setattr(self, "head_posY", float(positionY.text()))
+        card.add_row(
+            ("半径", radius_label),
+            ("周长", perimeter_label),
         )
-
-        layout.addWidget(position_GroupBox)
-        layout.addWidget(vertices_GroupBox)
-        layout.addSpacerItem(
-            QSpacerItem(20, 20, QSizePolicy.Preferred, QSizePolicy.Expanding)
-        )
-        return page
+        card.add_hint("圆由外接矩形决定；宽高不等时是椭圆，半径与周长按短边估算，仅供读数参考。")
+        return [card]
 
 
-class GroupPropertyItem(PropertyItem):
-    """文本属性窗口 - 优化布局"""
-    def __init__(self, parent=None,item:group_element=None):
-        super().__init__(item=item)
-        self.navi = None
-      
+class LinePropertyItem(PropertyItem):
+    """直线：两端点坐标 + 长度/角度。"""
+
+    def __init__(self, parent=None, item: line_element = None):
+        super().__init__(parent=parent, item=item)
+
     @Property(float)
     def head_posX(self):
         return self.item.get_scene_head_pos().x()
+
     @head_posX.setter
     def head_posX(self, val):
-        if self.item.get_scene_head_pos().x() != val:
-            y = self.item.get_scene_head_pos().y()
-            self.item.change_position(QPointF(val,y))
-    
+        current = self.item.get_scene_head_pos()
+        if current.x() != val:
+            self.item.change_head_pos(QPointF(val, current.y()))
+
     @Property(float)
     def head_posY(self):
         return self.item.get_scene_head_pos().y()
+
     @head_posY.setter
     def head_posY(self, val):
-        if self.item.get_scene_head_pos().y() != val:
-            x = self.item.get_scene_head_pos().x()
-            self.item.change_position(QPointF(x,val))
-    
-    
-         
-    def add_navigation_items(self,navigation):
-        # 添加顶级项
-        categories = [
-            ("交互", "interaction", [
-                ("事件绑定", "events")
-            ]),
-            ("属性", "property", [
-                ("布局", "layout"),
-                ("其它", "others")
-            ])
-        ]
-        for category, icon, items in categories:
-            category_item = QTreeWidgetItem([category])
-            category_item.setData(0, Qt.UserRole, f"category_{icon}")
-            navigation.navigation_tree.addTopLevelItem(category_item)
-            
-            for item_name, item_key in items:
-                item = QTreeWidgetItem([item_name])
-                item.setData(0, Qt.UserRole, item_key)
-                category_item.addChild(item)
-        
-        # 展开所有顶级项
-        for i in range(navigation.navigation_tree.topLevelItemCount()):
-            navigation.navigation_tree.topLevelItem(i).setExpanded(True)
-            # 创建内容页面
-        self.create_content_pages(navigation)
-        navigation.select_preferred_page()
-        navigation.destory_current.connect(self.on_destory_current)
-        self.navi = navigation
+        current = self.item.get_scene_head_pos()
+        if current.y() != val:
+            self.item.change_head_pos(QPointF(current.x(), val))
 
+    @Property(float)
+    def end_posX(self):
+        return self.item.get_scene_end_pos().x()
 
-    def on_destory_current(self):
-        self.item =None
-        self.navi.destory_current.disconnect(self.on_destory_current)
+    @end_posX.setter
+    def end_posX(self, val):
+        current = self.item.get_scene_end_pos()
+        if current.x() != val:
+            self.item.change_end_pos(QPointF(val, current.y()))
 
-    def create_content_pages(self,navi):
-        # 创建内容页面
-    
-        navi.add_page("events",     "事件绑定", self.create_events_page()    )
-        navi.add_page("layout",     "布局"    , self.create_layout_page()    )
-        navi.add_page("others",     "其它"    , self.create_others_page()    )
+    @Property(float)
+    def end_posY(self):
+        return self.item.get_scene_end_pos().y()
 
-    def create_events_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
+    @end_posY.setter
+    def end_posY(self, val):
+        current = self.item.get_scene_end_pos()
+        if current.y() != val:
+            self.item.change_end_pos(QPointF(current.x(), val))
 
-        event_group = QGroupBox("事件绑定")
-        event_layout = QVBoxLayout(event_group)
+    def create_appearance_page(self):
+        page = PropertyPage()
+        card = SectionCard("线条样式")
+        color = ColorField(self.item.get_color())
+        color.colorChanged.connect(self._apply_stroke_color)
+        card.add_row(("线条颜色", color))
 
-        hint = QLabel(
-            "事件触发时优先调用“处理函数”（运行态已注册的 Python 函数），"
-            "参数使用 JSON 对象；处理函数留空时才把“变量”写入运行态变量表。"
-            "值留空时：pressed 写 true、released 写 false、click 写 true、"
-            "toggle 写当前选中状态。attach 仅在进入运行态时执行一次，"
-            "适合初始化图元状态。"
+        line_width = make_int(self.item.get_line_width(), 0, 64, tooltip="线宽，0 表示不描边")
+        line_width.valueChanged.connect(lambda value: setattr(self, "lineWidth", int(value)))
+        card.add_row(("线宽", line_width))
+
+        opacity = OpacityField(self.item.get_opacity())
+        opacity.valueChanged.connect(self._apply_opacity)
+        card.add_row(("不透明度", opacity))
+        page.add_card(card)
+        return page
+
+    def create_layout_page(self):
+        page = PropertyPage()
+        card = SectionCard("端点坐标")
+
+        head = self.item.get_scene_head_pos() or QPointF(0, 0)
+        start_x = make_double(head.x(), step=1.0)
+        start_y = make_double(head.y(), step=1.0)
+        start_x.valueChanged.connect(lambda value: setattr(self, "head_posX", float(value)))
+        start_y.valueChanged.connect(lambda value: setattr(self, "head_posY", float(value)))
+        self._bind_geo(start_x, lambda: self.item.get_scene_head_pos().x())
+        self._bind_geo(start_y, lambda: self.item.get_scene_head_pos().y())
+        card.add_row(("起点 X", start_x), ("起点 Y", start_y))
+
+        end = self.item.get_scene_end_pos() or QPointF(0, 0)
+        end_x = make_double(end.x(), step=1.0)
+        end_y = make_double(end.y(), step=1.0)
+        end_x.valueChanged.connect(lambda value: setattr(self, "end_posX", float(value)))
+        end_y.valueChanged.connect(lambda value: setattr(self, "end_posY", float(value)))
+        self._bind_geo(end_x, lambda: self.item.get_scene_end_pos().x())
+        self._bind_geo(end_y, lambda: self.item.get_scene_end_pos().y())
+        card.add_row(("终点 X", end_x), ("终点 Y", end_y))
+
+        def _derived():
+            head = self.item.get_scene_head_pos() or QPointF(0, 0)
+            end = self.item.get_scene_end_pos() or QPointF(0, 0)
+            dx = end.x() - head.x()
+            dy = end.y() - head.y()
+            length = math.hypot(dx, dy)
+            angle = math.degrees(math.atan2(dy, dx)) if length else 0.0
+            return length, angle
+
+        length, angle = _derived()
+        length_label = make_value_label(_fmt(length))
+        angle_label = make_value_label(f"{_fmt(angle)}°")
+        self._bind_geo(length_label, lambda: _fmt(_derived()[0]))
+        self._bind_geo(angle_label, lambda: f"{_fmt(_derived()[1])}°")
+        card.add_row(
+            ("长度", length_label),
+            ("角度", angle_label),
         )
-        hint.setWordWrap(True)
-        event_layout.addWidget(hint)
+        card.add_hint("长度与角度由两个端点推导，只读展示；角度以 X 轴正方向为 0°。")
+        page.add_card(card)
+        return page
 
-        self.toggle_enabled_checkbox = QCheckBox("启用 toggle（点击后切换选中状态）")
-        self.toggle_enabled_checkbox.setChecked(self.item.is_toggle_enabled())
-        event_layout.addWidget(self.toggle_enabled_checkbox)
 
-        self.toggle_checked_checkbox = QCheckBox("初始为选中状态")
-        self.toggle_checked_checkbox.setChecked(self.item.is_checked())
+class TextPropertyItem(PropertyItem):
+    """文本：内容 / 外观 / 布局（高度由内容自动计算）。"""
+
+    def __init__(self, parent=None, item: text_element = None):
+        super().__init__(parent=parent, item=item)
+
+    def navigation_items(self):
+        return [
+            ("文本内容", "context"),
+            ("常规", "general"),
+            ("外观", "appearance"),
+            ("布局", "layout"),
+        ]
+
+    def create_content_pages(self, navi):
+        navi.add_page("context", "文本内容", self.create_context_page())
+        navi.add_page("general", "常规", self.create_general_page())
+        navi.add_page("appearance", "外观", self.create_appearance_page())
+        navi.add_page("layout", "布局", self.create_layout_page())
+
+    def create_context_page(self):
+        page = PropertyPage()
+        card = SectionCard("文本内容")
+
+        editor = QTextEdit()
+        editor.setObjectName("propTextArea")
+        editor.setPlaceholderText("输入要显示的文字")
+        editor.setFixedHeight(96)
+        # context 的读值带额外的绘制留白空格，回填时要 strip，否则每轮编辑都会加长
+        editor.setPlainText(str(self.item.context).strip())
+        editor.textChanged.connect(
+            lambda e=editor: setattr(self.item, "context", e.toPlainText())
+        )
+        card.add_widget(editor)
+
+        card.add_row(
+            ("字号", make_value_label(str(getattr(self.item, "font_size", "—")))),
+            ("字数", make_value_label(str(len(str(self.item.context).strip())))),
+        )
+        card.add_hint(
+            "字号由文本框高度自动推算；内容两侧各补一个空格用于绘制留白，"
+            "所以画布上的文字会比输入内容略宽。"
+        )
+        page.add_card(card)
+        return page
+
+    def _geometry_card(self, height_editable: bool = False) -> SectionCard:
+        return super()._geometry_card(height_editable=height_editable)
+
+
+class GroupPropertyItem(PropertyItem):
+    """组合组：事件绑定 + 常规（含成员管理）+ 外观 + 布局。"""
+
+    def __init__(self, parent=None, item: group_element = None):
+        super().__init__(parent=parent, item=item)
+
+    def navigation_items(self):
+        return [
+            ("事件绑定", "events"),
+            ("常规", "general"),
+            ("外观", "appearance"),
+            ("布局", "layout"),
+        ]
+
+    def _group_field_label(self) -> str:
+        return "成员规模"
+
+    def _group_field_value(self) -> str:
+        return f"组合组 · {len(self.item.childItems())} 个"
+
+    def create_content_pages(self, navi):
+        navi.add_page("events", "事件绑定", self.create_events_page())
+        navi.add_page("general", "常规", self.create_general_page())
+        navi.add_page("appearance", "外观", self.create_appearance_page())
+        navi.add_page("layout", "布局", self.create_layout_page())
+
+    # ------------------------------------------------------------------
+    # 事件
+    # ------------------------------------------------------------------
+    def create_events_page(self):
+        page = PropertyPage()
+
+        intro = SectionCard("事件说明")
+        intro.add_hint(
+            "事件触发时优先调用「处理函数」（运行态已注册的 Python 函数），参数使用 JSON 对象；"
+            "处理函数留空时才把「变量」写入运行态变量表。\n"
+            "值留空时：pressed 写 true、released 写 false、click 写 true、toggle 写当前选中状态。\n"
+            "attach 仅在进入运行态时执行一次，适合初始化图元状态。"
+        )
+        page.add_card(intro)
+
+        state = SectionCard("交互状态")
+        self.toggle_enabled_checkbox = make_check(
+            "启用 toggle（点击后切换选中状态）", self.item.is_toggle_enabled()
+        )
+        self.toggle_checked_checkbox = make_check("初始为选中状态", self.item.is_checked())
         self.toggle_checked_checkbox.setEnabled(self.item.is_toggle_enabled())
-        event_layout.addWidget(self.toggle_checked_checkbox)
-
+        state.add_widget(self.toggle_enabled_checkbox)
+        state.add_widget(self.toggle_checked_checkbox)
         self.toggle_enabled_checkbox.toggled.connect(self.handle_toggle_enabled_change)
         self.toggle_checked_checkbox.toggled.connect(self.handle_toggle_checked_change)
+        page.add_card(state)
 
         event_specs = (
-            ("attach",   "初始化 attach"),
-            ("pressed",  "按下 pressed"),
-            ("released", "松开 released"),
-            ("click",    "点击 clicked"),
-            ("toggle",   "切换 toggled"),
+            ("attach", "初始化 attach", "进入运行态时执行一次"),
+            ("pressed", "按下 pressed", "鼠标在组内按下"),
+            ("released", "松开 released", "鼠标松开"),
+            ("click", "点击 clicked", "一次完整的按下 + 松开"),
+            ("toggle", "切换 toggled", "选中状态翻转，值为当前状态"),
         )
-        for event_name, label in event_specs:
-            binding = self.item.get_event_binding(event_name) or {}
-
-            handler_row = QHBoxLayout()
-            title = QLabel(label)
-            title.setMinimumWidth(100)
-            handler_row.addWidget(title)
-
-            handler_edit = QLineEdit()
-            handler_edit.setPlaceholderText("处理函数名（如 safety_door.toggle）")
-            handler_edit.setText(str(binding.get("handler", "")))
-            handler_row.addWidget(handler_edit, 2)
-
-            args_edit = QLineEdit()
-            args_edit.setPlaceholderText('参数 JSON（如 {"door": "4"}）')
-            raw_args = binding.get("args")
-            if raw_args:
-                args_edit.setText(json.dumps(raw_args, ensure_ascii=False))
-            handler_row.addWidget(args_edit, 2)
-            event_layout.addLayout(handler_row)
-
-            target_row = QHBoxLayout()
-            target_row.addSpacing(100)
-            variable_edit = QLineEdit()
-            variable_edit.setPlaceholderText("变量名（处理函数为空时使用）")
-            variable_edit.setText(str(binding.get("variable", "")))
-            target_row.addWidget(variable_edit, 2)
-
-            value_edit = QLineEdit()
-            value_edit.setPlaceholderText("值（留空=事件值）")
-            value_edit.setText(str(binding.get("value", "")))
-            target_row.addWidget(value_edit, 1)
-            event_layout.addLayout(target_row)
-
-            for edit in (handler_edit, args_edit, variable_edit, value_edit):
-                edit.editingFinished.connect(
-                    lambda e=event_name, h=handler_edit, a=args_edit,
-                    v=variable_edit, val=value_edit:
-                    self.save_event_binding(e, v, val, h, a)
-                )
-
-        layout.addWidget(event_group)
-        layout.addStretch(1)
+        for event_name, label, description in event_specs:
+            page.add_card(self._event_card(event_name, label, description))
         return page
+
+    def _event_card(self, event_name: str, label: str, description: str) -> SectionCard:
+        binding = self.item.get_event_binding(event_name) or {}
+        card = SectionCard(label)
+        if binding.get("handler") or binding.get("variable"):
+            card.set_badge("已绑定")
+
+        handler = make_line(
+            str(binding.get("handler", "")),
+            placeholder="处理函数名（如 safety_door.toggle）",
+            max_width=520,
+        )
+        raw_args = binding.get("args")
+        args_text = json.dumps(raw_args, ensure_ascii=False) if raw_args else ""
+        args = make_line(args_text, placeholder='参数 JSON，如 {"door": "4"}', max_width=520)
+        variable = make_line(
+            str(binding.get("variable", "")), placeholder="变量名（处理函数为空时使用）"
+        )
+        value = make_line(str(binding.get("value", "")), placeholder="值（留空=事件默认值）")
+
+        card.add_row(("处理函数", handler))
+        card.add_row(("参数 JSON", args))
+        card.add_row(("变量", variable), ("值", value))
+        card.add_hint(description + "；清空处理函数与变量即解除该事件的绑定。")
+
+        for edit in (handler, args, variable, value):
+            edit.editingFinished.connect(
+                lambda e=event_name, h=handler, a=args, v=variable, val=value: self.save_event_binding(
+                    e, v, val, h, a
+                )
+            )
+        return card
 
     def save_event_binding(
         self, event_name, variable_edit, value_edit, handler_edit=None, args_edit=None
@@ -1176,13 +849,13 @@ class GroupPropertyItem(PropertyItem):
             except ValueError as exc:
                 print(f"事件参数不是合法 JSON，未保存 {event_name}: {exc}")
                 if args_edit is not None:
-                    args_edit.setStyleSheet("border: 1px solid #ff3b30")
+                    args_edit.setStyleSheet("border: 1px solid #dc2626")
                     args_edit.setToolTip("参数必须是 JSON 对象，例如 {\"door\": \"4\"}")
                 return
             if not isinstance(args, dict):
                 print(f"事件参数必须是 JSON 对象，未保存 {event_name}: {args_text!r}")
                 if args_edit is not None:
-                    args_edit.setStyleSheet("border: 1px solid #ff3b30")
+                    args_edit.setStyleSheet("border: 1px solid #dc2626")
                     args_edit.setToolTip('参数必须是 JSON 对象，例如 {"door": "4"}')
                 return
         if args_edit is not None:
@@ -1207,765 +880,219 @@ class GroupPropertyItem(PropertyItem):
 
     def handle_toggle_checked_change(self, checked):
         self.item.set_checked(checked)
-    
 
-    def create_layout_page(self):
-        page = QWidget()
-        layout  = QVBoxLayout(page)
-        layout1 = QHBoxLayout()
-        # 目录
-        start_position_GroupBox = QGroupBox("位置")
-        start_position_layout  = QVBoxLayout(start_position_GroupBox)
-        start_positionX_layout = QHBoxLayout()
-        start_positionX_layout.addWidget(QLabel("X:"))
-        start_positionX = QLineEdit()
-        start_positionX_layout.addWidget(start_positionX)
-        start_positionY_layout = QHBoxLayout()
-        start_positionY_layout.addWidget(QLabel("Y:"))
-        start_positionY = QLineEdit()
-        start_positionY_layout.addWidget(start_positionY)
-        start_position_layout.addLayout(start_positionX_layout)
-        start_position_layout.addLayout(start_positionY_layout)
+    # ------------------------------------------------------------------
+    # 成员
+    # ------------------------------------------------------------------
+    def _general_extra_cards(self):
+        return [self._members_card()]
 
-        size_GroupBox = QGroupBox("尺寸")
-        size_layout = QVBoxLayout(size_GroupBox)
-        width_layout = QHBoxLayout()
-        width_layout.addWidget(QLabel("W:"))
-        self.width = QLineEdit()
-        width_layout.addWidget(self.width)
-        height_layout = QHBoxLayout()
-        height_layout.addWidget(QLabel("H:"))
-        self.height = QLineEdit()
-        height_layout.addWidget(self.height)
-        size_layout.addLayout(width_layout)
-        size_layout.addLayout(height_layout)
-        
-        layout1.addWidget(start_position_GroupBox)
-        layout1.addWidget(size_GroupBox)
-       
-        layout.addLayout(layout1)
-        start_positionX.setText( f"{self.item.get_scene_head_pos().x():.1f}")
-        start_positionY.setText( f"{self.item.get_scene_head_pos().y():.1f}")
-        start_positionX.editingFinished.connect(lambda:setattr(self,"head_posX" , float(start_positionX.text())) )
-        start_positionY.editingFinished.connect(lambda:setattr(self,"head_posY" , float(start_positionY.text())) )
+    def _members_card(self) -> SectionCard:
+        card = SectionCard("成员")
+        members = sorted(
+            (child for child in self.item.childItems() if isinstance(child, base_element)),
+            key=lambda child: child.id(),
+        )
+        if not members:
+            card.add_hint("该组合组没有成员。解散分组后成员会回到画布顶层。")
+            return card
 
-        self.width.setText( f"{self.sizeWidth:.1f}")
-        self.height.setText( f"{self.sizeHeight:.1f}")
+        combo = QComboBox()
+        combo.setObjectName("propField")
+        combo.setFixedHeight(FIELD_HEIGHT)
+        combo.setMaximumWidth(280)
+        for member in members:
+            combo.addItem(f"{member.id()} · {member.get_name()}", member.id())
 
-        self.width.editingFinished.connect(self.on_width_edit_done)
-        self.height.editingFinished.connect(self.on_height_edit_done )
-        
-        return page
+        name_edit = make_line("", read_only=True, tooltip="组员名称随组名自动变化（组名_成员名）")
+        visible_check = make_check("显示", True, tooltip="取消后该成员在画布和运行态都不绘制")
 
+        listing = QListWidget()
+        listing.setObjectName("propMemberList")
+        listing.setFixedHeight(92)
+        listing.setMaximumWidth(780)
+        for member in members:
+            suffix = "" if member.get_visibility() else "   （隐藏）"
+            item = QListWidgetItem(f"{member.id():>4}  {member.get_name()}{suffix}")
+            item.setData(Qt.UserRole, member.id())
+            listing.addItem(item)
 
-    def on_width_edit_done(self):
-        scale =  float(self.width.text())/self.sizeWidth
-        self.height.setText( f"{(scale*self.sizeHeight):.1f}")
-        w = float(self.width.text())
-        h = float(self.height.text())
-        self.size = QSizeF(w,h)
-            
-    def on_height_edit_done(self):
-        scale =  float(self.height.text())/self.sizeHeight
-        self.width.setText( f"{(scale*self.sizeWidth):.1f}")
-        w = float(self.width.text())
-        h = float(self.height.text())
-        self.size = QSizeF(w,h)
+        card.add_row(("成员", combo))
+        card.add_row(("名称", name_edit), ("可见", visible_check))
+        card.add_widget(listing)
 
+        def current_member():
+            member_id = combo.currentData()
+            manager = getattr(self.item, "m_scene_manager", None)
+            if manager is None or member_id is None:
+                return None
+            return manager.findItem(int(member_id))
 
-    def create_others_page(self):
-        page    = QWidget()
-        layout  = QVBoxLayout(page)
-        layout_row1 = QHBoxLayout()
+        def sync_fields():
+            member = current_member()
+            if member is None:
+                return
+            name_edit.setText(member.get_name())
+            visible_check.blockSignals(True)
+            visible_check.setChecked(bool(member.get_visibility()))
+            visible_check.blockSignals(False)
 
-        others_GroupBox = QGroupBox("其它")
-        others_layout  = QVBoxLayout(others_GroupBox)
-        members_GroupBox = QGroupBox("组员")
-        members_layout  = QVBoxLayout(members_GroupBox)
+        def apply_visibility(checked):
+            member = current_member()
+            if member is not None:
+                member.set_visibility(bool(checked))
 
-        group_layout_row1 = QHBoxLayout()
-        group_layout_row1.addWidget(QLabel("Z值："))
-        self.zValue_spinBox  = QSpinBox()
-        self.zValue_spinBox.setRange(0,9999)
-        group_layout_row1.addWidget(self.zValue_spinBox)
-        self.zValue_spinBox.setEnabled(False)
-        self.zValue_spinBox.setValue(self.item.zValue())
-
-        group_layout_row2 = QHBoxLayout()
-        group_layout_row2.addWidget(QLabel("id："))
-        self.id_spinBox  = QSpinBox()
-        self.id_spinBox.setRange(0,9999)
-        group_layout_row2.addWidget(self.id_spinBox)
-        self.id_spinBox.setEnabled(False)
-        self.id_spinBox.setValue(self.item.id())
-
-        group_layout_row3 = QHBoxLayout()
-        group_layout_row3.addWidget(QLabel("名称："))
-        name_edit  = QLineEdit()
-        group_layout_row3.addWidget(name_edit)
-        name_edit.setText(self.item.get_name())
-        name_edit.editingFinished.connect(lambda: self.apply_name_edit(name_edit))
-        name_edit.editingFinished.connect(self.refresh_member_name_text)
-
-        others_layout.addLayout(group_layout_row1)
-        others_layout.addLayout(group_layout_row2)
-        others_layout.addLayout(group_layout_row3)
-
-
-
-        layout_row1.addWidget(others_GroupBox)
-
-        members_group_layout_row1 = QHBoxLayout()
-        members_group_layout_row2 = QHBoxLayout()
-        members_group_layout_row3 = QHBoxLayout()
-        members_group_layout_row1.addWidget(QLabel("成员id："))
-        members_id_combox   =QComboBox()
-        for item in self.item.childItems():
-            members_id_combox.addItem(str(item.id()))
-        # for id in self.item.childItems
-        
-        members_group_layout_row1.addWidget(members_id_combox)
-        members_group_layout_row2.addWidget(QLabel("名称："))
-        members_name_edit  = QLineEdit()
-        # 组员名称随组名自动变化（组名_成员名），此处只读显示，不能单独修改。
-        members_name_edit.setReadOnly(True)
-        members_name_edit.setToolTip("组员名称随组名自动变化（组名_成员名），不能单独修改")
-        # current_member_name = self.item.m_scene_manager.findItem(int(members_id_combox.currentText())).get_name()
-        current_member_item =  self.item.m_scene_manager.findItem(int(members_id_combox.currentText()))
-        members_name_edit.setText(current_member_item.get_name())
-        self.members_name_edit = members_name_edit
-        self.members_id_combox = members_id_combox
-        members_group_layout_row2.addWidget(members_name_edit)
-
-        members_id_combox.currentTextChanged.connect(lambda e:members_name_edit.setText(self.item.m_scene_manager.findItem(int(e)).get_name()))
-        
-
-
-        self.visibility_checkbox     = QCheckBox(parent=page,text="是否可见")
-        self.visibility_checkbox.setChecked(current_member_item.get_visibility())
-        self.visibility_checkbox.clicked.connect(self.handle_member_visibility_change)
-        members_id_combox.currentTextChanged.connect(lambda e:self.visibility_checkbox.setChecked(self.item.m_scene_manager.findItem(int(e)).get_visibility()))
-
-        members_group_layout_row3.addWidget(self.visibility_checkbox)
-
-        members_layout.addLayout(members_group_layout_row1)
-        members_layout.addLayout(members_group_layout_row2)
-        members_layout.addLayout(members_group_layout_row3)
-        layout_row1.addWidget(members_GroupBox)
-
-        
-        
-        h_spacer = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Preferred)
-        v_spacer = QSpacerItem(20, 20, QSizePolicy.Preferred, QSizePolicy.Expanding)
-        layout_row1.addSpacerItem(h_spacer)
-
-        layout.addLayout(layout_row1)
-
-        layout.addSpacerItem(v_spacer)
-        return page
-
-    def refresh_member_name_text(self):
-        """组名改变后刷新只读的组员名称显示。"""
-
-        if not hasattr(self, "members_name_edit"):
-            return
-        member_id = self.members_id_combox.currentText().strip()
-        if not member_id:
-            return
-        member = self.item.m_scene_manager.findItem(int(member_id))
-        if member is not None:
-            self.members_name_edit.setText(member.get_name())
-
-    def handle_member_visibility_change(self):
-        item2set =  self.item.m_scene_manager.findItem(int(self.members_id_combox.currentText()))
-        item2set.set_visibility(self.visibility_checkbox.isChecked())
-
-
-
-class CirclePropertyItem(PropertyItem):
-    """文本属性窗口 - 优化布局"""
-    def __init__(self, parent=None,item:circle_element=None):
-        super().__init__(item=item)
-        self.navi = None
-    
-    @Property(float)
-    def head_posX(self):
-        return self.item.get_scene_head_pos().x()
-    @head_posX.setter
-    def head_posX(self, val):
-        if self.item.get_scene_head_pos().x() != val:
-            y = self.item.get_scene_head_pos().y()
-            self.item.change_position(QPointF(val,y))
-    
-    @Property(float)
-    def head_posY(self):
-        return self.item.get_scene_head_pos().y()
-    @head_posY.setter
-    def head_posY(self, val):
-        if self.item.get_scene_head_pos().y() != val:
-            x = self.item.get_scene_head_pos().x()
-            self.item.change_position(QPointF(x,val))
-    
-    # @Property(float)
-    # def radius(self):
-    #     return self.item.radius
-    # @radius.setter
-    # def radius(self, val):
-    #     if self.item.radius != val:
-    #         self.item.change_radius(val)
-           
-    def add_navigation_items(self,navigation):
-        # 添加顶级项
-        categories = [
-            ("属性", "property", [
-                ("外观", "appearance"),
-                ("布局", "layout"),
-                ("其它", "others")
-            ])
-        ]
-        for category, icon, items in categories:
-            category_item = QTreeWidgetItem([category])
-            category_item.setData(0, Qt.UserRole, f"category_{icon}")
-            navigation.navigation_tree.addTopLevelItem(category_item)
-            
-            for item_name, item_key in items:
-                item = QTreeWidgetItem([item_name])
-                item.setData(0, Qt.UserRole, item_key)
-                category_item.addChild(item)
-        
-        # 展开所有顶级项
-        for i in range(navigation.navigation_tree.topLevelItemCount()):
-            navigation.navigation_tree.topLevelItem(i).setExpanded(True)
-            # 创建内容页面
-        self.create_content_pages(navigation)
-        navigation.select_preferred_page()
-        navigation.destory_current.connect(self.on_destory_current)
-        self.navi = navigation
-
-        
-    def on_destory_current(self):
-        self.item =None
-        self.navi.destory_current.disconnect(self.on_destory_current)
-    
-    def create_content_pages(self,navi):
-        # 创建内容页面
-        navi.add_page("appearance", "外观", self.create_appearance_page())
-        navi.add_page("layout",     "布局"    , self.create_layout_page())
-        navi.add_page("others",     "其它"    , self.create_others_page()    )
-    
-    
-    def create_appearance_page(self):
-        page   = QWidget()
-        layout = QVBoxLayout(page)
-        bg_color_layout   = QHBoxLayout()
-        appearance        = QGroupBox("外观")
-        appearance_layout = QVBoxLayout()
-        line_color_layout = QHBoxLayout()
-        line_color_layout.addWidget(QLabel("颜色："))
-        fill_checkbox     = QCheckBox(parent=page,text="是否填充")
-        fill_checkbox.setChecked(self.item.get_fill())
-        fill_checkbox.clicked.connect(lambda:self.item.set_fill(fill_checkbox.isChecked()))
-        # 字体颜色
-        self.line_color_btn = self.create_color_button(self.item.get_color())
-        self.line_color_btn.clicked.connect(lambda: self.select_line_color(page,False))
-        bg_color_layout.addWidget(QLabel("背景颜色"))
-        self.update_line_color_ui(False)
-
-        self.bg_color_btn   = self.create_color_button(self.item.get_fill_color())
-        self.bg_color_btn.clicked.connect(lambda: self.select_line_color(page,True))
-
-        self.line_width_spinBox     = QSpinBox()
-        self.line_width_spinBox.valueChanged.connect(lambda:setattr(self,"lineWidth" ,self.line_width_spinBox.value()) )
-        self.line_width_spinBox.setValue(self.lineWidth)
-
-        self.opacity_spinBox     = QSpinBox()
-        self.opacity_spinBox.setRange(0,255)
-        self.opacity_spinBox.valueChanged.connect(lambda:setattr(self,"opacity" ,self.opacity_spinBox.value()) )
-        self.opacity_spinBox.setValue(self.opacity)
-
-        line_color_layout.addWidget(self.line_color_btn)
-        line_color_layout.addWidget(QLabel("线宽："))
-        line_color_layout.addWidget(self.line_width_spinBox)
-
-        
-        bg_color_layout.addWidget(self.bg_color_btn)
-        bg_color_layout.addWidget(QLabel("透明度："))
-        bg_color_layout.addWidget(self.opacity_spinBox)
-
-        appearance_layout.addWidget(fill_checkbox)
-        appearance_layout.addLayout(line_color_layout)
-        appearance_layout.addLayout(bg_color_layout)
-        appearance.setLayout(appearance_layout)
-        layout.addWidget(appearance)
-        
-        return page
-
-    def create_color_button(self, color):
-        """创建颜色选择按钮"""
-        btn = QPushButton()
-        btn.setFixedSize(30, 30)
-        
-        # 确保 color 是 QColor 类型
-        if isinstance(color, str):
-            color = QColor(color)
-        elif isinstance(color, int):
-            color = QColor(color)
-        elif not isinstance(color, QColor):
-            color = QColor("#000000")  # 默认黑色
-            
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color.name()};
-                border: 1px solid #adb5bd;
-                border-radius: 4px;
-            }}
-        """)
-        return btn
-    
-    def update_line_color_ui(self,is_bg_color):
-        """从对象更新字体颜色UI"""
-        if not is_bg_color:
-            color = self.item.get_color() 
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.line_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-        else:
-            color = self.item.get_fill_color()
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-          
-    def select_line_color(self,parent,is_bg_color):
-        current_color = self.item.get_color()
-        color = QColorDialog.getColor(current_color, parent)
-        if color.isValid():
-            self.item.set_color(color) if not is_bg_color else self.item.set_fill_color(color)
-            if not is_bg_color:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.line_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-            else:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-    
-    def create_layout_page(self):
-        page = QWidget()
-        layout  = QVBoxLayout(page)
-        layout1 = QHBoxLayout()
-        # 目录
-        start_position_GroupBox = QGroupBox("位置")
-        start_position_layout  = QVBoxLayout(start_position_GroupBox)
-        start_positionX_layout = QHBoxLayout()
-        start_positionX_layout.addWidget(QLabel("X:"))
-        start_positionX = QLineEdit()
-        start_positionX_layout.addWidget(start_positionX)
-        start_positionY_layout = QHBoxLayout()
-        start_positionY_layout.addWidget(QLabel("Y:"))
-        start_positionY = QLineEdit()
-        start_positionY_layout.addWidget(start_positionY)
-        start_position_layout.addLayout(start_positionX_layout)
-        start_position_layout.addLayout(start_positionY_layout)
-
-        size_GroupBox = QGroupBox("尺寸")
-        size_layout = QVBoxLayout(size_GroupBox)
-        width_layout = QHBoxLayout()
-        width_layout.addWidget(QLabel("W:"))
-        width = QLineEdit()
-        width_layout.addWidget(width)
-        height_layout = QHBoxLayout()
-        height_layout.addWidget(QLabel("H:"))
-        height = QLineEdit()
-        height_layout.addWidget(height)
-        size_layout.addLayout(width_layout)
-        size_layout.addLayout(height_layout)
-        
-        layout1.addWidget(start_position_GroupBox)
-        layout1.addWidget(size_GroupBox)
-       
-        layout.addLayout(layout1)
-        start_positionX.setText( f"{self.item.get_scene_head_pos().x():.1f}")
-        start_positionY.setText( f"{self.item.get_scene_head_pos().y():.1f}")
-        start_positionX.editingFinished.connect(lambda:setattr(self,"head_posX" , float(start_positionX.text())) )
-        start_positionY.editingFinished.connect(lambda:setattr(self,"head_posY" , float(start_positionY.text())) )
-
-        width.setText( f"{self.sizeWidth:.1f}")
-        height.setText( f"{self.sizeHeight:.1f}")
-       
-
-        width.editingFinished.connect(lambda:setattr(self,"sizeWidth" , float(width.text())) )
-        
-        height.editingFinished.connect(lambda:setattr(self,"sizeHeight" , float(height.text())) )
-
-
-        
-        return page
-    # def create_layout_page(self):
-        
-    #     page = QWidget()
-    #     layout  = QVBoxLayout(page)
-    #     layout1 = QHBoxLayout()
-    #     # 目录
-    #     start_position_GroupBox = QGroupBox("位置")
-    #     start_position_layout  = QVBoxLayout(start_position_GroupBox)
-    #     start_positionX_layout = QHBoxLayout()
-    #     start_positionX_layout.addWidget(QLabel("X:"))
-    #     start_positionX = QLineEdit()
-    #     start_positionX_layout.addWidget(start_positionX)
-    #     start_positionY_layout = QHBoxLayout()
-    #     start_positionY_layout.addWidget(QLabel("Y:"))
-    #     start_positionY = QLineEdit()
-    #     start_positionY_layout.addWidget(start_positionY)
-    #     start_position_layout.addLayout(start_positionX_layout)
-    #     start_position_layout.addLayout(start_positionY_layout)
-
-    #     radius_GroupBox = QGroupBox("半径")
-
-    #     radius_GroupBox_layout  = QVBoxLayout(radius_GroupBox)
-    #     radius_layout   =QHBoxLayout()
-    #     radius_layout.addWidget(QLabel("r:"))
-    #     radius = QLineEdit()
-    #     radius_layout.addWidget(radius)
-        
-    #     radius_GroupBox_layout.addLayout(radius_layout )
-    #     layout1.addWidget(start_position_GroupBox)
-    #     layout1.addWidget(radius_GroupBox)
-       
-    #     layout.addLayout(layout1)
-    #     start_positionX.setText( f"{self.item.get_scene_center_pos().x():.1f}")
-    #     start_positionY.setText( f"{self.item.get_scene_center_pos().y():.1f}")
-    #     start_positionX.editingFinished.connect(lambda:setattr(self,"center_posX" , float(start_positionX.text())) )
-    #     start_positionY.editingFinished.connect(lambda:setattr(self,"center_posY" , float(start_positionY.text())) )
-
-    #     radius.setText( f"{self.radius:.1f}")
-      
-
-    #     radius.editingFinished.connect(lambda:setattr(self,"radius" , float(radius.text())) )
-       
-    #     return page
-
-    def create_others_page(self):
-       
-        page    = QWidget()
-        layout  = QVBoxLayout(page)
-        layout_row1 = QHBoxLayout()
-
-        others_GroupBox = QGroupBox("其它")
-        others_layout  = QVBoxLayout(others_GroupBox)
-
-        group_layout_row1 = QHBoxLayout()
-        group_layout_row1.addWidget(QLabel("Z值："))
-        self.zValue_spinBox  = QSpinBox()
-        self.zValue_spinBox.setRange(0,9999)
-        group_layout_row1.addWidget(self.zValue_spinBox)
-        self.zValue_spinBox.setEnabled(False)
-        self.zValue_spinBox.setValue(self.item.zValue())
-
-        group_layout_row2 = QHBoxLayout()
-        group_layout_row2.addWidget(QLabel("id："))
-        self.id_spinBox  = QSpinBox()
-        self.id_spinBox.setRange(0,9999)
-        group_layout_row2.addWidget(self.id_spinBox)
-        self.id_spinBox.setEnabled(False)
-        self.id_spinBox.setValue(self.item.id())
-
-        group_layout_row3 = QHBoxLayout()
-        group_layout_row3.addWidget(QLabel("名称："))
-        name_edit  = QLineEdit()
-        group_layout_row3.addWidget(name_edit)
-        name_edit.setText(self.item.get_name())
-        name_edit.editingFinished.connect(lambda: self.apply_name_edit(name_edit))
-
-        others_layout.addLayout(group_layout_row1)
-        others_layout.addLayout(group_layout_row2)
-        others_layout.addLayout(group_layout_row3)
-
-        layout_row1.addWidget(others_GroupBox)
-
-        h_spacer = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Preferred)
-        v_spacer = QSpacerItem(20, 20, QSizePolicy.Preferred, QSizePolicy.Expanding)
-        layout_row1.addSpacerItem(h_spacer)
-
-        layout.addLayout(layout_row1)
-
-        layout.addSpacerItem(v_spacer)
-        return page
+        combo.currentIndexChanged.connect(lambda _index: sync_fields())
+        visible_check.toggled.connect(apply_visibility)
+        listing.currentRowChanged.connect(
+            lambda row: combo.setCurrentIndex(row) if 0 <= row < combo.count() else None
+        )
+        sync_fields()
+        return card
 
 
 class ImagePropertyItem(PropertyItem):
-    """文本属性窗口 - 优化布局"""
-    def __init__(self, parent=None,item:image_element=None):
-        super().__init__(item=item)
-        self.navi = None
-      
-    @Property(float)
-    def head_posX(self):
-        return self.item.get_scene_head_pos().x()
-    @head_posX.setter
-    def head_posX(self, val):
-        if self.item.get_scene_head_pos().x() != val:
-            y = self.item.get_scene_head_pos().y()
-            self.item.change_position(QPointF(val,y))
-    
-    @Property(float)
-    def head_posY(self):
-        return self.item.get_scene_head_pos().y()
-    @head_posY.setter
-    def head_posY(self, val):
-        if self.item.get_scene_head_pos().y() != val:
-            x = self.item.get_scene_head_pos().x()
-            self.item.change_position(QPointF(x,val))
-    
-    
-         
-    def add_navigation_items(self,navigation):
-        # 添加顶级项
-        categories = [
-            ("属性", "property", [
-                ("外观", "appearance"),
-                ("布局", "layout"),
-                ("其它", "others")
-            ])
-        ]
-        for category, icon, items in categories:
-            category_item = QTreeWidgetItem([category])
-            category_item.setData(0, Qt.UserRole, f"category_{icon}")
-            navigation.navigation_tree.addTopLevelItem(category_item)
-            
-            for item_name, item_key in items:
-                item = QTreeWidgetItem([item_name])
-                item.setData(0, Qt.UserRole, item_key)
-                category_item.addChild(item)
-        
-        # 展开所有顶级项
-        for i in range(navigation.navigation_tree.topLevelItemCount()):
-            navigation.navigation_tree.topLevelItem(i).setExpanded(True)
-            # 创建内容页面
-        self.create_content_pages(navigation)
-        navigation.select_preferred_page()
-        navigation.destory_current.connect(self.on_destory_current)
-        self.navi = navigation
+    """图片：源文件 + 填充色 + 尺寸。"""
 
+    def __init__(self, parent=None, item: image_element = None):
+        super().__init__(parent=parent, item=item)
 
-    def on_destory_current(self):
-        self.item =None
-        self.navi.destory_current.disconnect(self.on_destory_current)
-
-    def create_content_pages(self,navi):
-        # 创建内容页面
-        navi.add_page("appearance", "外观", self.create_appearance_page())
-        navi.add_page("layout",     "布局"    , self.create_layout_page())
-        navi.add_page("others",     "其它"    , self.create_others_page()    )
-    
-    
     def create_appearance_page(self):
-        page   = QWidget()
-        layout = QVBoxLayout(page)
-        bg_color_layout   = QHBoxLayout()
-        appearance        = QGroupBox("外观")
-        appearance_layout = QVBoxLayout()
-        row1_layout       = QHBoxLayout()
-      
-        fill_checkbox     = QCheckBox(parent=page,text="是否填充")
-        fill_checkbox.setChecked(self.item.get_fill())
-        fill_checkbox.clicked.connect(lambda:self.item.set_fill(fill_checkbox.isChecked()))
+        page = PropertyPage()
 
-        btn_select_image = QPushButton(text="选择图片")
-        btn_select_image.setFixedSize(30, 25)
-        btn_select_image.clicked.connect(self.select_image)
-        self.image_path_show = QLineEdit()
-        self.image_path_show.setEnabled(False)
-        self.image_path_show.setText(self.item.image_path())
-        
-        bg_color_layout.addWidget(QLabel("背景颜色"))
-       
-
-        self.bg_color_btn   = self.create_color_button(self.item.get_fill_color())
-        self.bg_color_btn.clicked.connect(lambda: self.select_line_color(page,True))
-
-       
-        self.opacity_spinBox     = QSpinBox()
-        self.opacity_spinBox.setRange(0,255)
-        self.opacity_spinBox.valueChanged.connect(lambda:setattr(self,"opacity" ,self.opacity_spinBox.value()) )
-        self.opacity_spinBox.setValue(self.opacity)
-
-       
-
-        
-        bg_color_layout.addWidget(self.bg_color_btn)
-        bg_color_layout.addWidget(QLabel("透明度："))
-        bg_color_layout.addWidget(self.opacity_spinBox)
-
-        row1_layout.addWidget(fill_checkbox)
-        row1_layout.addWidget(self.image_path_show)
-        row1_layout.addWidget(btn_select_image)
-        appearance_layout.addLayout(row1_layout)
-
-        appearance_layout.addLayout(bg_color_layout)
-        appearance.setLayout(appearance_layout)
-        layout.addWidget(appearance)
-        
+        source = SectionCard("图片来源")
+        path_edit = make_line(self.item.image_path(), read_only=True, tooltip="相对程序目录的路径，随页面一起保存")
+        browse = QPushButton("浏览…")
+        browse.setObjectName("propBrowseButton")
+        browse.setFixedHeight(FIELD_HEIGHT)
+        browse.setMinimumWidth(64)
+        browse.clicked.connect(self.select_image)
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+        row_layout.addWidget(path_edit, 1)
+        row_layout.addWidget(browse)
+        source.add_widget(row)
+        source.add_hint("支持 PNG；路径按相对目录保存，换机器打开时请连同资源目录一起拷贝。")
+        page.add_card(source)
+        page.add_card(self._appearance_card())
         return page
-
-    def create_color_button(self, color):
-        """创建颜色选择按钮"""
-        btn = QPushButton()
-        btn.setFixedSize(30, 30)
-        
-        # 确保 color 是 QColor 类型
-        if isinstance(color, str):
-            color = QColor(color)
-        elif isinstance(color, int):
-            color = QColor(color)
-        elif not isinstance(color, QColor):
-            color = QColor("#000000")  # 默认黑色
-            
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color.name()};
-                border: 1px solid #adb5bd;
-                border-radius: 4px;
-            }}
-        """)
-        return btn
-    
-    def update_line_color_ui(self,is_bg_color):
-        """从对象更新字体颜色UI"""
-        if not is_bg_color:
-            color = self.item.get_color() 
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.line_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-        else:
-            color = self.item.get_fill_color()
-            color_code = color.name() if isinstance(color, QColor) else "#000000"
-            self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-          
-    def select_line_color(self,parent,is_bg_color):
-        current_color = self.item.get_color()
-        color = QColorDialog.getColor(current_color, parent)
-        if color.isValid():
-            self.item.set_color(color) if not is_bg_color else self.item.set_fill_color(color)
-            if not is_bg_color:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.line_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-            else:
-                color_code = color.name() if isinstance(color, QColor) else "#000000"
-                self.bg_color_btn.setStyleSheet(f"background-color: {color_code}; border: 1px solid #adb5bd; border-radius: 4px;")
-    
 
     def select_image(self):
         import sys
+
         parent = self.navi if self.navi else None
-        file_path, _ = QFileDialog.getOpenFileName(
-            parent,
-            "选择图片", 
-            "", 
-            "图片文件 (*.png);;所有文件 (*)"
-        )
-        if getattr(sys, 'frozen', False):
+        file_path, _ = QFileDialog.getOpenFileName(parent, "选择图片", "", "图片文件 (*.png)")
+        if not file_path:
+            return
+        if getattr(sys, "frozen", False):
             # 打包后的可执行文件路径（如 PyInstaller）
             base_dir = os.path.dirname(sys.executable)
         else:
             # 脚本文件所在路径
             base_dir = os.path.dirname(os.path.abspath(__file__))
-        print(base_dir)
-        if file_path:
-            # 转换为相对于项目根目录的相对路径
-            rel_path = os.path.relpath(file_path, base_dir)
-            self.item.set_image_path(rel_path)
-            self.image_path_show.setText(rel_path)
-            return
-    
-    
-    def create_layout_page(self):
-        page = QWidget()
-        layout  = QVBoxLayout(page)
-        layout1 = QHBoxLayout()
-        # 目录
-        start_position_GroupBox = QGroupBox("位置")
-        start_position_layout  = QVBoxLayout(start_position_GroupBox)
-        start_positionX_layout = QHBoxLayout()
-        start_positionX_layout.addWidget(QLabel("X:"))
-        start_positionX = QLineEdit()
-        start_positionX_layout.addWidget(start_positionX)
-        start_positionY_layout = QHBoxLayout()
-        start_positionY_layout.addWidget(QLabel("Y:"))
-        start_positionY = QLineEdit()
-        start_positionY_layout.addWidget(start_positionY)
-        start_position_layout.addLayout(start_positionX_layout)
-        start_position_layout.addLayout(start_positionY_layout)
-
-        size_GroupBox = QGroupBox("尺寸")
-        size_layout = QVBoxLayout(size_GroupBox)
-        width_layout = QHBoxLayout()
-        width_layout.addWidget(QLabel("W:"))
-        width = QLineEdit()
-        width_layout.addWidget(width)
-        height_layout = QHBoxLayout()
-        height_layout.addWidget(QLabel("H:"))
-        height = QLineEdit()
-        height_layout.addWidget(height)
-        size_layout.addLayout(width_layout)
-        size_layout.addLayout(height_layout)
-        
-        layout1.addWidget(start_position_GroupBox)
-        layout1.addWidget(size_GroupBox)
-       
-        layout.addLayout(layout1)
-        start_positionX.setText( f"{self.item.get_scene_head_pos().x():.1f}")
-        start_positionY.setText( f"{self.item.get_scene_head_pos().y():.1f}")
-        start_positionX.editingFinished.connect(lambda:setattr(self,"head_posX" , float(start_positionX.text())) )
-        start_positionY.editingFinished.connect(lambda:setattr(self,"head_posY" , float(start_positionY.text())) )
-
-        width.setText( f"{self.sizeWidth:.1f}")
-        height.setText( f"{self.sizeHeight:.1f}")
-       
-
-        width.editingFinished.connect(lambda:setattr(self,"sizeWidth" , float(width.text())) )
-        
-        height.editingFinished.connect(lambda:setattr(self,"sizeHeight" , float(height.text())) )
+        rel_path = os.path.relpath(file_path, base_dir)
+        self.item.set_image_path(rel_path)
+        self.item.prepareDirtyChange()
 
 
-        
+class CheckboxPropertyItem(RectPropertyItem):
+    """复选框：外观/布局之外补上勾选相关的交互设置。"""
+
+    def __init__(self, parent=None, item: checkbox_element = None):
+        super().__init__(parent=parent, item=item)
+
+    def navigation_items(self):
+        return [
+            ("常规", "general"),
+            ("外观", "appearance"),
+            ("布局", "layout"),
+            ("交互", "interaction"),
+        ]
+
+    def create_content_pages(self, navi):
+        super().create_content_pages(navi)
+        navi.add_page("interaction", "交互", self.create_interaction_page())
+
+    def create_interaction_page(self):
+        page = PropertyPage()
+        card = SectionCard("勾选状态")
+        toggle = make_check(
+            "运行时点击可切换勾选状态", self.item.is_toggle_enabled(),
+            tooltip="关闭后复选框只做状态指示，点击不会改变勾选",
+        )
+        checked = make_check("当前为勾选状态（设计态初始值）", self.item.is_checked())
+        toggle.toggled.connect(self.item.set_toggle_enabled)
+        checked.toggled.connect(self.item.set_checked)
+        card.add_widget(toggle)
+        card.add_widget(checked)
+        card.add_hint("勾选状态会写进页面数据，运行态按此初始值启动。")
+        page.add_card(card)
         return page
 
-    def create_others_page(self):
-        page    = QWidget()
-        layout  = QVBoxLayout(page)
-        layout_row1 = QHBoxLayout()
 
-        others_GroupBox = QGroupBox("其它")
-        others_layout  = QVBoxLayout(others_GroupBox)
+class WidgetPropertyItem(RectPropertyItem):
+    """嵌入式控件：补上控件文本与承载说明。"""
 
-        group_layout_row1 = QHBoxLayout()
-        group_layout_row1.addWidget(QLabel("Z值："))
-        self.zValue_spinBox  = QSpinBox()
-        self.zValue_spinBox.setRange(0,9999)
-        group_layout_row1.addWidget(self.zValue_spinBox)
-        self.zValue_spinBox.setEnabled(False)
-        self.zValue_spinBox.setValue(self.item.zValue())
+    def __init__(self, parent=None, item: widget_element = None):
+        super().__init__(parent=parent, item=item)
 
-        group_layout_row2 = QHBoxLayout()
-        group_layout_row2.addWidget(QLabel("id："))
-        self.id_spinBox  = QSpinBox()
-        group_layout_row2.addWidget(self.id_spinBox)
-        self.id_spinBox.setEnabled(False)
-        self.id_spinBox.setValue(self.item.id())
+    def navigation_items(self):
+        return [
+            ("常规", "general"),
+            ("外观", "appearance"),
+            ("布局", "layout"),
+            ("控件", "widget"),
+        ]
 
-        group_layout_row3 = QHBoxLayout()
-        group_layout_row3.addWidget(QLabel("名称："))
-        name_edit  = QLineEdit()
-        group_layout_row3.addWidget(name_edit)
-        name_edit.setText(self.item.get_name())
-        name_edit.editingFinished.connect(lambda: self.apply_name_edit(name_edit))
+    def create_content_pages(self, navi):
+        super().create_content_pages(navi)
+        navi.add_page("widget", "控件", self.create_widget_page())
 
-        others_layout.addLayout(group_layout_row1)
-        others_layout.addLayout(group_layout_row2)
-        others_layout.addLayout(group_layout_row3)
+    def create_widget_page(self):
+        page = PropertyPage()
+        card = SectionCard("控件内容")
+        text_edit = make_textarea(
+            self.item.widget_text(),
+            placeholder="显示在控件上的多行文字",
+        )
+        text_edit.textChanged.connect(
+            lambda: self.item.set_widget_text(text_edit.toPlainText())
+        )
+        card.add_row(("文本", text_edit))
 
-        layout_row1.addWidget(others_GroupBox)
+        # 字体大小
+        font_size = make_int(
+            self.item.widget_font_size(),
+            minimum=6,
+            maximum=200,
+            suffix=" pt",
+            tooltip="默认控件的字号",
+        )
+        font_size.valueChanged.connect(
+            lambda v: self.item.set_widget_font_size(v)
+        )
+        card.add_row(("字号", font_size))
 
-        h_spacer = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Preferred)
-        v_spacer = QSpacerItem(20, 20, QSizePolicy.Preferred, QSizePolicy.Expanding)
-        layout_row1.addSpacerItem(h_spacer)
+        # 文字颜色
+        color_field = ColorField(QColor(self.item.widget_color()))
+        color_field.colorChanged.connect(
+            lambda c: self.item.set_widget_color(c)
+        )
+        card.add_row(("文字色", color_field))
 
-        layout.addLayout(layout_row1)
+        # 背景色
+        background_field = ColorField(QColor(self.item.widget_background()))
+        background_field.colorChanged.connect(
+            lambda c: self.item.set_widget_background(c)
+        )
+        card.add_row(("背景色", background_field))
 
-        layout.addSpacerItem(v_spacer)
+        card.add_hint(
+            "控件图元在运行态挂载真实 Qt 控件（默认是只读的多行文本），"
+            "可以滚动、选中、复制；设计态只画占位框。几何由「布局」页的宽高决定。"
+            "字号、文字色、背景色只作用于默认控件，自定义控件可忽略。"
+        )
+        page.add_card(card)
         return page

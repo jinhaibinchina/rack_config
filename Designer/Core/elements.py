@@ -1197,7 +1197,7 @@ class widget_element(rect_element):
         elem = widget_element()
         elem.set_widget_factory(lambda host: QPushButton("确定", host))
 
-    默认控件是一个 ``QLineEdit``，仅作演示，可按需替换成任意 QWidget。
+    默认控件是一个只读的多行 ``QTextEdit``，仅作演示，可按需替换成任意 QWidget。
     """
 
     count = 0
@@ -1207,15 +1207,23 @@ class widget_element(rect_element):
         widget_element.count += 1
         self.type = "widget"
 
-        # 默认显示的文字（由默认 QLineEdit 承载；自定义控件可忽略）。
+        # 默认显示的文字（由默认只读多行文本控件承载；自定义控件可忽略）。
         self._widget_text = ""
         # 控件类型键，便于将来按类型恢复不同控件。
-        self._widget_type_key = "lineedit"
+        self._widget_type_key = "textedit"
+
+        # 默认控件的字体大小与配色（只作用于默认只读多行文本控件；
+        # 自定义控件可自行忽略）。
+        self._widget_font_size = 12
+        self._widget_color = "#000000"      # 文字颜色
+        self._widget_background = "#ffffff"  # 背景色
 
         # 承载层惰性创建：只有进入运行模式或显式调用 ``_ensure_layer`` 时才
         # 实例化，避免设计模式白白创建一堆 QGraphicsView。
         self._layer = None
         self._widget_factory = None
+        # 只读态：设计模式下控件仅展示（鼠标穿透），运行模式恢复可交互。
+        self._widget_readonly = False
 
         # 默认控件工厂：一个可编辑的单行输入框，用于演示。
         self.set_widget_factory(self._default_widget_factory)
@@ -1230,11 +1238,55 @@ class widget_element(rect_element):
     # ------------------------------------------------------------------
     # 控件工厂
     # ------------------------------------------------------------------
+    # 控件类型键 → 工厂方法。扩展新控件时在此登记即可，工具箱与序列化
+    # 通过 ``_widget_type_key`` 复用同一套分发。
+    WIDGET_CONTROL_TYPES = (
+        "textedit", "lineedit", "checkbox", "combobox", "pushbutton",
+        "label", "spinbox",
+    )
+
     def _default_widget_factory(self, host) -> QWidget:
-        line = QLineEdit(host)
-        line.setPlaceholderText("请输入…")
-        line.setText(self._widget_text)
-        return line
+        """按 ``_widget_type_key`` 创建对应的真实 Qt 控件。"""
+        widget = self._build_control(host)
+        self._apply_text(widget)
+        self._apply_style(widget)
+        return widget
+
+    def _build_control(self, host) -> QWidget:
+        """只负责构造控件本体（不含文本/样式，由调用方统一补上）。"""
+        key = getattr(self, "_widget_type_key", "textedit")
+        if key == "lineedit":
+            return QLineEdit(host)
+        if key == "checkbox":
+            return QCheckBox(host)
+        if key == "combobox":
+            return QComboBox(host)
+        if key == "pushbutton":
+            return QPushButton(host)
+        if key == "label":
+            return QLabel(host)
+        if key == "spinbox":
+            return QSpinBox(host)
+        # 默认：只读多行文本（可滚动/选中/复制）。
+        editor = QTextEdit(host)
+        editor.setReadOnly(True)
+        editor.setPlaceholderText("只读多行文本…")
+        return editor
+
+    def set_widget_type(self, type_key: str):
+        """切换默认控件类型（lineedit/checkbox/combobox/pushbutton/textedit/label/spinbox）。
+
+        只改类型键，控件本体由下次 ``_rebuild_widget`` 按新 key 重建；
+        若承载层已存在则立即重建。
+        """
+        if type_key not in self.WIDGET_CONTROL_TYPES:
+            type_key = "textedit"
+        self._widget_type_key = type_key
+        if self._layer is not None:
+            self._rebuild_widget()
+
+    def widget_type(self) -> str:
+        return getattr(self, "_widget_type_key", "textedit")
 
     def set_widget_factory(self, factory):
         """设置控件工厂。``factory(host_widget) -> QWidget``。
@@ -1248,9 +1300,8 @@ class widget_element(rect_element):
     def set_widget_text(self, text: str):
         """设置默认控件的文本内容（对自定义控件无效）。"""
         self._widget_text = str(text)
-        widget = self._leaf_widget()
-        if isinstance(widget, QLineEdit):
-            widget.setText(self._widget_text)
+        self._apply_text(self._leaf_widget())
+        self._auto_fit_size()
 
     def widget_text(self) -> str:
         return self._widget_text
@@ -1259,6 +1310,110 @@ class widget_element(rect_element):
         """返回当前真正的控件实例（未创建时为 None）。"""
         layer = self._layer
         return None if layer is None else layer.widget
+
+    def _apply_text(self, widget) -> None:
+        """把 ``_widget_text`` 写回默认控件（未创建时跳过）。
+
+        按控件类型区分写回方式：
+        - QTextEdit/QPlainTextEdit → setPlainText
+        - QLineEdit → setText
+        - QCheckBox / QPushButton / QLabel → 文本即标题（空则用默认标题）
+        - QComboBox → 文本按行拆成下拉选项
+        - QSpinBox → 文本作为数值范围/初值（见 _apply_spinbox）
+        """
+        if widget is None:
+            return
+        text = self._widget_text
+        if isinstance(widget, QComboBox):
+            items = [line for line in text.splitlines() if line.strip()]
+            current = [widget.itemText(i) for i in range(widget.count())]
+            if items != current:
+                widget.blockSignals(True)
+                widget.clear()
+                widget.addItems(items or ["选项 1"])
+                widget.blockSignals(False)
+        elif isinstance(widget, QSpinBox):
+            self._apply_spinbox(widget, text)
+        elif isinstance(widget, QCheckBox):
+            widget.setText(text or "选项")
+        elif isinstance(widget, QPushButton):
+            widget.setText(text or "按钮")
+        elif isinstance(widget, QLabel):
+            widget.setText(text or "标签")
+        elif isinstance(widget, QLineEdit):
+            widget.setText(text)
+        elif isinstance(widget, QPlainTextEdit):
+            widget.setPlainText(text)
+        elif isinstance(widget, QTextEdit):
+            widget.setPlainText(text)
+
+    def _apply_spinbox(self, widget: "QSpinBox", text: str) -> None:
+        """把 ``_widget_text`` 解析成 QSpinBox 的范围与初值。
+
+        约定格式（每行一个字段，``key=value``）：
+        - ``min=`` / ``max=``：数值范围（缺省 0 / 99）
+        - ``value=``：初始值（缺省取 min）
+        若文本为空或非 key=value 形式，则保持控件默认值。
+        """
+        cfg: dict[str, str] = {}
+        for line in text.splitlines():
+            line = line.strip()
+            if "=" in line:
+                key, _, value = line.partition("=")
+                cfg[key.strip().lower()] = value.strip()
+
+        def _as_int(raw: str, default: int) -> int:
+            try:
+                return int(float(raw))
+            except (TypeError, ValueError):
+                return default
+
+        minimum = _as_int(cfg.get("min", ""), widget.minimum())
+        maximum = _as_int(cfg.get("max", ""), widget.maximum())
+        if minimum > maximum:
+            minimum, maximum = maximum, minimum
+        widget.setRange(minimum, maximum)
+        value = _as_int(cfg.get("value", ""), minimum)
+        widget.setValue(max(minimum, min(value, maximum)))
+
+    def _apply_style(self, widget) -> None:
+        """把字体大小、文字色、背景色应用到默认控件（未创建时跳过）。"""
+        if widget is None:
+            return
+        color = QColor(self._widget_color)
+        background = QColor(self._widget_background)
+        if not color.isValid():
+            color = QColor("#000000")
+        if not background.isValid():
+            background = QColor("#ffffff")
+        widget.setStyleSheet(
+            f"color: {color.name()};"
+            f"background-color: {background.name()};"
+            f"font-size: {int(self._widget_font_size)}pt;"
+        )
+
+    # -- 字体 / 配色 ----------------------------------------------------
+    def set_widget_font_size(self, size: int):
+        self._widget_font_size = int(size)
+        self._apply_style(self._leaf_widget())
+        self._auto_fit_size()
+
+    def widget_font_size(self) -> int:
+        return self._widget_font_size
+
+    def set_widget_color(self, color) -> None:
+        self._widget_color = color.name() if isinstance(color, QColor) else str(color)
+        self._apply_style(self._leaf_widget())
+
+    def widget_color(self) -> str:
+        return self._widget_color
+
+    def set_widget_background(self, color) -> None:
+        self._widget_background = color.name() if isinstance(color, QColor) else str(color)
+        self._apply_style(self._leaf_widget())
+
+    def widget_background(self) -> str:
+        return self._widget_background
 
     # ------------------------------------------------------------------
     # 承载层的挂载 / 释放
@@ -1283,9 +1438,10 @@ class widget_element(rect_element):
         if self._widget_factory is not None:
             child = self._widget_factory(layer.view.viewport())
         layer.set_widget(child)
-        if isinstance(child, QLineEdit):
-            child.setText(self._widget_text)
+        self._apply_text(child)
+        layer.set_interactive(not self._widget_readonly)
         self.sync_widget_geometry()
+        self._auto_fit_size()
 
     def _release_widget(self):
         """释放承载层（图元析构 / 被删除时调用）。"""
@@ -1359,6 +1515,60 @@ class widget_element(rect_element):
         angle = self.sceneTransform().get_rotation_angle()
         layer.apply(center_window, size, scene.scale_factor or 1.0, angle)
 
+    # ------------------------------------------------------------------
+    # 边框自适应：让图元边框贴合真实控件的固有尺寸
+    # ------------------------------------------------------------------
+    def _scene_size_from_view(self, view_w: float, view_h: float) -> QSizeF:
+        """把控件像素尺寸（视图单位，scale=1.0）反推成场景尺寸。
+
+        与 ``_view_design_size`` 的 x/y 交换保持一致（AGV 90° 映射）：
+        控件的宽度对应场景的高度、控件的高度对应场景的宽度。
+        """
+        scene = self.m_scene
+        if scene is None:
+            return QSizeF(0.0, 0.0)
+        units_x = scene.scene_units_per_grid_x
+        units_y = scene.scene_units_per_grid_y
+        grid = scene.grid_size
+        if units_x <= 0 or units_y <= 0 or grid <= 0:
+            return QSizeF(0.0, 0.0)
+        scene_w = view_h * units_x / grid
+        scene_h = view_w * units_y / grid
+        return QSizeF(scene_w, scene_h)
+
+    def _auto_fit_size(self):
+        """按控件的 ``sizeHint`` 更新图元边框（中心锚定）。
+
+        仅在只读态（设计模式）下生效，让边框贴合控件的自然大小；运行模式
+        保持用户手动拉伸的尺寸，不随内容回弹。
+        """
+        if not self._widget_readonly:
+            return
+        widget = self._leaf_widget()
+        if widget is None:
+            return
+        hint = widget.sizeHint()
+        if hint.width() <= 0 or hint.height() <= 0:
+            return
+        scene_size = self._scene_size_from_view(hint.width(), hint.height())
+        if scene_size.width() <= 0.0 or scene_size.height() <= 0.0:
+            return
+
+        w = scene_size.width()
+        h = scene_size.height()
+        # 顶点关于原点对称，保持中心锚定（图元位置不随内容变化漂移）。
+        self.setSize(w, h)
+        half_w = w / 2.0
+        half_h = h / 2.0
+        self._head_pos = QPointF(-half_w, -half_h)
+        self._end_pos = QPointF(half_w, half_h)
+        self._topLeft = self._head_pos
+        self._bottomRight = self._end_pos
+        self._topRight = QPointF(half_w, -half_h)
+        self._bottomLeft = QPointF(-half_w, half_h)
+        self._center_pos = QPointF(0.0, 0.0)
+        self.update_boundingRect()
+
     def set_widget_visible(self, visible: bool):
         """控制真实控件的显隐（模式切换时由场景调用）。"""
         if not visible:
@@ -1370,6 +1580,23 @@ class widget_element(rect_element):
             return
         self.sync_widget_geometry()
         layer.set_visible(True)
+
+    def set_widget_readonly(self, readonly: bool):
+        """控制控件是否只读（设计模式展示 / 运行模式交互）。
+
+        ``readonly=True`` 时控件仅作展示、鼠标事件穿透到场景（图元可正常
+        选中/拖动/缩放）；``False`` 恢复可交互。若承载层尚未创建，则只记录
+        状态，等 ``_rebuild_widget`` 时应用。
+        """
+        self._widget_readonly = bool(readonly)
+        if self._layer is not None:
+            self._layer.set_interactive(not self._widget_readonly)
+            # 切到只读（设计）态时贴合一次控件自然尺寸。
+            if self._widget_readonly:
+                self._auto_fit_size()
+
+    def widget_readonly(self) -> bool:
+        return self._widget_readonly
 
     # ------------------------------------------------------------------
     # 几何变化钩子：拖动 / 移动后同步子窗口
@@ -1390,14 +1617,15 @@ class widget_element(rect_element):
             self.sync_widget_geometry()
 
     # ------------------------------------------------------------------
-    # 绘制：设计模式画占位框（含旋转），运行模式交给真实控件
+    # 绘制：真实控件已挂载显示时跳过占位框，否则退回占位框（兜底）
     # ------------------------------------------------------------------
     def paint(self, painter: QPainter, shine_flag):
         if self.get_visibility() is False:
             super().paint(painter, shine_flag)
             return
-        # 运行模式下该区域由真实控件覆盖，占位框不再参与绘制。
-        if self.m_scene is not None and self.m_scene.mode() == SceneMode.Run:
+        # 真实控件已挂载且可见时，该区域由控件覆盖，占位框不再参与绘制。
+        # （设计模式同样会加载真实控件，因此两种模式都跳过占位框。）
+        if self.has_widget_layer() and self._layer is not None:
             super().paint(painter, shine_flag)
             return
         if not (self.m_veiw_dirty_region.intersects(self.viewBoundingRect().toRect())):
@@ -1458,14 +1686,20 @@ class widget_element(rect_element):
         data = super().to_dict()
         data["widgetText"] = self._widget_text
         # 记录控件类型键，便于将来按类型恢复不同控件。
-        data["widgetType"] = getattr(self, "_widget_type_key", "lineedit")
+        data["widgetType"] = getattr(self, "_widget_type_key", "textedit")
+        data["widgetFontSize"] = int(getattr(self, "_widget_font_size", 12))
+        data["widgetColor"] = getattr(self, "_widget_color", "#000000")
+        data["widgetBackground"] = getattr(self, "_widget_background", "#ffffff")
         return data
 
     @classmethod
     def from_dict(cls, data):
         item = super().from_dict(data)
         item._widget_text = str(data.get("widgetText", ""))
-        item._widget_type_key = str(data.get("widgetType", "lineedit"))
+        item._widget_type_key = str(data.get("widgetType", "textedit"))
+        item._widget_font_size = int(data.get("widgetFontSize", 12))
+        item._widget_color = str(data.get("widgetColor", "#000000"))
+        item._widget_background = str(data.get("widgetBackground", "#ffffff"))
         return item
 
     def clone(self):
@@ -1485,7 +1719,10 @@ class widget_element(rect_element):
         cloned.m_angle_init = self.m_angle_init
         cloned.m_pos_init = self.m_pos_init
         cloned._widget_text = self._widget_text
-        cloned._widget_type_key = getattr(self, "_widget_type_key", "lineedit")
+        cloned._widget_type_key = getattr(self, "_widget_type_key", "textedit")
+        cloned._widget_font_size = getattr(self, "_widget_font_size", 12)
+        cloned._widget_color = getattr(self, "_widget_color", "#000000")
+        cloned._widget_background = getattr(self, "_widget_background", "#ffffff")
         cloned.set_group_id(self.get_group_id())
         cloned.set_zValue(self.zValue())
         for child in self.childItems():

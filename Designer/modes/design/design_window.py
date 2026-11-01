@@ -346,9 +346,9 @@ class DesignWindow(QMainWindow):
             | QDockWidget.DockWidgetClosable
         )
         self.property_dock.setWidget(self.property_panel)
-        self.property_dock.setMinimumHeight(190)
+        self.property_dock.setMinimumHeight(240)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.property_dock)
-        self.resizeDocks([self.property_dock], [250], Qt.Vertical)
+        self.resizeDocks([self.property_dock], [300], Qt.Vertical)
         self._update_property_panel(scene)
 
     def _connect_dock_signals(self) -> None:
@@ -587,6 +587,7 @@ class DesignWindow(QMainWindow):
             self.page_dock.set_current(page_id)
             self._update_grid_actions()
             self._update_property_panel(page.scene)
+            self._connect_property_geometry_signal(page.scene)
             self._refresh_page_counts()
             self._update_status()
             self._update_selection_actions()
@@ -816,6 +817,23 @@ class DesignWindow(QMainWindow):
         self._update_property_panel(scene.current_selected)
         self._update_status()
         self._update_selection_actions()
+
+    def _connect_property_geometry_signal(self, scene) -> None:
+        """把场景的几何变化信号接到属性面板，用于图元拖动/缩放时刷新字段。
+
+        每个场景只连接一次；切回已加载的页面时跳过，避免重复触发。
+        """
+
+        if scene is None or self.property_panel is None:
+            return
+        if not hasattr(self, "_geometry_bound_scenes"):
+            self._geometry_bound_scenes = set()
+        if scene in self._geometry_bound_scenes:
+            return
+        scene.item_GeometryChange.connect(
+            self.property_panel.on_item_geometry_changed
+        )
+        self._geometry_bound_scenes.add(scene)
 
     def _selected_top_level_items(self):
         scene = self.current_page.scene if self.current_page else None

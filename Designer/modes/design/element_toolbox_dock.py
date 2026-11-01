@@ -322,6 +322,43 @@ def _create_tool_icon(key: str) -> QIcon:
         painter.drawLine(12, 12, 17, 18)
         painter.drawLine(17, 18, 21, 14)
         painter.drawEllipse(QRectF(18, 9, 3, 3))
+    elif key == "widget":
+        # 通用控件：矩形 + 中央横线，暗示可交互的输入区域。
+        painter.drawRect(QRectF(4, 6, 20, 16))
+        painter.drawLine(7, 12, 21, 12)
+        painter.drawLine(7, 17, 17, 17)
+    elif key == "widget_lineedit":
+        painter.drawRect(QRectF(4, 9, 20, 10))
+        painter.drawLine(7, 14, 21, 14)
+    elif key == "widget_checkbox":
+        painter.drawRect(QRectF(5, 5, 18, 18))
+        painter.drawLine(8, 14, 12, 18)
+        painter.drawLine(12, 18, 20, 8)
+    elif key == "checkbox":
+        painter.drawRect(QRectF(5, 5, 18, 18))
+        painter.drawLine(8, 14, 12, 18)
+        painter.drawLine(12, 18, 20, 8)
+    elif key == "widget_combobox":
+        painter.drawRect(QRectF(4, 8, 20, 12))
+        painter.drawLine(6, 12, 20, 12)
+        painter.drawLine(19, 11, 16, 14)
+        painter.drawLine(19, 11, 22, 14)
+    elif key == "widget_pushbutton":
+        painter.drawRoundedRect(QRectF(4, 8, 20, 12), 3, 3)
+    elif key == "widget_label":
+        # 标签：无边框文本 "A" + 下划线，暗示纯展示文字。
+        font = painter.font()
+        font.setBold(True)
+        font.setPointSize(15)
+        painter.setFont(font)
+        painter.drawText(QRectF(0, 2, size, size - 6), Qt.AlignCenter, "A")
+        painter.drawLine(6, 22, 22, 22)
+    elif key == "widget_spinbox":
+        # 数字输入：矩形 + 右侧上下箭头，暗示数值微调。
+        painter.drawRect(QRectF(4, 8, 20, 12))
+        painter.drawLine(20, 11, 16, 11)
+        painter.drawLine(20, 13, 16, 17)
+        painter.drawLine(20, 15, 16, 11)
 
     painter.end()
     return QIcon(pixmap)

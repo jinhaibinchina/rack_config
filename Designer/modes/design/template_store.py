@@ -35,6 +35,7 @@ from PySide6.QtCore import QPointF
 from Designer.Core.element import base_element
 from Designer.Core.elements import (
     base_element,
+    checkbox_element,
     circle_element,
     group_element,
     image_element,
@@ -42,8 +43,10 @@ from Designer.Core.elements import (
     rect_element,
     text_element,
     triangle_element,
+    widget_element,
 )
 from Designer.Core.myQuadTreeScene import SceneManager
+from Designer.Core.my_common import SceneMode
 
 
 TEMPLATE_FILE_NAME = "toolbox_templates.json"
@@ -58,6 +61,8 @@ ELEMENT_CLASSES = {
     "text": text_element,
     "image": image_element,
     "group": group_element,
+    "checkbox": checkbox_element,
+    "widget": widget_element,
 }
 
 TYPE_NAME_PREFIX = {
@@ -68,6 +73,8 @@ TYPE_NAME_PREFIX = {
     "circle": "圆",
     "text": "文本",
     "image": "图片",
+    "checkbox": "复选框",
+    "widget": "控件",
 }
 
 # Every ``to_dict`` implementation stores absolute scene coordinates in these
@@ -443,6 +450,13 @@ def create_template_instance(
             item.set_scene_ref(scene)
             item.set_scene_manager_ref(manager)
             item.completed(True)
+            # widget 控件走的是 ``completed(True)``（construct_from_dict=True），
+            # ``SceneManager.addItem`` 里对反序列化路径跳过承载层同步；模板实例化
+            # 同样要挂载真实控件，否则复制出来的控件只画占位框。
+            if isinstance(item, widget_element):
+                readonly = scene.mode() != SceneMode.Run
+                item.set_widget_readonly(readonly)
+                item.set_widget_visible(True)
             created[new_id] = item
 
         # Rebuild parent/child relationships after every item exists.

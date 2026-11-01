@@ -4477,6 +4477,147 @@
                     "zValue": 145.0
                 }
             ]
+        },
+        {
+            "id": "tpl_3",
+            "name": "组_198 (2)",
+            "root_id": 1646,
+            "width": 2060.294809827965,
+            "height": 1626.479249404424,
+            "created_at": "2026-11-01T23:05:02",
+            "items": [
+                {
+                    "id": 1646,
+                    "name": "组_198",
+                    "type": "group",
+                    "parent_id": 0,
+                    "children_ids": [
+                        1645,
+                        1643,
+                        1644
+                    ],
+                    "group_id": 0,
+                    "center_pos": {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "origin_pos": {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "width": 2060.294809827965,
+                    "height": 1626.479249404424,
+                    "rotate": 27.49999999999997,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": false,
+                        "fill_color": "#00ff00",
+                        "opacity": 255,
+                        "cornerRadius": 0.0
+                    },
+                    "zValue": 1646
+                },
+                {
+                    "id": 1643,
+                    "name": "组_198_控件_80",
+                    "type": "widget",
+                    "parent_id": 1646,
+                    "children_ids": [],
+                    "group_id": 1646,
+                    "center_pos": {
+                        "x": 351.941,
+                        "y": 327.179
+                    },
+                    "origin_pos": {
+                        "x": 351.941,
+                        "y": 327.179
+                    },
+                    "width": 768.0,
+                    "height": 1024.0,
+                    "rotate": 27.49999999999997,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": false,
+                        "fill_color": "#00ff00",
+                        "opacity": 255,
+                        "cornerRadius": 0.0
+                    },
+                    "zValue": 1643,
+                    "widgetText": "",
+                    "widgetType": "textedit",
+                    "widgetFontSize": 12,
+                    "widgetColor": "#000000",
+                    "widgetBackground": "#ffffff"
+                },
+                {
+                    "id": 1644,
+                    "name": "组_198_控件_81",
+                    "type": "widget",
+                    "parent_id": 1646,
+                    "children_ids": [],
+                    "group_id": 1646,
+                    "center_pos": {
+                        "x": -579.55,
+                        "y": 87.081
+                    },
+                    "origin_pos": {
+                        "x": -579.55,
+                        "y": 87.081
+                    },
+                    "width": 228.0,
+                    "height": 1248.0,
+                    "rotate": -24.50000000000002,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": false,
+                        "fill_color": "#00ff00",
+                        "opacity": 255,
+                        "cornerRadius": 51.0
+                    },
+                    "zValue": 1644,
+                    "widgetText": "的首付大概烦烦烦",
+                    "widgetType": "pushbutton",
+                    "widgetFontSize": 28,
+                    "widgetColor": "#000000",
+                    "widgetBackground": "#ffffff"
+                },
+                {
+                    "id": 1645,
+                    "name": "组_198_控件_82",
+                    "type": "widget",
+                    "parent_id": 1646,
+                    "children_ids": [],
+                    "group_id": 1646,
+                    "center_pos": {
+                        "x": 1035.264,
+                        "y": -137.85
+                    },
+                    "origin_pos": {
+                        "x": 1085.264,
+                        "y": -137.85
+                    },
+                    "width": 180.0,
+                    "height": 408.0,
+                    "rotate": -3.1805546814635168e-15,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": false,
+                        "fill_color": "#00ff00",
+                        "opacity": 255,
+                        "cornerRadius": 0.0
+                    },
+                    "zValue": 1645,
+                    "widgetText": "",
+                    "widgetType": "checkbox",
+                    "widgetFontSize": 26,
+                    "widgetColor": "#000000",
+                    "widgetBackground": "#ffffff"
+                }
+            ]
         }
     ]
 }

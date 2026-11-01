@@ -29,7 +29,7 @@ if _PROJECT_ROOT not in sys.path:
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLineEdit
+from PySide6.QtWidgets import QApplication, QTextEdit
 
 from Designer.Core.elements import widget_element
 from Designer.Core.my_common import SceneMode
@@ -100,14 +100,18 @@ def main() -> int:
     scene.scale_factor = 1.0
     center_element()
 
-    # --- 1. 设计模式：不创建承载层 -----------------------------------
+    # --- 1. 设计模式：也加载承载层，但只读展示（鼠标穿透） ----------
     scene.set_scene_mode(SceneMode.Design)
-    check("设计模式不创建承载层", item._layer is None)
+    check("设计模式创建承载层", item._layer is not None and item._layer.is_active())
+    check("设计模式控件只读穿透",
+          item._layer is not None
+          and item._layer.widget is not None
+          and item._layer.widget.testAttribute(Qt.WA_TransparentForMouseEvents))
 
     design_children = [
         child for child in scene.children() if type(child).__name__ == "QGraphicsView"
     ]
-    check("设计模式场景下没有 QGraphicsView", not design_children,
+    check("设计模式场景下存在 QGraphicsView（承载层）", bool(design_children),
           f"发现 {len(design_children)} 个")
 
     # --- 2. 运行模式：控件出现且几何正确 -----------------------------
@@ -116,7 +120,7 @@ def main() -> int:
     layer = item._layer
     check("运行模式创建承载层", layer is not None and layer.is_active())
     check("承载视图可见", layer is not None and layer.view.isVisible())
-    check("承载控件是 QLineEdit", isinstance(layer.widget, QLineEdit),
+    check("承载控件是 QTextEdit", isinstance(layer.widget, QTextEdit),
           type(layer.widget).__name__ if layer.widget else "None")
 
     design_size = item._view_design_size()
@@ -157,10 +161,14 @@ def main() -> int:
           f"view.hasFocus={view.hasFocus()}")
 
     target = focus_widget if focus_widget is not None else view
-    layer.widget.setText("")
+    # 默认控件 QTextEdit 是只读的，键盘输入回归前先放开只读。
+    if isinstance(layer.widget, QTextEdit):
+        layer.widget.setReadOnly(False)
+    layer.widget.setPlainText("")
     QTest.keyClicks(target, "AB")
     app.processEvents()
-    check("键盘输入进入控件", layer.widget.text() == "AB", repr(layer.widget.text()))
+    check("键盘输入进入控件", layer.widget.toPlainText() == "AB",
+          repr(layer.widget.toPlainText()))
 
     layer.widget.clearFocus()
     scene.setFocus()

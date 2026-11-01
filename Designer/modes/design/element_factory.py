@@ -33,6 +33,7 @@ class ToolDefinition:
     default_width: float
     default_height: float
     description: str
+    widget_type: Optional[str] = None
 
 
 TOOL_DEFINITIONS = [
@@ -48,7 +49,7 @@ TOOL_DEFINITIONS = [
     ToolDefinition(
         key="checkbox",
         label="复选框",
-        category="基本图元",
+        category="功能控件",
         element_class=checkbox_element,
         default_width=40.0,
         default_height=40.0,
@@ -57,11 +58,71 @@ TOOL_DEFINITIONS = [
     ToolDefinition(
         key="widget",
         label="控件",
-        category="基本图元",
+        category="功能控件",
+        element_class=widget_element,
+        default_width=600.0,
+        default_height=800.0,
+        description="拖拽到画布，嵌入一个真实 Qt 控件（运行时显示并可交互）",
+    ),
+    ToolDefinition(
+        key="widget_lineedit",
+        label="输入框",
+        category="功能控件",
+        element_class=widget_element,
+        default_width=240.0,
+        default_height=60.0,
+        description="拖拽到画布，嵌入单行文本输入框（QLineEdit）",
+        widget_type="lineedit",
+    ),
+    ToolDefinition(
+        key="widget_checkbox",
+        label="勾选框",
+        category="功能控件",
         element_class=widget_element,
         default_width=160.0,
-        default_height=40.0,
-        description="拖拽到画布，嵌入一个真实 Qt 控件（运行时显示并可交互）",
+        default_height=60.0,
+        description="拖拽到画布，嵌入真实勾选框（QCheckBox）",
+        widget_type="checkbox",
+    ),
+    ToolDefinition(
+        key="widget_combobox",
+        label="下拉框",
+        category="功能控件",
+        element_class=widget_element,
+        default_width=240.0,
+        default_height=60.0,
+        description="拖拽到画布，嵌入下拉选择框（QComboBox）",
+        widget_type="combobox",
+    ),
+    ToolDefinition(
+        key="widget_pushbutton",
+        label="按钮",
+        category="功能控件",
+        element_class=widget_element,
+        default_width=160.0,
+        default_height=80.0,
+        description="拖拽到画布，嵌入按钮（QPushButton）",
+        widget_type="pushbutton",
+    ),
+    ToolDefinition(
+        key="widget_label",
+        label="标签",
+        category="功能控件",
+        element_class=widget_element,
+        default_width=240.0,
+        default_height=60.0,
+        description="拖拽到画布，嵌入文本标签（QLabel）",
+        widget_type="label",
+    ),
+    ToolDefinition(
+        key="widget_spinbox",
+        label="数字输入",
+        category="功能控件",
+        element_class=widget_element,
+        default_width=160.0,
+        default_height=60.0,
+        description="拖拽到画布，嵌入数字微调框（QSpinBox）",
+        widget_type="spinbox",
     ),
     ToolDefinition(
         key="triangle",
@@ -111,7 +172,7 @@ TOOL_DEFINITIONS = [
 ]
 
 TOOL_DEFINITIONS_BY_KEY = {definition.key: definition for definition in TOOL_DEFINITIONS}
-TOOL_CATEGORIES = ["基本图元", "文本与素材"]
+TOOL_CATEGORIES = ["基本图元", "功能控件", "文本与素材"]
 
 
 def tools_in_category(category: str) -> list[ToolDefinition]:
@@ -140,6 +201,10 @@ def create_element(
     try:
         item = manager.createItem(definition.element_class)
         pos = QPointF(scene_pos)
+
+        # widget_element 的控件变体：创建后按 key 指定真实控件类型。
+        if definition.widget_type and isinstance(item, widget_element):
+            item.set_widget_type(definition.widget_type)
 
         if isinstance(item, triangle_element):
             # Triangles are defined by three vertices; the toolbox drop creates
@@ -172,6 +237,11 @@ def create_element(
             other.set_selected(False)
         item.set_selected(True)
         scene.set_current_select_item(item)
+        # widget 控件：设计模式下也要立刻挂载真实控件并只读展示，否则新放置的
+        # 控件只会画占位框，看起来"没显示控件"。
+        if isinstance(item, widget_element):
+            item.set_widget_readonly(True)
+            item.set_widget_visible(True)
         scene.update()
         return item
     except Exception as exc:

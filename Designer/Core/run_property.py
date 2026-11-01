@@ -160,10 +160,10 @@ class CabinetPropertyItem(QObject):
         print(f"树控件选择模式: {navigation.navigation_tree.selectionMode()}")
         print(f"树控件焦点策略: {navigation.navigation_tree.focusPolicy()}")
         
-        navigation.select_preferred_page()
+        if not navigation._building_navigation:
+            navigation.select_preferred_page()
         
-        navigation.destory_current.connect(self.on_destory_current)
-        
+        navigation.destory_current.connect(self.on_destory_current)        
         self.handle_itemSelectionChanged()
 
     def debug_mousePressEvent(self, event):
