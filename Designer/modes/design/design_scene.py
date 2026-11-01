@@ -7,7 +7,7 @@ inherited from the existing ``QuadTreeScene``.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, Qt, Signal
+from PySide6.QtCore import QEvent, QPointF, Qt, Signal
 
 # from my_elements_v2 import base_element, group_element
 from Designer.Core.element import base_element
@@ -163,6 +163,83 @@ class DesignScene(QuadTreeScene):
         self.selectionChanged.emit()
         self.update()
 
+    # ------------------------------------------------------------------
+    # Tab cycling inside a selected group
+    # ------------------------------------------------------------------
+    def event(self, event):
+        # Qt 在 QWidget::event 里对 Tab/Backtab 先做焦点遍历，成功就
+        # 地吞掉按键，keyPressEvent 根本收不到。因此必须在更靠前的
+        # event() 层拦截：有组上下文时消费按键做成员切换，否则保持
+        # Tab 原有的焦点导航行为。keyPressEvent 里的同名分支仅覆盖
+        # 焦点遍历失败后的兜底路径（如 sendEvent 直投的场景）。
+        if (
+            event.type() == QEvent.Type.KeyPress
+            and event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab)
+            and not event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            reverse = event.key() == Qt.Key.Key_Backtab or bool(
+                event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+            )
+            if self.cycle_selected_group_member(reverse):
+                event.accept()
+                return True
+        return super().event(event)
+
+    def _tab_context_group(self):
+        """Return the group whose members Tab should cycle, or None.
+
+        The context is either the selected group itself, or the nearest
+        group ancestor of the currently selected member — the latter keeps
+        Tab cycling after the selection has already moved to a member.
+        """
+
+        current = getattr(self, "current_selected", None)
+        if isinstance(current, group_element) and current.get_selected():
+            return current
+        parent = getattr(current, "m_parent", None)
+        while parent is not None:
+            if isinstance(parent, group_element):
+                return parent
+            parent = parent.m_parent
+        return None
+
+    def cycle_selected_group_member(self, reverse: bool = False) -> bool:
+        """Move the selection through a group's members (Tab / Shift+Tab).
+
+        The full cycle is 组 → 成员1 → … → 成员N → 组; Shift+Tab walks it
+        backwards.  Members are visited in creation order (sorted by id).
+        Returns False when there is no group context so the key keeps its
+        default behaviour.
+        """
+
+        group = self._tab_context_group()
+        if group is None:
+            return False
+        members = sorted(
+            (
+                child
+                for child in group.m_children
+                if isinstance(child, base_element) and child.get_selectable()
+            ),
+            key=lambda item: item.id(),
+        )
+        if not members:
+            return False
+
+        current = self.current_selected
+        sequence = [group] + (members[::-1] if reverse else members)
+        if current in sequence:
+            target = sequence[(sequence.index(current) + 1) % len(sequence)]
+        else:
+            target = members[-1] if reverse else members[0]
+
+        for item in self.findChildren(base_element):
+            item.set_selected(False)
+        target.set_selected(True)
+        self.set_current_select_item(target)
+        self.update()
+        return True
+
     def selected_group(self):
         """Return the one selected top-level group, if there is exactly one."""
 
@@ -225,4 +302,11 @@ class DesignScene(QuadTreeScene):
             self.snap_to_current_point()
             event.accept()
             return
+        if event.key() in (Qt.Key_Tab, Qt.Key_Backtab) and not has_ctrl:
+            reverse = event.key() == Qt.Key_Backtab or bool(
+                event.modifiers() & Qt.ShiftModifier
+            )
+            if self.cycle_selected_group_member(reverse):
+                event.accept()
+                return
         super().keyPressEvent(event)

@@ -22,3 +22,20 @@
 - 打包（PyInstaller）必须带 `myDesigner/data2.json`（1.3 MB 场景）；漏了程序能起但画面全空。get_json_path 的查找顺序：exe 同目录 → _MEIPASS → _MEIPASS/myDesigner → cwd
 - hook-snap7.py 里 os.add_dll_directory 只能传**目录**，且要判存在；传 dll 文件路径会 FileNotFoundError 直接把 exe 顶死在启动阶段
 - 场景为空是合法状态（源码里 data2.json 可能还没生成），所有 handle_* 入口都要对 `rack()`/图元返回 None 做兜底，别链式调用
+
+# 设计器 widget 图元（嵌入式 QWidget）
+- 承载方式：`Designer/Core/embedded_widget_layer.py` 的 `EmbeddedWidgetLayer` = 每个控件一个透明 `QGraphicsView` + `QGraphicsProxyWidget`；不再直接 `QWidget(scene)` 当宿主
+- 缩放交 `view.setTransform(scale)`、旋转交 `proxy.setRotation(-angle)`（与 `painter.rotate(-angle)` 同向），文字随缩放矢量放大
+- **承载 view 必须 `StrongFocus`**（view + viewport 都要）。设成 `NoFocus` 时点击只给 proxy 一个"逻辑焦点"（`widget.hasFocus()` 为 True），系统焦点仍留在主场景，`QGraphicsView::keyPressEvent` 收不到按键 → 点得进去但打不了字，英文同样不行
+- `addWidget` 前**不能**先 `setParent`（哪怕 parent 是 viewport），否则 proxy 静默接管失败、控件退化成普通子窗口 → 不旋转
+- `set_widget_factory` 要的是可调用对象 `factory(host) -> QWidget`，不是控件实例；传实例会在重建时报 `TypeError: 'xxx' object is not callable`。延迟创建用闭包/lambda
+- `set_scene_mode(Run)` 在 `load_element_info_run_mode()` **之前**调用时（`RackStoresWindow` 就是这样），切换那一刻场景还是空的，加载完必须补一次 `_sync_embedded_widgets(True)`，否则承载层永远不创建，运行态连占位框都不画 → 看起来"控件没加载出来"。已在 `load_element_info_run_mode` 末尾补
+- **控件上的左键语义**：承载视图把鼠标事件全接走了，场景原本"左键拖动平移"在控件上就失效。`EmbeddedWidgetLayer` 用延迟派发解决：press 先扣住 → 移动超过 `startDragDistance` 判为拖动画布（改 `scene.offset` + `update_coordinate` + `_sync_embedded_widgets_geometry`）→ 没超阈值则在 release 时补发 press/release 给 viewport（照常点击/取焦）。两次快速点击还会补一个 `MouseButtonDblClick`，否则双击在控件里失效。滚轮不拦（冒泡给场景缩放）
+- 控件必须先 `setMinimumSize(1,1)`（给 0,0 无效），否则 `proxy.resize` 被 minimumSizeHint 卡住（QPushButton 宽 80），包围盒偏大、控件被裁
+- 尺寸用 `proxy.resize(w,h)` 驱动，不要 `widget.setFixedSize`（fix 之后 proxy 的 boundingRect 不跟手）
+- 几何：中心 = `pos_viewToWindow(sceneToView(get_scene_center_pos()))`，尺寸 = `scene_size.height/width × grid/units`（AGV 下 w/h 是交换的），view 的 geometry = 旋转后包围盒 × scale
+- 承载层惰性创建：设计模式不建（只画占位框），切 Run 时 `_sync_embedded_widgets(True)` 建并显示；`Delete()` 里显式 `_release_widget()`
+- 视图之间按 zValue 用 `raise_()` 排序（`_restack_embedded_widgets`）；场景自绘内容永远在这些视图下面
+- 回归脚本：`tools/verify_embedded_widget.py`（21 项，含旋转/缩放/自定义工厂/删除回收）、`tools/overlay_widget_probe.py`（独立验证台）
+- 注意：用 `DesignWindow` 写冒烟脚本会在关闭时把 page_*.json 全部重写（多出测试图元），跑完必须 `git checkout` 还原
+

@@ -1,6 +1,7 @@
 import os
 
 from .element import*
+from .embedded_widget_layer import EmbeddedWidgetLayer
 from res.designer_resource_manager import  resource_manager as res_mng
 # 图元析构时的调试输出。默认关闭：一次场景加载会产生上千行日志，
 # 需要排查时可设置环境变量 RACK_DEBUG_DESTROY=1 打开。
@@ -1173,13 +1174,20 @@ class checkbox_element(rect_element):
 class widget_element(rect_element):
     """嵌入式 QWidget 图元：在自绘场景中挂载一个真实的 Qt 控件。
 
-    本场景是纯自绘的 ``QWidget``（不是 QGraphicsView 体系），因此不能用
-    ``QGraphicsProxyWidget``。这里的做法是：图元持有一个真实的 QWidget
-    作为场景的子窗口，通过 ``sceneToView`` 把场景坐标映射到窗口坐标、
-    再乘以 ``scale_factor`` 得到像素尺寸，实时同步到 ``setGeometry``。
+    承载方式见 :class:`Designer.Core.embedded_widget_layer.EmbeddedWidgetLayer`：
+    每个控件包在一个透明 ``QGraphicsView`` 里（内部 ``QGraphicsProxyWidget``）。
+    这样做同时解决了两件裸 QWidget 做不到的事：
+
+    - **跟随缩放**：缩放交给 ``QGraphicsView.setTransform``，控件由 painter 变换
+      渲染，文字是矢量缩放的（裸宿主只能改 setGeometry 的像素宽高，字号恒定）；
+    - **可旋转**：旋转交给 proxy item（绕控件中心，与 ``painter.rotate(-angle)``
+      同向），裸 QWidget 不支持任意角度变换。
+
+    命中测试、光标定位、文本选中、隐式 grab、双击识别、焦点、输入法全部由 Qt
+    原生完成，不需要手写逆变换派发。验证记录见 ``tools/overlay_widget_probe.py``。
 
     交互约定：
-    - **设计模式**：只显示占位框（真实 QWidget 隐藏），方便选中、拖动、
+    - **设计模式**：只显示占位框（真实控件隐藏），方便选中、拖动、
       吸附、成组，与普通矩形图元行为一致。
     - **运行模式**：隐藏占位框，显示真实 QWidget 并允许用户直接操作。
 
@@ -1201,30 +1209,23 @@ class widget_element(rect_element):
 
         # 默认显示的文字（由默认 QLineEdit 承载；自定义控件可忽略）。
         self._widget_text = ""
+        # 控件类型键，便于将来按类型恢复不同控件。
+        self._widget_type_key = "lineedit"
 
-        # 真实 QWidget 宿主。惰性创建：只有进入运行模式或显式调用
-        # ``attach_widget`` 时才实例化，避免设计模式白白创建一堆窗口。
-        self._host_widget = None
+        # 承载层惰性创建：只有进入运行模式或显式调用 ``_ensure_layer`` 时才
+        # 实例化，避免设计模式白白创建一堆 QGraphicsView。
+        self._layer = None
         self._widget_factory = None
 
         # 默认控件工厂：一个可编辑的单行输入框，用于演示。
         self.set_widget_factory(self._default_widget_factory)
 
     def __del__(self):
-        self._release_widget()
+        try:
+            self._release_widget()
+        except RuntimeError:
+            pass
         _log_destroy("widget", self)
-
-    # ------------------------------------------------------------------
-    # 禁用旋转：真实 QWidget 无法旋转，因此 widget_element 始终保持水平。
-    # 无论从 Ctrl+滚轮、属性面板还是代码调用，旋转操作都被忽略。
-    # ------------------------------------------------------------------
-    def setRotation(self, ang):
-        # no-op：widget 图元禁止旋转。
-        return
-
-    def rotate_to_ang(self, ang):
-        # no-op：widget 图元禁止旋转。
-        return
 
     # ------------------------------------------------------------------
     # 控件工厂
@@ -1238,148 +1239,165 @@ class widget_element(rect_element):
     def set_widget_factory(self, factory):
         """设置控件工厂。``factory(host_widget) -> QWidget``。
 
-        调用后若已有宿主控件会重建，以保证工厂立即生效。
+        调用后若已有承载层会重建，以保证工厂立即生效。
         """
         self._widget_factory = factory
-        if self._host_widget is not None:
+        if self._layer is not None:
             self._rebuild_widget()
 
     def set_widget_text(self, text: str):
         """设置默认控件的文本内容（对自定义控件无效）。"""
         self._widget_text = str(text)
-        if self._host_widget is not None and isinstance(
-            self._host_widget.child, QLineEdit
-        ):
-            self._host_widget.child.setText(self._widget_text)
+        widget = self._leaf_widget()
+        if isinstance(widget, QLineEdit):
+            widget.setText(self._widget_text)
 
     def widget_text(self) -> str:
         return self._widget_text
 
+    def _leaf_widget(self):
+        """返回当前真正的控件实例（未创建时为 None）。"""
+        layer = self._layer
+        return None if layer is None else layer.widget
+
     # ------------------------------------------------------------------
-    # 真实 QWidget 的挂载 / 释放
+    # 承载层的挂载 / 释放
     # ------------------------------------------------------------------
-    def _ensure_widget(self) -> QWidget:
-        """确保宿主控件存在（惰性创建），返回宿主 QWidget。"""
-        if self._host_widget is not None:
-            return self._host_widget
+    def _ensure_layer(self):
+        """确保承载层存在（惰性创建）。"""
+        if self._layer is not None:
+            return self._layer
         scene = self.m_scene
         if scene is None:
             return None
-        host = QWidget(scene)
-        host.setAttribute(Qt.WA_TransparentForMouseEvents, False)
-        # 不抢焦点、不进入 Tab 链，避免影响场景快捷键。
-        host.setFocusPolicy(Qt.NoFocus)
-        host.child = None
-        self._host_widget = host
+        self._layer = EmbeddedWidgetLayer(scene)
         self._rebuild_widget()
-        return host
+        return self._layer
 
     def _rebuild_widget(self):
-        """按当前工厂重建子控件，替换旧的。"""
-        host = self._host_widget
-        if host is None:
+        """按当前工厂重建控件，替换旧的。"""
+        layer = self._layer
+        if layer is None:
             return
-        old = host.child
-        if old is not None:
-            old.setParent(None)
-            old.deleteLater()
-            host.child = None
+        child = None
         if self._widget_factory is not None:
-            child = self._widget_factory(host)
-            if child is not None:
-                child.setParent(host)
-                host.child = child
-        # 子控件铺满宿主，由宿主几何决定最终位置与大小。
-        self._relayout_widget()
-
-    def _relayout_widget(self):
-        host = self._host_widget
-        if host is None:
-            return
-        child = host.child
-        if child is not None:
-            child.setGeometry(0, 0, host.width(), host.height())
-            child.show()
+            child = self._widget_factory(layer.view.viewport())
+        layer.set_widget(child)
+        if isinstance(child, QLineEdit):
+            child.setText(self._widget_text)
+        self.sync_widget_geometry()
 
     def _release_widget(self):
-        """释放宿主控件（图元析构 / 被删除时调用）。"""
-        host = self._host_widget
-        if host is not None:
-            try:
-                host.setParent(None)
-                host.deleteLater()
-            except RuntimeError:
-                pass
-            self._host_widget = None
+        """释放承载层（图元析构 / 被删除时调用）。"""
+        layer = self._layer
+        self._layer = None
+        if layer is not None:
+            layer.dispose()
+
+    def has_widget_layer(self) -> bool:
+        """承载层是否已创建且挂着真实控件。"""
+        return self._layer is not None and self._layer.is_active()
+
+    def raise_widget_view(self):
+        """把承载视图提到同层顶部（场景按 zValue 排序后调用）。"""
+        layer = self._layer
+        if layer is not None:
+            layer.raise_view()
+
+    def Delete(self):
+        """删除图元：先回收承载层，避免真实控件残留成幽灵窗口。"""
+        try:
+            self._release_widget()
+        except RuntimeError:
+            pass
+        super().Delete()
 
     # ------------------------------------------------------------------
     # 几何同步：场景坐标 → 窗口像素坐标
     # ------------------------------------------------------------------
-    def sync_widget_geometry(self):
-        """把真实 QWidget 对齐到图元当前的场景包围盒。
+    def _view_design_size(self) -> QSizeF:
+        """控件在 scale=1.0 时的设计尺寸（视图单位），口径与 paint 一致。
 
-        由场景在缩放/平移/图元移动后统一调用。设计模式下宿主控件隐藏，
+        场景 x 对应画笔 y、场景 y 对应画笔 x（AGV 地图的 90° 映射），所以宽高
+        分别取 scene_size 的另一条边换算——与占位框的绘制公式保持完全一致。
+        """
+        scene = self.m_scene
+        if scene is None:
+            return QSizeF(0.0, 0.0)
+        units_x = scene.scene_units_per_grid_x
+        units_y = scene.scene_units_per_grid_y
+        if units_x <= 0 or units_y <= 0:
+            return QSizeF(0.0, 0.0)
+        width = self.scene_size.height() * scene.grid_size / units_y
+        height = self.scene_size.width() * scene.grid_size / units_x
+        return QSizeF(width, height)
+
+    def sync_widget_geometry(self):
+        """把真实控件对齐到图元当前的场景包围盒。
+
+        由场景在缩放/平移/图元移动后统一调用。设计模式下承载层隐藏，
         此方法仍会更新几何，保证切到运行模式时位置立即可用。
 
-        直接复用基类已验证的坐标换算链 ``viewBoundingRect``（场景包围盒 →
-        视图矩形，正确处理 AGV 的 x/y 交换）与 ``rect_viewToWindow``（视图
-        矩形 → 窗口像素矩形），避免自行重算坐标约定引入偏差。
+        中心点沿用已验证的换算链：``sceneToView``（场景 → 视图，含 AGV 的
+        x/y 交换）→ ``pos_viewToWindow``（视图 → 窗口像素）。
         """
-        host = self._host_widget
-        if host is None:
+        layer = self._layer
+        if layer is None or not layer.is_active():
             return
         scene = self.m_scene
         if scene is None:
             return
 
-        view_rect = self.viewBoundingRect()
-        if view_rect.isNull() or view_rect.width() <= 0 or view_rect.height() <= 0:
-            host.hide()
+        size = self._view_design_size()
+        if size.width() <= 1.0 or size.height() <= 1.0:
+            layer.set_visible(False)
             return
 
-        win_rect = scene.rect_viewToWindow(view_rect)
-        pw = win_rect.width()
-        ph = win_rect.height()
-        if pw <= 1 or ph <= 1:
-            host.hide()
-            return
-        host.setGeometry(int(round(win_rect.x())), int(round(win_rect.y())),
-                         int(round(pw)), int(round(ph)))
-        self._relayout_widget()
+        center_window = scene.pos_viewToWindow(
+            scene.sceneToView(self.get_scene_center_pos())
+        )
+        angle = self.sceneTransform().get_rotation_angle()
+        layer.apply(center_window, size, scene.scale_factor or 1.0, angle)
 
     def set_widget_visible(self, visible: bool):
-        """控制宿主控件的显隐（模式切换时由场景调用）。"""
-        if self._host_widget is None:
-            if visible:
-                self._ensure_widget()
-            else:
-                return
+        """控制真实控件的显隐（模式切换时由场景调用）。"""
+        if not visible:
+            if self._layer is not None:
+                self._layer.set_visible(False)
+            return
+        layer = self._ensure_layer()
+        if layer is None:
+            return
         self.sync_widget_geometry()
-        self._host_widget.setVisible(visible)
+        layer.set_visible(True)
 
     # ------------------------------------------------------------------
     # 几何变化钩子：拖动 / 移动后同步子窗口
     # ------------------------------------------------------------------
     def setPos(self, *args):
         super().setPos(*args)
-        if self._host_widget is not None:
+        if self._layer is not None:
             self.sync_widget_geometry()
 
     def move_by(self, *args):
         super().move_by(*args)
-        if self._host_widget is not None:
+        if self._layer is not None:
             self.sync_widget_geometry()
 
     def setSize(self, w, h):
         super().setSize(w, h)
-        if self._host_widget is not None:
+        if self._layer is not None:
             self.sync_widget_geometry()
 
     # ------------------------------------------------------------------
-    # 绘制：设计模式画占位框，运行模式画轻量占位（真实控件盖在其上）
+    # 绘制：设计模式画占位框（含旋转），运行模式交给真实控件
     # ------------------------------------------------------------------
     def paint(self, painter: QPainter, shine_flag):
         if self.get_visibility() is False:
+            super().paint(painter, shine_flag)
+            return
+        # 运行模式下该区域由真实控件覆盖，占位框不再参与绘制。
+        if self.m_scene is not None and self.m_scene.mode() == SceneMode.Run:
             super().paint(painter, shine_flag)
             return
         if not (self.m_veiw_dirty_region.intersects(self.viewBoundingRect().toRect())):
@@ -1400,9 +1418,9 @@ class widget_element(rect_element):
         bg_rect = QRectF(-w / 2.0, -h / 2.0, w, h)
 
         painter.translate(center_pos_view)
-        # widget 图元禁止旋转，因此不调用 painter.rotate()：占位框始终与
-        # 真实 QWidget（水平轴对齐）保持一致，避免出现"边框转了、控件没转"
-        # 的错位。旋转操作已在 setRotation/rotate_to_ang 里被忽略。
+        # 与 rect_element 一致：占位框跟随图元旋转，真实控件由承载层用
+        # proxy.setRotation(-angle) 保持同向，两者不会错位。
+        painter.rotate(-self.sceneTransform().get_rotation_angle())
 
         fill_color = self._fill_color
         if self.get_fill():
@@ -1448,14 +1466,6 @@ class widget_element(rect_element):
         item = super().from_dict(data)
         item._widget_text = str(data.get("widgetText", ""))
         item._widget_type_key = str(data.get("widgetType", "lineedit"))
-        # widget 图元禁止旋转：即使旧数据里存了非零角度，也强制复位为水平。
-        if abs(item.sceneTransform().get_rotation_angle()) > 1e-6:
-            item.m_transform.rotate_around(
-                -item.sceneTransform().get_rotation_angle(), item.m_origin
-            )
-            item.invalidate_transform_cache()
-            item.m_angle = 0.0
-            item.m_angle_init = 0.0
         return item
 
     def clone(self):

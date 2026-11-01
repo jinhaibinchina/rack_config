@@ -700,20 +700,35 @@ class QuadTreeScene(myGraphicsScene):
         运行模式下显示并可交互，设计模式下隐藏（占位框仍由 paint 绘制）。
         缩放、平移、图元移动后也应调用（此时只刷新几何，不改显隐）。
         """
-        for item in list(getattr(self.scene_manager, "m_items", {}).values()):
-            if isinstance(item, widget_element):
-                if visible:
-                    item._ensure_widget()
-                    item.set_widget_visible(True)
-                else:
-                    item.set_widget_visible(False)
+        widget_items = [
+            item
+            for item in list(getattr(self.scene_manager, "m_items", {}).values())
+            if isinstance(item, widget_element)
+        ]
+        for item in widget_items:
+            # set_widget_visible(True) 内部会惰性创建承载层，False 时只隐藏。
+            item.set_widget_visible(visible)
+        if visible:
+            self._restack_embedded_widgets(widget_items)
 
     def _sync_embedded_widgets_geometry(self):
         """仅刷新已挂载控件的几何（缩放/平移后）。"""
+        widget_items = []
         for item in list(getattr(self.scene_manager, "m_items", {}).values()):
-            if isinstance(item, widget_element):
-                if item._host_widget is not None:
-                    item.sync_widget_geometry()
+            if isinstance(item, widget_element) and item.has_widget_layer():
+                item.sync_widget_geometry()
+                widget_items.append(item)
+        self._restack_embedded_widgets(widget_items)
+
+    def _restack_embedded_widgets(self, widget_items):
+        """按 zValue 重排各承载视图的层叠顺序。
+
+        场景内容整体由 painter 画在宿主 widget 上，所以承载视图永远在自绘内容
+        之上；视图之间则是普通子窗口堆叠，需要显式按 zValue 排序。
+        """
+        ordered = sorted(widget_items, key=lambda item: item.zValue())
+        for item in ordered:
+            item.raise_widget_view()
 
 
     # ------------------------------------------------------------------
@@ -1767,6 +1782,13 @@ class QuadTreeScene(myGraphicsScene):
         self.delete_all_elements()
         SceneSerializer.deserialize_scene(self, filename,mode= SceneMode.Run)
         self.update()
+        # 运行模式加载必须补一次承载层同步：常见调用姿势是
+        # ``set_scene_mode(Run)`` → ``load_element_info_run_mode()``，切换模式时
+        # 场景还是空的，一个 widget 图元都没有；加载完若不补这一下，
+        # 控件对应的 overlay 视图永远不会创建，画面里只剩占位框（而且是运行
+        # 模式，占位框也不画），看起来就是"控件没加载出来"。
+        if self.mode() == SceneMode.Run:
+            self._sync_embedded_widgets(True)
         self.__load_done = True    
     
     def right_alignment_for_selected(self):

@@ -15,6 +15,8 @@ from .rack_status_panel_model import RackStatusPanelModel
 from .rack_store_hmi_config_model import RackHmiConfigModel
 from .rack_store_process_model import RackProcessModel
 
+from .rack_global_parameters_model import RackGlobalParasModel
+
 from Designer.Core.my_common import SceneMode
 
 class RackStoresWindow(QWidget):
@@ -47,6 +49,8 @@ class RackStoresWindow(QWidget):
         self.rack_hmi_config_models = [RackHmiConfigModel(self.SceneManager, self,group_name=f"HMI{i+1}") for i in range(5)]  # HMI1..HMI5
 
         self.rack_process_model = RackProcessModel(self.SceneManager, self)
+
+        self.rack_parameters_model = RackGlobalParasModel(self.SceneManager, self)
 
         if self.panel_status.warnings:
             if not self.SceneManager.m_items:

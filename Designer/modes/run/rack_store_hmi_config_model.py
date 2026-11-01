@@ -27,7 +27,7 @@ class RackHmiConfigModel(QObject):
         self.line1:line_element = scene_manager.findItemByName(f"{group_name}_直线_1")
         self.line2:line_element = scene_manager.findItemByName(f"{group_name}_直线_2")                                                       
       
-
+        
 
     def set_text(self, text: str):
         """设置文本内容"""
