@@ -13,6 +13,7 @@ from Designer.Core.elements import (
     circle_element,
     image_element,
     line_element,
+    polygon_element,
     rect_element,
     text_element,
     triangle_element,
@@ -134,6 +135,15 @@ TOOL_DEFINITIONS = [
         description="拖拽到画布，创建等腰三角形",
     ),
     ToolDefinition(
+        key="polygon",
+        label="多边形",
+        category="基本图元",
+        element_class=polygon_element,
+        default_width=140.0,
+        default_height=120.0,
+        description="拖拽到画布，创建正六边形；点击绘制时左键加点、右键结束",
+    ),
+    ToolDefinition(
         key="line",
         label="直线",
         category="基本图元",
@@ -206,7 +216,12 @@ def create_element(
         if definition.widget_type and isinstance(item, widget_element):
             item.set_widget_type(definition.widget_type)
 
-        if isinstance(item, triangle_element):
+        if isinstance(item, polygon_element):
+            # 拖拽放下生成默认正六边形（点击绘制路径走 myGraphicsScene 的逐点添加）
+            item.set_default_geometry(
+                pos, definition.default_width, definition.default_height
+            )
+        elif isinstance(item, triangle_element):
             # Triangles are defined by three vertices; the toolbox drop creates
             # the legacy apex-up shape inside the requested bounding box.
             item.set_default_geometry(

@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "current_page": "page_1",
+    "current_page": "page_5",
     "pages": [
         {
             "id": "page_1",
@@ -21,6 +21,11 @@
             "id": "page_4",
             "name": "页面 4",
             "file": "datas/design/pages/page_4.json"
+        },
+        {
+            "id": "page_5",
+            "name": "页面 5",
+            "file": "datas/design/pages/page_5.json"
         }
     ]
 }

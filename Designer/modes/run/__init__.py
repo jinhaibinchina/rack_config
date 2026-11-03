@@ -2,6 +2,9 @@
 from .rack_store_widget import RackStoreWindow
 
 from .rack_stores_widget import RackStoresWindow
+
+from .rack_global_paras_widget import RackGlobalParasWindow
+
 from .rack_store_model import (
     CylinderState,
     LightColor,
@@ -26,6 +29,7 @@ from .rack_status_panel_model import (
 __all__ = [
     "RackStoreWindow",
     "RackStoresWindow",
+    "RackGlobalParasWindow",
     "RackStoreModel",
     "RackStoreStatusModel",
     "RackStatusPanelModel",

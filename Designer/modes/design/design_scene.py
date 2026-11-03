@@ -11,7 +11,13 @@ from PySide6.QtCore import QEvent, QPointF, Qt, Signal
 
 # from my_elements_v2 import base_element, group_element
 from Designer.Core.element import base_element
-from Designer.Core.elements import group_element
+from Designer.Core.elements import (
+    group_element,
+    boolean_elements,
+    BOOL_UNION,
+    BOOL_INTERSECT,
+    BOOL_SUBTRACT,
+)
 
 from Designer.Core.myQuadTreeScene import QuadTreeScene
 
@@ -252,8 +258,69 @@ class DesignScene(QuadTreeScene):
         ]
         return groups[0] if len(groups) == 1 else None
 
+    def _selected_top_level_items(self):
+        """返回选中的顶层图元（不含组内成员），保持选中顺序。"""
+        return [
+            item
+            for item in self.findChildren(base_element)
+            if item.get_selected() and not item.is_has_parent()
+        ]
+
+    def _apply_boolean(self, op: str) -> None:
+        """对选中的多个图元做布尔运算，结果替换源图元。
+
+        CAD 惯例：并/交/差运算后用生成的 ``path_element`` 替换源图元。
+        至少需要 2 个支持面域的图元（rect/circle/triangle/path）。
+        """
+        items = [
+            item
+            for item in self._selected_top_level_items()
+            if not item.to_bool_path().isEmpty()
+        ]
+        if len(items) < 2:
+            status = getattr(self, "statusBar", None)
+            if status is not None:
+                status.showMessage("布尔运算需要至少选中 2 个闭合图元", 2000)
+            return
+        manager = getattr(self, "scene_manager", None)
+        if manager is None:
+            return
+        try:
+            result = boolean_elements(manager, items, op)
+        except ValueError as exc:
+            status = getattr(self, "statusBar", None)
+            if status is not None:
+                status.showMessage(f"布尔运算失败：{exc}", 2000)
+            return
+        # 删除源图元（CAD 替换语义）
+        for item in items:
+            item.set_selected(False)
+            item.Delete()
+        result.set_selected(True)
+        self.set_current_select_item(result)
+        self.update()
+
     def extend_context_menu(self, menu) -> None:
         """Append design-mode specific actions to the inherited menu."""
+
+        # 布尔运算：仅在选中 ≥2 个可参与面域运算的图元时提供
+        boolean_items = [
+            item
+            for item in self._selected_top_level_items()
+            if not item.to_bool_path().isEmpty()
+        ]
+        if len(boolean_items) >= 2:
+            menu.addSeparator()
+            bool_menu = menu.addMenu("布尔运算")
+            for label, op in (
+                ("并集", BOOL_UNION),
+                ("交集", BOOL_INTERSECT),
+                ("差集（第一个减其余）", BOOL_SUBTRACT),
+            ):
+                action = bool_menu.addAction(label)
+                action.triggered.connect(
+                    lambda checked=False, _op=op: self._apply_boolean(_op)
+                )
 
         group = self.selected_group()
         if group is not None:

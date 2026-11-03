@@ -1,0 +1,270 @@
+{
+    "sceneRect": {
+        "x": -1.800533139874915,
+        "y": -339.4395509125602,
+        "width": 1652.7236330747733,
+        "height": 3163.3949869431194
+    },
+    "backgroundColor": "#ffffffff",
+    "items": [
+        {
+            "id": 4,
+            "name": "屏蔽膜卷号报警",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1346.845,
+                "y": 1409.718
+            },
+            "origin_pos": {
+                "x": 1346.845,
+                "y": 1409.718
+            },
+            "width": 96.0,
+            "height": 576.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 4,
+            "widgetText": "屏蔽膜卷号报警",
+            "widgetType": "checkbox",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 6,
+            "name": "屏蔽物料状态NG报警",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1180.335,
+                "y": 1329.133
+            },
+            "origin_pos": {
+                "x": 1180.335,
+                "y": 1329.133
+            },
+            "width": 96.0,
+            "height": 740.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 6,
+            "widgetText": "屏蔽物料状态NG报警",
+            "widgetType": "checkbox",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 7,
+            "name": "非运行状态下仍响应泊车",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1017.039,
+                "y": 1281.718
+            },
+            "origin_pos": {
+                "x": 1017.039,
+                "y": 1281.718
+            },
+            "width": 96.0,
+            "height": 832.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 7,
+            "widgetText": "非运行状态下仍响应泊车",
+            "widgetType": "checkbox",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 8,
+            "name": "仓位编号1",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 788.116,
+                "y": 1021.389
+            },
+            "origin_pos": {
+                "x": 788.116,
+                "y": 1021.389
+            },
+            "width": 104.0,
+            "height": 404.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 8,
+            "widgetText": "",
+            "widgetType": "spinbox",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 9,
+            "name": "仓位编号2",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 570.338,
+                "y": 1023.074
+            },
+            "origin_pos": {
+                "x": 570.338,
+                "y": 1023.074
+            },
+            "width": 104.0,
+            "height": 404.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 9,
+            "widgetText": "",
+            "widgetType": "spinbox",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 12,
+            "name": "控件_15",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 790.193,
+                "y": 1476.721
+            },
+            "origin_pos": {
+                "x": 790.193,
+                "y": 1476.721
+            },
+            "width": 84.0,
+            "height": 448.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 12,
+            "widgetText": "料仓编号第一位",
+            "widgetType": "label",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 13,
+            "name": "控件_16",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 566.915,
+                "y": 1477.54
+            },
+            "origin_pos": {
+                "x": 566.915,
+                "y": 1477.54
+            },
+            "width": 84.0,
+            "height": 448.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 13,
+            "widgetText": "料仓编号第二位",
+            "widgetType": "label",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 14,
+            "name": "矩形_1318",
+            "type": "rect",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -139.864,
+                "y": 1271.979
+            },
+            "origin_pos": {
+                "x": -139.864,
+                "y": 1271.979
+            },
+            "width": 3579.1184964034564,
+            "height": 941.6985075653727,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": true,
+                "fill_color": "#a7a7fa",
+                "opacity": 107,
+                "cornerRadius": 77.0
+            },
+            "zValue": 3
+        }
+    ]
+}

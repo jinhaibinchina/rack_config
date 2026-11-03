@@ -34,6 +34,8 @@ from .elements import (
     group_element,
     image_element,
     line_element,
+    path_element,
+    polygon_element,
     rect_element,
     text_element,
     triangle_element,
@@ -56,6 +58,8 @@ from .myPropertyForElement import (
     GroupPropertyItem,
     ImagePropertyItem,
     LinePropertyItem,
+    PathPropertyItem,
+    PolygonPropertyItem,
     RectPropertyItem,
     TextPropertyItem,
     TrianglePropertyItem,
@@ -75,6 +79,8 @@ GLYPHS = {
     "text": "文",
     "image": "图",
     "group": "组",
+    "path": "径",
+    "polygon": "多",
 }
 
 
@@ -224,6 +230,8 @@ class NavigationContentWidget(QWidget):
                 LinePropertyItem(item=selected_obj).add_navigation_items(self)
             elif isinstance(selected_obj, group_element):
                 GroupPropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, polygon_element):
+                PolygonPropertyItem(item=selected_obj).add_navigation_items(self)
             elif isinstance(selected_obj, triangle_element):
                 TrianglePropertyItem(item=selected_obj).add_navigation_items(self)
             elif isinstance(selected_obj, checkbox_element):
@@ -236,6 +244,8 @@ class NavigationContentWidget(QWidget):
                 CirclePropertyItem(item=selected_obj).add_navigation_items(self)
             elif isinstance(selected_obj, image_element):
                 ImagePropertyItem(item=selected_obj).add_navigation_items(self)
+            elif isinstance(selected_obj, path_element):
+                PathPropertyItem(item=selected_obj).add_navigation_items(self)
             else:
                 self._show_empty_state(
                     "未选择图元",

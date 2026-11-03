@@ -29,6 +29,7 @@ from .elements import (
     group_element,
     image_element,
     line_element,
+    polygon_element,
     rect_element,
     text_element,
     triangle_element,
@@ -1712,7 +1713,16 @@ class myGraphicsScene(grid_map_window):
         
         if self.current_element_id>0:
             child =self.current_element
-            if isinstance(child, triangle_element):
+            if isinstance(child, polygon_element):
+                if child.get_actived():
+                    self.draw_triangle_draft_on_sence(
+                        painter,
+                        child.get_draw_vertices(),
+                        self.get_pos_from_mouse(),
+                        child.get_color(),
+                        child.get_line_width(),
+                    )
+            elif isinstance(child, triangle_element):
                 if child.get_actived():
                     self.draw_triangle_draft_on_sence(
                         painter,
@@ -1942,7 +1952,13 @@ class myGraphicsScene(grid_map_window):
             # child=self.findChild(QObject,str(self.current_element_id))
             child = self.current_element if self.current_element_id>0 else None
             
-            if isinstance(child, triangle_element):
+            if isinstance(child, polygon_element):
+                if child.get_actived():
+                    child.add_draw_vertex(self.get_pos_from_mouse())
+                    print(f"获得第{len(child.get_draw_vertices())}个点{self.get_pos_from_mouse()}")
+                    self.update()
+
+            elif isinstance(child, triangle_element):
                 if child.get_actived():
                     points = child.get_draw_vertices()
                     if len(points) < 3:

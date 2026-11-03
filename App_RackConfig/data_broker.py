@@ -109,6 +109,8 @@ class PollingThread(QThread):
 
             self._read_and_emit(31,650,240, self.broker.data_ready, 'db31', timeout=2)
 
+            
+
             self.msleep(int(self._interval * 1000))
 
     def _read_and_emit(self, db_number:int,start:int, size:int, signal:Signal, cache_key:str, timeout=1):

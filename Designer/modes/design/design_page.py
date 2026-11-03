@@ -16,6 +16,7 @@ from Designer.Core.elements import (
     group_element,
     image_element,
     line_element,
+    polygon_element,
     rect_element,
     text_element,
     triangle_element,
@@ -73,6 +74,9 @@ class DesignPage(QObject):
         )
         self.scene.action_begin_draw_triangle.connect(
             lambda: self.begin_draw_element(triangle_element)
+        )
+        self.scene.action_begin_draw_polygon.connect(
+            lambda: self.begin_draw_element(polygon_element)
         )
         self.scene.action_begin_draw_circle.connect(
             lambda: self.begin_draw_element(circle_element)

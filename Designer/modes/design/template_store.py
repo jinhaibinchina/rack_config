@@ -40,6 +40,8 @@ from Designer.Core.elements import (
     group_element,
     image_element,
     line_element,
+    path_element,
+    polygon_element,
     rect_element,
     text_element,
     triangle_element,
@@ -63,6 +65,8 @@ ELEMENT_CLASSES = {
     "group": group_element,
     "checkbox": checkbox_element,
     "widget": widget_element,
+    "path": path_element,
+    "polygon": polygon_element,
 }
 
 TYPE_NAME_PREFIX = {
@@ -75,6 +79,8 @@ TYPE_NAME_PREFIX = {
     "image": "图片",
     "checkbox": "复选框",
     "widget": "控件",
+    "path": "路径",
+    "polygon": "多边形",
 }
 
 # Every ``to_dict`` implementation stores absolute scene coordinates in these

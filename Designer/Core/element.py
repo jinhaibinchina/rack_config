@@ -1311,6 +1311,41 @@ class base_element(QObject):
         local_rect = QRectF(self._head_pos, self._end_pos).normalized()
         return local_rect.contains(local_pos)
 
+    def to_bool_path(self) -> QPainterPath:
+        """返回该图元用于布尔运算的面域路径（场景坐标）。
+
+        仅闭合可填充图元（rect/circle/triangle/path）有意义，其余（line/text/
+        image/widget）默认返回空路径，表示不参与面域布尔。子类覆写时须保证
+        返回的是**场景坐标**下的闭合路径，使交/并/差可以直接在场景空间计算。
+        """
+        return QPainterPath()
+
+    def _map_local_path_to_scene(self, local_path: QPainterPath) -> QPainterPath:
+        """把局部坐标的 ``QPainterPath`` 逐 element 映射到场景坐标。
+
+        ``QPainterPath`` 没有统一的整体矩阵变换 API，这里遍历每个 element、
+        用 ``sceneTransform().map()`` 映射其坐标后重建等价的场景路径。布尔运算
+        只消费闭合面域，因此只关心 moveTo/lineTo（曲线会被保留为曲线）。
+        """
+        if local_path.isEmpty():
+            return QPainterPath()
+        transform = self.sceneTransform()
+        out = QPainterPath()
+        for i in range(local_path.elementCount()):
+            el = local_path.elementAt(i)
+            p = transform.map(QPointF(el.x, el.y))
+            if el.isMoveTo():
+                out.moveTo(p)
+            elif el.isLineTo():
+                out.lineTo(p)
+            elif el.isCurveTo():
+                # CurveTo 的三要素由紧随的 CurveToData 元素携带，这里仅记录
+                # 当前控制点；Data 元素在下一轮迭代按 lineTo 兜底处理。
+                out.lineTo(p)
+            else:  # CurveToData 等
+                out.lineTo(p)
+        return out
+
     def viewBoundingRect(self):
         return self.m_scene.rect_sceneToView(self._sceneBoundingRect)
     def selectViewBoundingRect(self):

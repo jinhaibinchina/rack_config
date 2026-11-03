@@ -20,6 +20,8 @@ from .elements import (
     group_element,
     image_element,
     line_element,
+    path_element,
+    polygon_element,
     rect_element,
     text_element,
     triangle_element,
@@ -515,6 +517,10 @@ class SceneSerializer:
                     item = widget_element.from_dict(item_data)
                 elif item_data["type"] == "triangle":
                     item = triangle_element.from_dict(item_data)
+                elif item_data["type"] == "path":
+                    item = path_element.from_dict(item_data)
+                elif item_data["type"] == "polygon":
+                    item = polygon_element.from_dict(item_data)
                 elif item_data["type"] == "circle":
                     item = circle_element.from_dict(item_data)
                 elif item_data["type"] == "text":
@@ -572,6 +578,7 @@ class QuadTreeScene(myGraphicsScene):
     action_begin_draw_rect   =Signal()
     action_begin_draw_triangle =Signal()
     action_begin_draw_circle =Signal()
+    action_begin_draw_polygon =Signal()
     action_begin_new_rect    =Signal(dict)
     action_begin_new_text    =Signal()
     action_begin_new_image   =Signal()
@@ -739,7 +746,6 @@ class QuadTreeScene(myGraphicsScene):
         ordered = sorted(widget_items, key=lambda item: item.zValue())
         for item in ordered:
             item.raise_widget_view()
-
 
     # ------------------------------------------------------------------
     # Group event bindings (run mode)
@@ -1089,6 +1095,10 @@ class QuadTreeScene(myGraphicsScene):
     def mousePressEvent(self, event):
         super().mousePressEvent( event)
 
+        if event.button() == Qt.LeftButton:
+            # 左键开始新的交互：恢复默认右键菜单（多边形绘制结束时曾临时禁用）
+            self.setContextMenuPolicy(Qt.DefaultContextMenu)
+
         if event.button() == Qt.LeftButton and self._mode == SceneMode.Run:
             previous = self._event_pressed_group
             if previous is not None:
@@ -1100,6 +1110,17 @@ class QuadTreeScene(myGraphicsScene):
                 self._event_pressed_group.handle_mouse_press()
         
         if event.button() == Qt.RightButton:
+            # 正在绘制的多边形：右键结束最后一个点并闭合，且不弹出右键菜单。
+            child = self.current_element if self.current_element_id > 0 else None
+            if isinstance(child, polygon_element) and child.get_actived():
+                if child.finish_draw(self.get_pos_from_mouse()):
+                    debug_log("多边形绘制完成")
+                self.update()
+                # 绘制结束/进行中都禁用右键菜单，避免结束瞬间误弹上下文菜单；
+                # 下一次左键（开始新的选择或绘制）时恢复默认菜单策略。
+                self.setContextMenuPolicy(Qt.NoContextMenu)
+                return
+
             if self.is_setting_father or self.is_setting_base_pos:
                 event.ignore()  # 明确忽略事件，阻止传递到contextMenuEvent
                 self.setContextMenuPolicy(Qt.NoContextMenu)  # 完全禁用默认右键菜单
@@ -1250,6 +1271,7 @@ class QuadTreeScene(myGraphicsScene):
         action_line           = menu.addAction("绘制直线")
         action_rect           = menu.addAction("绘制矩形")
         action_triangle       = menu.addAction("绘制三角形")
+        action_polygon        = menu.addAction("绘制多边形")
         action_circle         = menu.addAction("绘制圆")
         action_new_image       = menu.addAction("新建图片")
         action_new_text       = menu.addAction("新建标签")
@@ -1287,6 +1309,9 @@ class QuadTreeScene(myGraphicsScene):
         elif selected_action == action_triangle:
             print("绘制三角形")
             self.action_begin_draw_triangle.emit()
+        elif   selected_action == action_polygon:
+            print("绘制多边形")
+            self.action_begin_draw_polygon.emit()
         elif   selected_action == action_circle:
             print("绘制圆")
             self.action_begin_draw_circle.emit()
@@ -1651,6 +1676,8 @@ class QuadTreeScene(myGraphicsScene):
 
             if isinstance(item, group_element):
                 return "组_", group_element
+            if isinstance(item, polygon_element):
+                return "多边形_", polygon_element
             if isinstance(item, triangle_element):
                 return "三角形_", triangle_element
             if isinstance(item, rect_element):
@@ -2023,6 +2050,10 @@ class SceneManager(QObject):
                 group_element.count+=1
             
             item.initialize()
+        elif isinstance(item,polygon_element)  :
+            name = "多边形_"
+            while item.set_name(name + str(polygon_element.count))==False:
+                polygon_element.count+=1
         elif isinstance(item,triangle_element)  :
             name = "三角形_"
             while item.set_name(name + str(triangle_element.count))==False:
@@ -2066,6 +2097,11 @@ class SceneManager(QObject):
             while item.set_name(name + str(image_element.count))==False:
                 # name += str(text_element.count)+"_"
                 image_element.count+=1
+
+        elif isinstance(item,path_element):
+            name = "路径_"
+            while item.set_name(name + str(path_element.count))==False:
+                path_element.count+=1
         
 
 

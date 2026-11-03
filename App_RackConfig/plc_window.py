@@ -19,6 +19,7 @@ from App_RackConfig.global_config import global_cfg
 
 from App_RackConfig.flip_clock import FlipDigit_Time_display
 
+from Designer.modes.run.rack_global_paras_widget import RackGlobalParasWindow
 
 from res.app_rack_config_resource_manager import resource_manager as res_mng
 
@@ -1161,6 +1162,17 @@ class Recipe(LoadWidget):
         super().__init__(ui_file_path,qss_file)
         self.plc_mgr = plc_mgr
 
+
+        self.spinBox_WrapupMaterialType_ly:QSpinBox = self.ui.spinBox_WrapupMaterialType_ly
+        self.spinBox_WrapupDrumType_ly:QSpinBox = self.ui.spinBox_WrapupDrumType_ly
+
+        self.spinBox_UnreelingDrumType:QSpinBox = self.ui.spinBox_UnreelingDrumType
+        self.spinBox_UnreelingMaterialType:QSpinBox = self.ui.spinBox_UnreelingMaterialType
+        self.spinBox_UnreelingMaterialAttributeA:QSpinBox = self.ui.spinBox_UnreelingMaterialAttributeA
+        self.spinBox_UnreelingMaterialAttributeB:QSpinBox = self.ui.spinBox_UnreelingMaterialAttributeB
+        self.spinBox_WrapupDrumType:QSpinBox = self.ui.spinBox_WrapupDrumType
+        self.spinBox_Wrapup_MaterialType:QSpinBox = self.ui.spinBox_Wrapup_MaterialType
+
         self.spinBox_DrumType:QSpinBox = self.ui.spinBox_DrumType
         self.spinBox_LoadDrumType:QSpinBox = self.ui.spinBox_LoadDrumType
         self.spinBox_UnLoadDrumType:QSpinBox = self.ui.spinBox_UnLoadDrumType
@@ -1208,16 +1220,31 @@ class Recipe(LoadWidget):
        
         groupBox_LY :QGroupBox = self.ui.groupBox_LY
         groupBox_MQ :QGroupBox = self.ui.groupBox_MQ
+
+        groupBox_LY_from_host :QGroupBox = self.ui.groupBox_LY_from_host
+        groupBox_MQ_from_host :QGroupBox = self.ui.groupBox_MQ_from_host
+
         if get_int(datas,0) ==1 or get_int(datas,0) ==2:
             groupBox_LY.setVisible(True)
             groupBox_MQ.setVisible(False)
+
+            groupBox_LY_from_host.setVisible(True)  
+            groupBox_MQ_from_host.setVisible(False)
+
+
+            
         elif get_int(datas,0) ==3 or get_int(datas,0) ==4 or get_int(datas,0) >=5 and get_int(datas,0) <=8:
             groupBox_LY.setVisible(False)
             groupBox_MQ.setVisible(True)
 
+            groupBox_LY_from_host.setVisible(False)
+            groupBox_MQ_from_host.setVisible(True)
+
         else:
             groupBox_LY.setVisible(False)
             groupBox_MQ.setVisible(False)
+            groupBox_LY_from_host.setVisible(False)
+            groupBox_MQ_from_host.setVisible(False)
             return
         datas = self.plc_mgr.read_data(26,0,6, priority=True)
         if datas is None:
@@ -1226,6 +1253,21 @@ class Recipe(LoadWidget):
         self.spinBox_DrumType.setValue(get_int(datas,0))
         self.spinBox_LoadDrumType.setValue(get_int(datas,2))
         self.spinBox_UnLoadDrumType.setValue(get_int(datas,4))
+
+        datas = self.plc_mgr.read_data(32,0,16, priority=True)
+        if datas is None:
+            return
+        self.spinBox_WrapupMaterialType_ly.setValue(get_int(datas,0))
+        self.spinBox_WrapupDrumType_ly.setValue(get_int(datas,2))
+
+        self.spinBox_UnreelingDrumType.setValue(get_int(datas,4))
+        self.spinBox_UnreelingMaterialType.setValue(get_int(datas,6))
+        
+        self.spinBox_UnreelingMaterialAttributeA.setValue(get_int(datas,8))
+        self.spinBox_UnreelingMaterialAttributeB.setValue(get_int(datas,10))
+        self.spinBox_WrapupDrumType.setValue(get_int(datas,12))
+        self.spinBox_Wrapup_MaterialType.setValue(get_int(datas,14))
+
 
     def on_login_success(self):
 
@@ -1464,7 +1506,20 @@ class WindowContainer(LoadWidget):
         w.host_selected_change.connect(self.on_host_select_change)
         
         leftArea.setLayout(layout)
+
+        leftArea.setMaximumWidth(layout.sizeHint().width())
         self._ConfigWindow = w
+
+
+        middle_area: QFrame = self.ui.middle_area
+        layout = QVBoxLayout()
+
+        w = RackGlobalParasWindow(plc_mgr,self)
+        layout.addWidget(w)
+        middle_area.setLayout(layout)
+        middle_area.setMaximumWidth(400)
+        self.rack_global_w = w
+
         
         layout = QVBoxLayout()
         layout.addWidget( AGV_interact(plc_mgr,data_broker))
@@ -1492,6 +1547,12 @@ class WindowContainer(LoadWidget):
         rightArea.currentChanged.connect(w.update_list_widget)
         self._ConfigWindow.update_rcd_window.connect(lambda:w.update_list_widget(4))
         self._rcd =w
+
+        datas = self.plc_mgr.read_data(41,0,10, priority=True)
+        if datas is None:
+            return
+        self.rack_global_w.apply_db41(datas)
+        
     
 
     def on_host_select_change(self,host_No:int):

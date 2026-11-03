@@ -1,158 +1,143 @@
 {
     "sceneRect": {
-        "x": -1982.2735828884388,
-        "y": -5517.915077550302,
-        "width": 4001.1760189620572,
-        "height": 8700.709248625912
+        "x": 118.85654237575272,
+        "y": -14624.405567680667,
+        "width": 2457.42435589226,
+        "height": 4703.63207293097
     },
     "backgroundColor": "#bee1f59b",
     "items": [
         {
-            "id": 1,
-            "name": "控件_7",
-            "type": "widget",
-            "parent_id": 0,
+            "id": 45,
+            "name": "组_1_多边形_7",
+            "type": "polygon",
+            "parent_id": 47,
             "children_ids": [],
-            "group_id": 0,
+            "group_id": 47,
             "center_pos": {
-                "x": -204.0,
-                "y": -364.0
+                "x": 1645.211,
+                "y": -7433.873
             },
             "origin_pos": {
-                "x": -204.0,
-                "y": -364.0
+                "x": 1645.211,
+                "y": -7433.873
             },
-            "width": 116.0,
-            "height": 320.0,
-            "rotate": 0.0,
+            "width": 3949.00021853725,
+            "height": 5926.533595063437,
+            "rotate": -19.99999999999998,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 45,
+            "vertices": [
+                {
+                    "x": 926.469,
+                    "y": -8291.235
+                },
+                {
+                    "x": -659.373,
+                    "y": -8365.069
+                },
+                {
+                    "x": 162.493,
+                    "y": -5734.555
+                },
+                {
+                    "x": 2249.303,
+                    "y": -7375.699
+                },
+                {
+                    "x": 2155.948,
+                    "y": -4466.323
+                },
+                {
+                    "x": 3437.427,
+                    "y": -8282.852
+                },
+                {
+                    "x": 1158.415,
+                    "y": -10410.136
+                }
+            ]
+        },
+        {
+            "id": 46,
+            "name": "组_1_直线_1",
+            "type": "line",
+            "parent_id": 47,
+            "children_ids": [],
+            "group_id": 47,
+            "head_pos": {
+                "x": 1805.728,
+                "y": -9095.213
+            },
+            "end_pos": {
+                "x": -611.786,
+                "y": -9888.052
+            },
+            "origin_pos": {
+                "x": 596.971,
+                "y": -9491.632
+            },
+            "style": {
+                "stroke": "#ff5500",
+                "strokeWidth": 5,
+                "opacity": 255
+            },
+            "rotate": -19.99999999999998,
+            "length": 2544.202813464843,
+            "zValue": 46
+        },
+        {
+            "id": 47,
+            "name": "组_1",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                46,
+                45
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1625.571,
+                "y": -7487.833
+            },
+            "origin_pos": {
+                "x": 1625.571,
+                "y": -7487.833
+            },
+            "width": 3949.0,
+            "height": 6041.379266707885,
+            "rotate": -19.99999999999998,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
                 "fill": false,
                 "fill_color": "#00ff00",
                 "opacity": 255,
                 "cornerRadius": 0.0
             },
-            "zValue": 1,
-            "widgetText": "",
-            "widgetType": "pushbutton",
-            "widgetFontSize": 12,
-            "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
+            "zValue": 47
         },
         {
-            "id": 2,
-            "name": "控件_9",
-            "type": "widget",
-            "parent_id": 0,
-            "children_ids": [],
-            "group_id": 0,
-            "center_pos": {
-                "x": -287.596,
-                "y": -633.721
-            },
-            "origin_pos": {
-                "x": -287.596,
-                "y": -633.721
-            },
-            "width": 116.0,
-            "height": 320.0,
-            "rotate": 0.0,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 2,
-            "widgetText": "",
-            "widgetType": "pushbutton",
-            "widgetFontSize": 12,
-            "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
-        },
-        {
-            "id": 3,
-            "name": "控件_10",
-            "type": "widget",
-            "parent_id": 0,
-            "children_ids": [],
-            "group_id": 0,
-            "center_pos": {
-                "x": -86.469,
-                "y": -559.519
-            },
-            "origin_pos": {
-                "x": -86.469,
-                "y": -559.519
-            },
-            "width": 116.0,
-            "height": 320.0,
-            "rotate": 0.0,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 3,
-            "widgetText": "",
-            "widgetType": "pushbutton",
-            "widgetFontSize": 12,
-            "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
-        },
-        {
-            "id": 4,
-            "name": "控件_11",
-            "type": "widget",
-            "parent_id": 0,
-            "children_ids": [],
-            "group_id": 0,
-            "center_pos": {
-                "x": -260.258,
-                "y": -145.549
-            },
-            "origin_pos": {
-                "x": -260.258,
-                "y": -145.549
-            },
-            "width": 116.0,
-            "height": 320.0,
-            "rotate": 0.0,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 4,
-            "widgetText": "",
-            "widgetType": "pushbutton",
-            "widgetFontSize": 12,
-            "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
-        },
-        {
-            "id": 5,
-            "name": "文本_207",
+            "id": 48,
+            "name": "文本_37",
             "type": "text",
             "parent_id": 0,
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": -394.899,
-                "y": -1651.505
+                "x": -284.721,
+                "y": -10960.577
             },
             "origin_pos": {
-                "x": -394.899,
-                "y": -1651.505
+                "x": -284.721,
+                "y": -10960.577
             },
             "width": 100.0,
             "height": 320.0,
@@ -166,58 +151,25 @@
                 "opacity": 255
             },
             "context": " 文本标签 ",
-            "zValue": 5
+            "zValue": 48
         },
         {
-            "id": 6,
-            "name": "控件_16",
+            "id": 49,
+            "name": "控件_24",
             "type": "widget",
             "parent_id": 0,
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 535.087,
-                "y": -1096.591
+                "x": 1447.408,
+                "y": -12482.359
             },
             "origin_pos": {
-                "x": 535.087,
-                "y": -1096.591
+                "x": 1447.408,
+                "y": -12482.359
             },
-            "width": 768.0,
-            "height": 1024.0,
-            "rotate": 18.5,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 6,
-            "widgetText": "",
-            "widgetType": "textedit",
-            "widgetFontSize": 12,
-            "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
-        },
-        {
-            "id": 7,
-            "name": "控件_30",
-            "type": "widget",
-            "parent_id": 0,
-            "children_ids": [],
-            "group_id": 0,
-            "center_pos": {
-                "x": -76.628,
-                "y": -1211.855
-            },
-            "origin_pos": {
-                "x": -76.628,
-                "y": -1211.855
-            },
-            "width": 116.0,
-            "height": 344.0,
+            "width": 84.0,
+            "height": 128.0,
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
@@ -227,40 +179,40 @@
                 "opacity": 255,
                 "cornerRadius": 0.0
             },
-            "zValue": 7,
+            "zValue": 49,
             "widgetText": "",
-            "widgetType": "combobox",
+            "widgetType": "label",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
             "widgetBackground": "#ffffff"
         },
         {
-            "id": 8,
-            "name": "图片_6",
-            "type": "image",
-            "image_path": "H7.png",
+            "id": 50,
+            "name": "矩形_551",
+            "type": "rect",
             "parent_id": 0,
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 122.53,
-                "y": -2292.196
+                "x": 1439.011,
+                "y": -12614.932
             },
             "origin_pos": {
-                "x": 122.53,
-                "y": -2292.196
+                "x": 1439.011,
+                "y": -12614.932
             },
-            "width": 400.0,
-            "height": 400.0,
+            "width": 150.9026727974342,
+            "height": 201.82075257570978,
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 2,
-                "fill": false,
+                "fill": true,
                 "fill_color": "#00ff00",
-                "opacity": 255
+                "opacity": 255,
+                "cornerRadius": 0.0
             },
-            "zValue": 8
+            "zValue": 52
         }
     ]
 }

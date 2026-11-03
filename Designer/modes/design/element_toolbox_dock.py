@@ -306,6 +306,17 @@ def _create_tool_icon(key: str) -> QIcon:
         path.lineTo(3, 23)
         path.closeSubpath()
         painter.drawPath(path)
+    elif key == "polygon":
+        # 正六边形
+        path = QPainterPath()
+        path.moveTo(14, 4)
+        path.lineTo(24, 10)
+        path.lineTo(24, 19)
+        path.lineTo(14, 25)
+        path.lineTo(4, 19)
+        path.lineTo(4, 10)
+        path.closeSubpath()
+        painter.drawPath(path)
     elif key == "line":
         painter.drawLine(4, 22, 24, 6)
     elif key == "circle":
@@ -384,6 +395,16 @@ def _template_bounds(items):
             if isinstance(raw_vertices, list):
                 vertices = [_dict_point(point) for point in raw_vertices]
                 if len(vertices) == 3 and all(
+                    point is not None for point in vertices
+                ):
+                    points.extend(vertices)
+                    continue
+
+        if item_type == "polygon":
+            raw_vertices = data.get("vertices")
+            if isinstance(raw_vertices, list):
+                vertices = [_dict_point(point) for point in raw_vertices]
+                if len(vertices) >= 3 and all(
                     point is not None for point in vertices
                 ):
                     points.extend(vertices)
@@ -488,6 +509,21 @@ def _create_template_icon(template: ToolboxTemplate) -> QIcon:
                     path = QPainterPath(to_icon(*vertices[0]))
                     path.lineTo(to_icon(*vertices[1]))
                     path.lineTo(to_icon(*vertices[2]))
+                    path.closeSubpath()
+                    painter.drawPath(path)
+                    drawn += 1
+                    continue
+
+        if item_type == "polygon":
+            raw_vertices = data.get("vertices")
+            if isinstance(raw_vertices, list):
+                vertices = [_dict_point(point) for point in raw_vertices]
+                if len(vertices) >= 3 and all(
+                    point is not None for point in vertices
+                ):
+                    path = QPainterPath(to_icon(*vertices[0]))
+                    for point in vertices[1:]:
+                        path.lineTo(to_icon(*point))
                     path.closeSubpath()
                     painter.drawPath(path)
                     drawn += 1

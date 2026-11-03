@@ -843,7 +843,19 @@ class rect_element(base_element):
             for item in self.childItems():
                 item.set_visibility(enable)
         return super().set_visibility(enable)
-    
+
+    def to_bool_path(self) -> QPainterPath:
+        """矩形面域（含圆角），映射到场景坐标。"""
+        w = self.scene_size.width()
+        h = self.scene_size.height()
+        local = QPainterPath()
+        radius = self.get_corner_radius()
+        if radius > 0:
+            local.addRoundedRect(QRectF(-w / 2.0, -h / 2.0, w, h), radius, radius)
+        else:
+            local.addRect(QRectF(-w / 2.0, -h / 2.0, w, h))
+        return self._map_local_path_to_scene(local)
+
     def get_corner_radius(self) -> float:
         """圆角半径，单位为场景坐标（与宽高一致），0 表示直角。"""
         return self._corner_radius
@@ -2195,6 +2207,13 @@ class circle_element(base_element):
         self.scene_size.setHeight(h)
         self.radius_h =h/2.0
         self.radius_w =w/2.0
+
+    def to_bool_path(self) -> QPainterPath:
+        """椭圆（圆）面域，映射到场景坐标。"""
+        local = QPainterPath()
+        local.addEllipse(QRectF(-self.radius_w, -self.radius_h,
+                                self.radius_w * 2.0, self.radius_h * 2.0))
+        return self._map_local_path_to_scene(local)
         
     def getSize(self)->QSizeF:
         return self.scene_size
@@ -3835,6 +3854,10 @@ class triangle_element(rect_element):
         path.closeSubpath()
         return path
 
+    def to_bool_path(self) -> QPainterPath:
+        """三角形面域，映射到场景坐标。"""
+        return self._map_local_path_to_scene(self._triangle_path())
+
     def check_hover(self, mouse_pos: QPointF):
         if self.is_moving() or not self.get_selectable() or not self._vertices_local:
             self.set_hover(False)
@@ -3969,3 +3992,495 @@ class triangle_element(rect_element):
             item._refresh_local_bounds()
             item.update_boundingRect()
         return item
+
+
+class polygon_element(triangle_element):
+    """任意多边形图元（顶点数 ≥ 3）。
+
+    复用 ``triangle_element`` 的全部几何、变换、命中测试、绘制与序列化
+    逻辑，唯一区别是顶点数量不受 3 的限制：
+
+    - 绘制：左键逐点添加顶点，右键结束（把当前鼠标位置作为最后一个顶点
+      后闭合）；顶点数少于 3 时右键不结束、不产生图元。
+    - 命名：``多边形_N``。
+    - 序列化：``vertices`` 存任意数量的场景坐标顶点。
+
+    与 ``triangle_element`` 一样，包围盒/位置/旋转/缩放全部沿用
+    ``rect_element`` 的语义，因此属性面板、组内变换、复制粘贴都能直接
+    复用，无需额外适配。
+    """
+
+    count = 0
+
+    def __init__(self, *args, **kwargs):
+        polygon_element.count += 1
+        super().__init__(*args, **kwargs)
+        self.type = "polygon"
+        # 多边形必须逐点绘制，不生成默认顶点形状。
+        self._vertices_local: List[QPointF] = []
+        self._draft_scene_vertices: List[QPointF] = []
+        self._refresh_local_bounds()
+
+    def __del__(self):
+        _log_destroy("polygon", self)
+
+    # ------------------------------------------------------------------ 顶点约束放宽
+    @staticmethod
+    def _parse_scene_vertices(value) -> List[QPointF]:
+        if not isinstance(value, (list, tuple)) or len(value) < 3:
+            return []
+        vertices = []
+        for point in value:
+            if not isinstance(point, dict):
+                return []
+            try:
+                vertices.append(QPointF(float(point["x"]), float(point["y"])))
+            except (KeyError, TypeError, ValueError):
+                return []
+        return vertices
+
+    def _apply_scene_vertices(self, scene_vertices: List[QPointF], angle: float = 0.0,
+                              origin_scene: Optional[QPointF] = None):
+        """与三角形一致，但允许任意 ≥3 个顶点。"""
+        points = [QPointF(point) for point in scene_vertices]
+        if len(points) < 3:
+            return False
+
+        parent = self.m_parent
+        if parent is not None:
+            parent_points = [parent.mapFromScene(point) for point in points]
+        else:
+            parent_points = points
+        if self._vertices_local:
+            transform = self.m_transform
+        else:
+            transform = Transform()
+            transform.rotate(angle)
+
+        local_points = [transform.map_inverse(point) for point in parent_points]
+        local_center = self._bounding_rect(local_points).center()
+        self._vertices_local = [point - local_center for point in local_points]
+
+        self.m_pos_init = self.m_pos = parent_points[0] - transform.map(
+            self._vertices_local[0]
+        )
+        self.m_angle_init = self.m_angle = angle
+        self.m_transform = transform
+        self.invalidate_transform_cache(mark_dirty=False)
+
+        if origin_scene is not None:
+            origin_parent = (
+                parent.mapFromScene(origin_scene) if parent is not None else origin_scene
+            )
+            self.m_origin = transform.map_inverse(origin_parent - self.m_pos)
+        else:
+            self.m_origin = QPointF(0.0, 0.0)
+
+        self._draft_scene_vertices = []
+        self._refresh_local_bounds()
+        self.update_boundingRect()
+        return True
+
+    # ------------------------------------------------------------------ 绘制交互
+    def add_draw_vertex(self, scene_pos: QPointF) -> bool:
+        """追加一个顶点；多边形不设顶点上限，由右键显式结束。"""
+        if not self.get_actived():
+            return False
+        self._draft_scene_vertices.append(QPointF(scene_pos))
+        return True
+
+    def set_default_geometry(self, top_left: QPointF, width: float, height: float):
+        """工具箱拖拽放下时生成一个默认正六边形（顶点数 6）。
+
+        与 ``triangle_element.set_default_geometry`` 语义一致：在给定包围盒
+        内拟合一个规则多边形，供用户放下后继续编辑。
+        """
+        import math as _math
+        width = float(width)
+        height = float(height)
+        center = QPointF(
+            top_left.x() + width / 2.0,
+            top_left.y() + height / 2.0,
+        )
+        rx = width / 2.0
+        ry = height / 2.0
+        n = 6
+        scene_vertices = []
+        for k in range(n):
+            # 从正上方开始顺时针，顶点朝上
+            ang = _math.pi / 2.0 - k * (2.0 * _math.pi / n)
+            scene_vertices.append(
+                QPointF(center.x() + rx * _math.cos(ang),
+                        center.y() + ry * _math.sin(ang))
+            )
+        self._apply_scene_vertices(scene_vertices, angle=0.0)
+        self.completed()
+
+    def clone(self):
+        """深度克隆多边形（顶点数任意），与 ``triangle_element.clone`` 一致。"""
+        cloned = polygon_element()
+        cloned._name = self._name
+        cloned.m_pos = self.m_pos
+        cloned.set_line_width(self.get_line_width())
+        cloned.set_color(self.get_color())
+        cloned.set_fill(self.get_fill())
+        cloned.set_fill_color(self.get_fill_color())
+        cloned.set_opacity(self.get_opacity())
+        cloned._vertices_local = [QPointF(point) for point in self._vertices_local]
+        cloned._draft_scene_vertices = []
+        cloned.setTransformOriginPoint(self.transformOriginPoint())
+        cloned.setTransform(Transform(self.transform().m))
+        cloned.m_angle = self.m_angle
+        cloned.m_angle_init = self.m_angle_init
+        cloned.m_pos_init = self.m_pos_init
+        cloned._refresh_local_bounds()
+        cloned.set_group_id(self.get_group_id())
+        cloned.set_zValue(self.zValue())
+        for child in self.childItems():
+            child_clone = child.clone()
+            child_clone.m_parent = cloned
+            cloned.m_children.add(child_clone)
+        return cloned
+
+    def finish_draw(self, scene_pos: QPointF) -> bool:
+        """右键结束：把当前鼠标位置作为最后一个顶点后闭合多边形。
+
+        顶点数不足 3 时不闭合（无法构成面域）。此时忽略这次右键（不追加
+        顶点），保留当前绘制状态让用户继续左键加点，返回 ``False``。
+        """
+        if not self.get_actived():
+            return False
+        if len(self._draft_scene_vertices) < 2:
+            return False
+        self._draft_scene_vertices.append(QPointF(scene_pos))
+        self._apply_scene_vertices(self._draft_scene_vertices, angle=0.0)
+        self.completed()
+        return True
+
+    @classmethod
+    def from_dict(cls, data):
+        """从任意数量的顶点恢复多边形。"""
+        item = super().from_dict(data)
+        vertices = cls._parse_scene_vertices(data.get("vertices"))
+        if len(vertices) >= 3:
+            origin_data = data.get("origin_pos") or {}
+            try:
+                origin_scene = QPointF(
+                    float(origin_data["x"]), float(origin_data["y"])
+                )
+            except (KeyError, TypeError, ValueError):
+                origin_scene = None
+            try:
+                angle = float(data.get("rotate", 0.0))
+            except (TypeError, ValueError):
+                angle = 0.0
+            item._apply_scene_vertices(vertices, angle=angle, origin_scene=origin_scene)
+        else:
+            # 非法/空顶点：回退为空多边形（无有效顶点，等待重新绘制）
+            item._vertices_local = []
+            item._draft_scene_vertices = []
+            item._refresh_local_bounds()
+            item.update_boundingRect()
+        return item
+
+
+class path_element(base_element):
+    """布尔运算结果图元：承载一个任意闭合 ``QPainterPath``。
+
+    与 rect/circle/triangle 不同，路径没有「宽高」这类规则几何，因此采用
+    **恒等变换**（``m_pos = (0,0)``、``m_transform = identity``），内部
+    ``_path`` 直接以场景坐标存储，局部坐标即场景坐标，布尔运算结果无需做
+    任何逆变换。
+
+    - ``to_bool_path()`` 直接返回 ``_path``，可继续参与下一轮布尔。
+    - 移动 = 平移 ``_path``；缩放 = 绕包围盒中心等比缩放；旋转暂不支持。
+    - 序列化遍历 path 的每个 element（moveTo/lineTo/curveTo），JSON 只存
+      线段顶点（曲线采样成折线，MVP 足够）。
+    """
+
+    count = 0
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.parent = parent
+        path_element.count += 1
+        self.type = "path"
+        self.scene_size = QSizeF(0.0, 0.0)
+        self._path = QPainterPath()
+        # 恒等变换：局部坐标即场景坐标
+        self.m_pos = QPointF(0.0, 0.0)
+        self.m_transform = Transform()
+        self._head_pos = None
+        self._end_pos = None
+        self._topLeft = None
+        self._bottomRight = None
+        self._topRight = None
+        self._bottomLeft = None
+        self._center_pos = QPointF(0.0, 0.0)
+        self.set_fill(True)
+        self.set_fill_color(QColor(0, 150, 255, 80))
+        self.set_actived(True)
+        self.set_selected(False)
+
+    def __del__(self):
+        _log_destroy("path", self)
+
+    # ------------------------------------------------------------------ 几何
+    def set_path(self, path: QPainterPath):
+        self._path = QPainterPath(path)
+        self.update_boundingRect()
+
+    def path(self) -> QPainterPath:
+        return self._path
+
+    def to_bool_path(self) -> QPainterPath:
+        # 恒等变换下局部路径就是场景路径
+        return QPainterPath(self._path)
+
+    def update_boundingRect(self):
+        super().update_boundingRect()
+        self.prepareGeometryChange()
+        rect = self._path.boundingRect()
+        self._sceneBoundingRect = rect
+        if rect.isEmpty():
+            self._head_pos = self._end_pos = self._topLeft = self._bottomRight = None
+            self._topRight = self._bottomLeft = None
+            self._center_pos = QPointF(0.0, 0.0)
+            self.scene_size = QSizeF(0.0, 0.0)
+            return
+        # 恒等变换：这些「局部」坐标直接等于场景坐标
+        self._topLeft = rect.topLeft()
+        self._bottomRight = rect.bottomRight()
+        self._topRight = QPointF(rect.right(), rect.top())
+        self._bottomLeft = QPointF(rect.left(), rect.bottom())
+        self._head_pos = rect.topLeft()
+        self._end_pos = rect.bottomRight()
+        self._center_pos = rect.center()
+        self.scene_size = QSizeF(rect.width(), rect.height())
+
+    def completed(self, construct_from_dict=False):
+        self.update_boundingRect()
+        super().completed(construct_from_dict)
+
+    def getSize(self) -> QSizeF:
+        return self.scene_size
+
+    def setSize(self, w, h):
+        # 缩放整个路径，使其包围盒变为 w×h（等比缩放，中心锚定）
+        rect = self._path.boundingRect()
+        if rect.isEmpty() or rect.width() <= 0 or rect.height() <= 0:
+            return
+        sx = w / rect.width()
+        sy = h / rect.height()
+        s = min(sx, sy) if (sx > 0 and sy > 0) else 1.0
+        center = rect.center()
+        self._path.translate(-center.x(), -center.y())
+        m = QTransform().scale(s, s)
+        self._path = m.map(self._path)
+        self._path.translate(center.x(), center.y())
+        self.update_boundingRect()
+
+    def change_position(self, pos: QPointF):
+        rect = self._path.boundingRect()
+        if rect.isEmpty():
+            return
+        delta = pos - rect.topLeft()
+        self._path.translate(delta.x(), delta.y())
+        self.update_boundingRect()
+
+    def change_size(self, w, h):
+        self.setSize(w, h)
+
+    def check_hover(self, mouse_pos: QPointF):
+        if self.is_moving() or not self.get_selectable():
+            self.set_hover(False)
+            return False
+        super().check_hover(mouse_pos)
+        # 恒等变换：mapFromScene 即恒等，直接用场景坐标判断
+        pos = self.mapFromScene(mouse_pos)
+        if self.get_fill():
+            hovered = self._path.contains(pos)
+        else:
+            stroker = QPainterPathStroker()
+            stroker.setWidth(max(10.0, float(self.get_line_width())))
+            hovered = stroker.createStroke(self._path).contains(pos)
+        self.set_hover(bool(hovered))
+        return bool(hovered)
+
+    # ------------------------------------------------------------------ 绘制
+    def paint(self, painter: QPainter, shine_flag):
+        if self.get_visibility() is False:
+            base_element.paint(self, painter, shine_flag)
+            return
+        if not self.m_veiw_dirty_region.intersects(self.viewBoundingRect().toRect()):
+            base_element.paint(self, painter, shine_flag)
+            return
+        if self._path.isEmpty():
+            base_element.paint(self, painter, shine_flag)
+            return
+
+        painter.save()
+        color = self._color
+        if self.get_hover() or (self.is_in_group() and self._is_group_in_hover):
+            color = QColor(14, 248, 236)
+
+        # 场景坐标 → 视图坐标（sceneToView 内部处理 AGV 90° 映射）
+        view_path = QPainterPath()
+        for i in range(self._path.elementCount()):
+            el = self._path.elementAt(i)
+            vp = self.m_scene.sceneToView(QPointF(el.x, el.y))
+            if el.isMoveTo():
+                view_path.moveTo(vp)
+            elif el.isLineTo():
+                view_path.lineTo(vp)
+            elif el.isCurveTo():
+                view_path.lineTo(vp)
+            else:
+                view_path.lineTo(vp)
+
+        fill_color = self._fill_color
+        painter.setBrush(fill_color if self.get_fill() else Qt.NoBrush)
+        if self.get_line_width() > 0:
+            painter.setPen(QPen(color, self.get_line_width()))
+        else:
+            painter.setPen(QPen(fill_color, 0))
+        painter.drawPath(view_path)
+        painter.restore()
+
+        base_element.paint(self, painter, shine_flag)
+
+    # ------------------------------------------------------------------ 序列化
+    def to_dict(self):
+        parent_id = self.m_parent.id() if self.m_parent else 0
+        children_ids = [child.id() for child in self.m_children]
+        rect = self._path.boundingRect()
+        center = rect.center() if not rect.isEmpty() else QPointF(0.0, 0.0)
+        return {
+            "id": self.id(),
+            "name": self.get_name(),
+            "type": self.type,
+            "parent_id": parent_id,
+            "children_ids": children_ids,
+            "group_id": self._group_id,
+            "center_pos": {"x": round(center.x(), 3), "y": round(center.y(), 3)},
+            "origin_pos": {"x": round(center.x(), 3), "y": round(center.y(), 3)},
+            "width": round(rect.width(), 3),
+            "height": round(rect.height(), 3),
+            "rotate": 0.0,
+            "style": {
+                "stroke": color_to_str(self.get_color()),
+                "strokeWidth": self.get_line_width(),
+                "fill": self.get_fill(),
+                "fill_color": color_to_str(self.get_fill_color()),
+                "opacity": self.get_opacity(),
+            },
+            "zValue": self.zValue(),
+            "vertices": [
+                {"x": round(el.x, 3), "y": round(el.y, 3), "move": el.isMoveTo()}
+                for el in (
+                    self._path.elementAt(i) for i in range(self._path.elementCount())
+                )
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        item = cls()
+        item.setID(data["id"])
+        item._set_name(data["name"])
+        item.m_parent_id = data.get("parent_id", 0)
+        item.m_children_ids = set(data.get("children_ids", []))
+        item._group_id = data.get("group_id", 0)
+        style = data.get("style", {})
+        item.set_line_width(style.get("strokeWidth", 2))
+        item.set_color(str_to_color(style.get("stroke", "#000000")))
+        item.set_fill(bool(style.get("fill", True)))
+        item.set_fill_color(str_to_color(style.get("fill_color", "#ff0000")))
+        item.set_opacity(style.get("opacity", 255))
+        item.set_zValue(data.get("zValue", 0))
+        path = QPainterPath()
+        for v in data.get("vertices", []):
+            p = QPointF(float(v["x"]), float(v["y"]))
+            if v.get("move"):
+                path.moveTo(p)
+            else:
+                path.lineTo(p)
+        # 布尔结果是闭合面域；若反序列化出的路径未闭合则补一刀
+        path.closeSubpath()
+        item._path = path
+        item.update_boundingRect()
+        return item
+
+    def clone(self):
+        cloned = path_element()
+        cloned._name = self._name
+        cloned._path = QPainterPath(self._path)
+        cloned.set_line_width(self.get_line_width())
+        cloned.set_color(self.get_color())
+        cloned.set_fill(self.get_fill())
+        cloned.set_fill_color(self.get_fill_color())
+        cloned.set_opacity(self.get_opacity())
+        cloned.m_pos = self.m_pos
+        cloned.m_transform = Transform()
+        cloned.set_group_id(self.get_group_id())
+        cloned.set_zValue(self.zValue())
+        cloned.update_boundingRect()
+        return cloned
+
+
+# 布尔运算类型（与 QPainterPath 的方法对应）
+BOOL_UNION = "union"        # 并集 united
+BOOL_INTERSECT = "intersect"  # 交集 intersected
+BOOL_SUBTRACT = "subtract"    # 差集 subtracted（a - b）
+
+
+def boolean_elements(manager, items, op=BOOL_UNION):
+    """对多个图元的面域做布尔运算，生成一个新的 ``path_element``。
+
+    Args:
+        manager: ``SceneManager``，用于注册结果图元（分配 id、加入场景）。
+        items: 参与运算的图元列表（至少 2 个，须实现 ``to_bool_path``）。
+        op: 运算类型，``BOOL_UNION`` / ``BOOL_INTERSECT`` / ``BOOL_SUBTRACT``。
+
+    Returns:
+        ``path_element``，已加入场景（``completed`` 已触发）；结果样式继承
+        第一个图元的填充/描边。
+
+    说明：所有运算都在**场景坐标**下进行（``to_bool_path`` 返回场景路径），
+    结果直接存入恒等变换的 ``path_element``，无需逆变换。
+    """
+    if not items or len(items) < 2:
+        raise ValueError("布尔运算至少需要 2 个图元")
+    if op not in (BOOL_UNION, BOOL_INTERSECT, BOOL_SUBTRACT):
+        raise ValueError(f"不支持的布尔运算类型: {op}")
+
+    acc = None
+    for item in items:
+        p = item.to_bool_path()
+        if p.isEmpty():
+            continue
+        if acc is None:
+            acc = p
+            continue
+        if op == BOOL_UNION:
+            acc = acc.united(p)
+        elif op == BOOL_INTERSECT:
+            acc = acc.intersected(p)
+        else:  # subtract：从第一个累计结果中依次减掉后续图元
+            acc = acc.subtracted(p)
+
+    if acc is None or acc.isEmpty():
+        raise ValueError("布尔运算结果为空")
+
+    result = manager.createItem(path_element)
+    # 继承第一个图元的样式
+    first = items[0]
+    result.set_color(first.get_color())
+    result.set_line_width(first.get_line_width())
+    result.set_fill(first.get_fill())
+    result.set_fill_color(first.get_fill_color())
+    result.set_opacity(first.get_opacity())
+    result.set_path(acc)
+    # 注册到场景：走 completed -> completed_item_signal -> addItem
+    result.completed(False)
+    return result

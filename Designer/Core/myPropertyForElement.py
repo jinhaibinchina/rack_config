@@ -42,6 +42,8 @@ from .elements import (
     group_element,
     image_element,
     line_element,
+    path_element,
+    polygon_element,
     rect_element,
     text_element,
     triangle_element,
@@ -72,6 +74,8 @@ TYPE_LABELS = {
     "text": "文本",
     "image": "图片",
     "group": "组合组",
+    "path": "路径",
+    "polygon": "多边形",
 }
 
 
@@ -501,6 +505,19 @@ class RectPropertyItem(PropertyItem):
         card.add_row(("圆角", radius))
 
 
+class PathPropertyItem(RectPropertyItem):
+    """布尔运算结果路径：复用矩形的外观/布局页，仅去掉圆角。
+
+    ``path_element`` 没有 ``get_corner_radius``，``RectPropertyItem`` 的
+    ``_appearance_extra_rows`` 已通过 ``hasattr`` 兜底自动跳过圆角行；
+    这里只是提供清晰命名，不额外覆盖任何字段，填充/描边/不透明度/位置/
+    尺寸全部沿用父类实现。
+    """
+
+    def __init__(self, parent=None, item: path_element = None):
+        super().__init__(parent=parent, item=item)
+
+
 class TrianglePropertyItem(RectPropertyItem):
     """三角形：位置 + 三个顶点。"""
 
@@ -553,9 +570,60 @@ class TrianglePropertyItem(RectPropertyItem):
         self.item.set_scene_vertices(vertices)
 
 
+class PolygonPropertyItem(TrianglePropertyItem):
+    """任意多边形：复用三角形的外观/位置页，顶点坐标按实际数量动态列出。"""
+
+    def __init__(self, parent=None, item: polygon_element = None):
+        super().__init__(parent=parent, item=item)
+
+    def _layout_extra_cards(self):
+        card = SectionCard("顶点坐标")
+        vertices = self.item.get_scene_vertices()
+        for index in range(len(vertices)):
+            point = vertices[index] if index < len(vertices) else QPointF(0, 0)
+            x_box = make_double(point.x(), step=1.0)
+            y_box = make_double(point.y(), step=1.0)
+            x_box.valueChanged.connect(
+                lambda value, i=index: self._apply_vertex_axis(i, x=float(value))
+            )
+            y_box.valueChanged.connect(
+                lambda value, i=index: self._apply_vertex_axis(i, y=float(value))
+            )
+            self._bind_geo(
+                x_box,
+                lambda i=index: (
+                    self.item.get_scene_vertices()[i].x()
+                    if i < len(self.item.get_scene_vertices())
+                    else 0.0
+                ),
+            )
+            self._bind_geo(
+                y_box,
+                lambda i=index: (
+                    self.item.get_scene_vertices()[i].y()
+                    if i < len(self.item.get_scene_vertices())
+                    else 0.0
+                ),
+            )
+            card.add_row((f"顶点 {index + 1} X", x_box), ("Y", y_box))
+        card.add_hint(f"共 {len(vertices)} 个顶点；改动顶点不会同时移动整体位置。")
+        return [card]
+
+    def _apply_vertex_axis(self, index: int, x=None, y=None) -> None:
+        vertices = self.item.get_scene_vertices()
+        if index < 0 or index >= len(vertices):
+            return
+        point = QPointF(vertices[index])
+        if x is not None:
+            point.setX(x)
+        if y is not None:
+            point.setY(y)
+        vertices[index] = point
+        self.item.set_scene_vertices(vertices)
+
+
 class CirclePropertyItem(PropertyItem):
     """圆形：外观 + 直径 / 半径。"""
-
     def __init__(self, parent=None, item: circle_element = None):
         super().__init__(parent=parent, item=item)
 
