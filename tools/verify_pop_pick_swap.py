@@ -20,10 +20,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from PySide6.QtCore import QEventLoop, QPointF, Qt, QTimer
+from PySide6.QtCore import QEventLoop, QPoint, QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QImage
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QToolBar
 
 _RESULTS: list[tuple[bool, str, str]] = []
 
@@ -234,6 +234,116 @@ def run() -> int:
         not mismatch,
         f"错位={','.join(mismatch)}",
     )
+
+    # ---- 8b. 最大窗口：把当前展示的两页撑满 ----
+    #
+    # 这里的「两页」是右侧槽位上的当前页 + 左侧堆叠最上面那一页，不是
+    # Z 前两名——扇形里 Z 最高的两张互相盖住，取它们只会有**一张**撑满，
+    # 右侧当前页反而被裁掉。这条断言同时锁住「两张都在视口内」。
+    def _window_rect(card) -> QRectF:
+        bound = card.sceneBoundingRect()
+        top_left = scene.sceneToView(bound.topLeft())
+        bottom_right = scene.sceneToView(bound.bottomRight())
+        view_rect = QRectF(top_left, bottom_right).normalized()
+        scale = scene.scale_factor
+        return QRectF(
+            view_rect.x() * scale + scene.offset.x(),
+            view_rect.y() * scale + scene.offset.y(),
+            view_rect.width() * scale,
+            view_rect.height() * scale,
+        )
+
+    toolbar_texts = [
+        action.text()
+        for bar in win.findChildren(QToolBar)
+        for action in bar.actions()
+    ]
+    check(
+        "工具栏有最大窗口按钮",
+        "最大窗口" in toolbar_texts,
+        "、".join(toolbar_texts),
+    )
+
+    front = [deck.slot_card(), deck.stack_cards()[0]]
+    scale_before = scene.scale_factor
+    win._maximize_view()
+    _wait(80)
+    check(
+        "最大窗口放大了视图",
+        scene.scale_factor > scale_before,
+        f"{scale_before:.3f} → {scene.scale_factor:.3f}",
+    )
+
+    union = QRectF()
+    for card in front:
+        rect = _window_rect(card)
+        union = rect if union.isNull() else union.united(rect)
+    viewport = QRectF(0.0, 0.0, float(scene.width()), float(scene.height()))
+    check(
+        "两页都完整落在窗口内",
+        viewport.adjusted(-1, -1, 1, 1).contains(union),
+        f"两页包围盒 ({union.x():.0f},{union.y():.0f}) "
+        f"{union.width():.0f}x{union.height():.0f}，"
+        f"视口 {scene.width()}x{scene.height()}",
+    )
+    fill = max(union.width() / scene.width(), union.height() / scene.height())
+    check(
+        "两页撑满窗口（主方向 ≥ 90%）",
+        fill >= 0.90,
+        f"填充 {fill * 100:.0f}%",
+    )
+
+    # 最大视图下左侧最上层被锁定：这是"专注看"的状态，不能顺手一点就跑掉。
+    # 锁定认的是"当前堆叠最上层"这张卡，不是某张固定名字的卡。
+    locked = deck.stack_cards()[0]
+    slot_before = deck.slot_card().get_name()
+    locked_point = scene.pos_viewToWindow(
+        scene.sceneToView(locked.get_scene_center_pos())
+    )
+    QTest.mouseClick(
+        scene,
+        Qt.LeftButton,
+        Qt.NoModifier,
+        QPoint(int(locked_point.x()), int(locked_point.y())),
+    )
+    _wait(120)
+    check(
+        "最大视图下点最上层不触发交换",
+        not deck.is_busy() and deck.slot_card().get_name() == slot_before,
+        f"槽位 {slot_before} → {deck.slot_card().get_name()}",
+    )
+    check(
+        "锁定后状态栏有提示",
+        "锁定" in win.statusBar().currentMessage(),
+        win.statusBar().currentMessage(),
+    )
+    check("锁定状态在最大视图内保持", win._maximized)
+
+    # 退出最大视图 → 同一张卡恢复可交换
+    win._fit_view()
+    _wait(80)
+    check("适应窗口解除锁定", not win._maximized)
+    unlocked_point = scene.pos_viewToWindow(
+        scene.sceneToView(locked.get_scene_center_pos())
+    )
+    QTest.mouseClick(
+        scene,
+        Qt.LeftButton,
+        Qt.NoModifier,
+        QPoint(int(unlocked_point.x()), int(unlocked_point.y())),
+    )
+    _wait(120)
+    while deck.is_busy():
+        _wait(20)
+    check(
+        "解除锁定后同一张卡可以交换",
+        deck.slot_card().get_name() != slot_before,
+        f"槽位 {slot_before} → {deck.slot_card().get_name()}",
+    )
+    deck.reset()
+    _wait(80)
+    win._fit_view()
+    _wait(80)
 
     # ---- 9. 动画期间快速渲染：位图快照 + 占位框只描边 ----
     #

@@ -100,6 +100,10 @@ class PopPickWindow(QMainWindow):
 
         self._press_pos: Optional[QPointF] = None
         self._dragged = False
+        # 「最大窗口」视图下锁定左侧最上层那一页，防止看着看着把正对着
+        # 的那页点跑了。任何重新取景的动作（适应窗口/重置/滚轮缩放）都会
+        # 解除锁定，见 _maximize_view / _fit_view / eventFilter。
+        self._maximized = False
 
         self.setObjectName("popPickWindow")
         self.setWindowTitle(APP_TITLE)
@@ -139,6 +143,8 @@ class PopPickWindow(QMainWindow):
         # 先加载再切模式：set_scene_mode 里那轮 embedded widget 同步只有在
         # 图元已入库时才有效，反过来做运行态一个控件都不会挂载。
         self.scene.set_scene_mode(SceneMode.Run)
+
+        self.scene.set_canvas_navigation_enabled(False)
 
     # ------------------------------------------------------------------
     # 页面堆叠
@@ -181,6 +187,11 @@ class PopPickWindow(QMainWindow):
         fit_action.triggered.connect(self._fit_view)
         toolbar.addAction(fit_action)
 
+        maximize_action = QAction("最大窗口", self)
+        maximize_action.setToolTip("把最前面的两页放大到撑满窗口")
+        maximize_action.triggered.connect(self._maximize_view)
+        toolbar.addAction(maximize_action)
+
         self.plc_status_action = QAction(
             "PLC：未接入" if self.enable_plc else "PLC：离线", self
         )
@@ -194,6 +205,7 @@ class PopPickWindow(QMainWindow):
         if self.deck is None:
             return
         self.deck.reset()
+        self._maximized = False
         self.statusBar().showMessage("已恢复初始布局", 2500)
 
     def _fit_view(self) -> None:
@@ -203,16 +215,70 @@ class PopPickWindow(QMainWindow):
                 continue
             bound = item.sceneBoundingRect()
             rect = bound if rect.isNull() else rect.united(bound)
-        if rect.isNull() or rect.width() <= 0 or rect.height() <= 0:
-            return
         # 留一圈边距，卡片边框和旋转后的尖角不贴边
-        margin = max(rect.width(), rect.height()) * 0.04
-        self.scene.set_view_scene_rect(rect.adjusted(-margin, -margin, margin, margin))
+        if self._show_scene_rect(rect, 0.04):
+            self._maximized = False
+
+    def _maximize_view(self) -> None:
+        """把当前正在展示的两页放大到撑满窗口。
+
+        「最前面的两页」不是 Z 前两名——扇形里 Z 最高的两张是相邻的，
+        后一张被前一张整片盖住，取这两张的结果是**只有一张**卡撑满画面，
+        右侧当前页反而被裁掉一半。真正「两页」指的是画面上各自完整呈现
+        内容的那两张：右侧槽位上的当前页 + 左侧堆叠里最上面的一页。
+
+        排除掉左侧其余被压住的卡之后，包围盒比「适应窗口」紧凑，因此
+        缩放比更大，正好用来凑近看这两页。
+        """
+        if self.deck is None:
+            return
+        front = []
+        slot = self.deck.slot_card()
+        if slot is not None:
+            front.append(slot)
+        stack = self.deck.stack_cards()
+        if stack:
+            front.append(stack[0])
+        if not front:
+            return
+
+        rect = QRectF()
+        for card in front:
+            bound = card.sceneBoundingRect()
+            rect = bound if rect.isNull() else rect.united(bound)
+
+        # 边距比「适应窗口」紧一档：这个动作用途就是尽量放大，留白只够
+        # 露出边框和抗锯齿边缘。
+        if not self._show_scene_rect(rect, 0.015):
+            return
+        # 锁定：最大视图是"专注看这两页"的状态，左侧最上层那张占满左半屏，
+        # 最容易顺手点掉。这里把它锁住，退出该状态才恢复交换。
+        self._maximized = True
+        names = "、".join(f"「{card.get_name()}」" for card in front)
+        self.statusBar().showMessage(
+            f"已放大到最前面两页：{names} ｜ 左侧最上层已锁定，点「适应窗口」恢复交换",
+            4000,
+        )
+
+    def _show_scene_rect(self, rect: QRectF, margin_ratio: float) -> bool:
+        """把一段场景矩形铺满视口。
+
+        ``set_view_scene_rect`` 走的是和「适应窗口」相同的反算路径（内含
+        ``clamp(0.01, 10.0)`` 的缩放保护），不用另写一套几何。
+        返回 False 表示矩形不可用、什么都没改。
+        """
+        if rect.isNull() or rect.width() <= 0 or rect.height() <= 0:
+            return False
+        margin = max(rect.width(), rect.height()) * margin_ratio
+        self.scene.set_view_scene_rect(
+            rect.adjusted(-margin, -margin, margin, margin)
+        )
         # 改的是场景的 offset / scale，卡片实体（承载视图）必须跟着重排。
         # 滚轮缩放和拖拽平移都在 myQuadTreeScene 里各自补了这一步，走
         # ``set_view_scene_rect`` 这条程序化路径不会自动触发；漏了就会出现
         # "黑边框缩放了、白卡片没动"的错位画面。
         self.scene.refresh_embedded_widgets()
+        return True
 
     # ------------------------------------------------------------------
     # 鼠标：把"点一下卡片"翻译成一次交换
@@ -236,6 +302,10 @@ class PopPickWindow(QMainWindow):
             # 拖动是"平移画布"（场景自己处理），只有原地按放才算点击
             if press is not None and not dragged:
                 self._handle_click(QPointF(event.position()))
+        elif kind == QEvent.Wheel:
+            # 滚轮缩放等于重新取景，最大视图状态随之失效，锁定一并解除；
+            # 否则用户缩回全貌后会发现最上面那页点不动。
+            self._maximized = False
         return super().eventFilter(obj, event)
 
     def _handle_click(self, window_pos: QPointF) -> None:
@@ -247,7 +317,23 @@ class PopPickWindow(QMainWindow):
         if card is self.deck.slot_card():
             self.statusBar().showMessage("这是当前页，点左侧任意页面进行互换", 2500)
             return
+        if self._maximized and self._is_locked_card(card):
+            self.statusBar().showMessage(
+                "最大视图下已锁定这一页，点「适应窗口」后可继续交换", 3000
+            )
+            return
         self.deck.swap_with_slot(card)
+
+    def _is_locked_card(self, card) -> bool:
+        """最大视图下被锁定的那张：左侧堆叠里最上面的一页。
+
+        每次现算，不缓存引用——交换之后最上层会换人，缓存下来的引用会
+        锁到一张已经跑到右边槽位的卡上。
+        """
+        if self.deck is None:
+            return False
+        stack = self.deck.stack_cards()
+        return bool(stack) and card is stack[0]
 
     def _window_to_scene(self, window_pos: QPointF) -> QPointF:
         """窗口像素 → 场景坐标。
