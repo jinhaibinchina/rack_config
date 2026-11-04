@@ -5,7 +5,8 @@ from PySide6.QtCore import Qt, QObject, QEvent ,Signal,QTimer
 
 import sys
 import os
-from App_RackConfig.plc_manager import PLCManager
+
+from common.com.snap7 import PLCManager
 from App_RackConfig.search_ip import scan_by_arp
 from App_RackConfig.load_ui import LoadMainWindow
 
@@ -60,8 +61,8 @@ class Panel(QFrame):
         main_layout.addLayout(h_layout)
         main_layout.addWidget( self.listWidget)
 
-        # self.listWidget.addItem('192.168.1.100')
-        # self.ip_SerialNumber ={'192.168.1.100': b'SerialNumber'}
+        self.listWidget.addItem('192.168.1.100')
+        self.ip_SerialNumber ={'192.168.1.100': b'SerialNumber'}
 
         self.setLayout(main_layout)
 

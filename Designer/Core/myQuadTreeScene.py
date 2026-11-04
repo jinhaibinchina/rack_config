@@ -1,5 +1,9 @@
 
+from __future__ import annotations
+
 from threading import Lock
+from typing import Any, Callable, Optional
+
 from PySide6.QtCore import QRectF, QPointF
 
 from .my_common import SceneMode
@@ -7,10 +11,11 @@ from .myGraphicsScene import myGraphicsScene, DEFAULT_BACKGROUND_COLOR, debug_lo
 
 from PySide6.QtWidgets import QMainWindow, QApplication
 
-from PySide6.QtWidgets import QMenu,QDialog,QSizePolicy
+from PySide6.QtWidgets import QMenu,QDialog,QSizePolicy,QWidget
 from PySide6.QtWidgets import ( QToolTip)
 from PySide6.QtCore import Qt, QPointF, QRectF,Signal,QSize,QObject,QRect,QPoint,QTimer,QSizeF
-from PySide6.QtGui import QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack
+from PySide6.QtGui import (QPainter, QPen, QColor,QFont , QPixmap,QRegion, QUndoCommand,QUndoStack,
+                           QMouseEvent, QWheelEvent, QShowEvent, QResizeEvent, QContextMenuEvent)
 
 import json,sys,os,traceback,math
 from .elements import (
@@ -38,7 +43,7 @@ import copy
 from res.designer_resource_manager import  resource_manager as res_mng
 
 class QuadtreeNode:
-    def __init__(self, boundary: QRectF, capacity=4, max_depth=8, depth=0):
+    def __init__(self, boundary: QRectF, capacity: int =4, max_depth: int =8, depth: int =0) -> None:
         self.boundary = boundary  # 节点边界（矩形区域）
         
         self.capacity = capacity  # 节点最大容量
@@ -55,10 +60,10 @@ class QuadtreeNode:
 
         self.scene_ref=None
 
-    def set_scene_ref(self,scene):
+    def set_scene_ref(self,scene: Any) -> None:
         self.scene_ref=scene
 
-    def subdivide(self):
+    def subdivide(self) -> None:
         """ 分裂当前节点为4个子节点 """
         x, y = self.boundary.x(), self.boundary.y()
         w, h = self.boundary.width() / 2, self.boundary.height() / 2
@@ -126,7 +131,7 @@ class QuadtreeNode:
         return True
 
     
-    def query(self, area: QRectF, found_items: set):  # 使用集合而非列表
+    def query(self, area: QRectF, found_items: set) -> None:  # 使用集合而非列表
         if not self.boundary.intersects(area):
             return
 
@@ -157,7 +162,7 @@ class QuadtreeNode:
     #         if self.se.remove(item): removed = True
         
     #     return removed
-    def remove_all(self):
+    def remove_all(self) -> int:
         # 旧实现在遍历中删除元素，会跳过一半条目；直接清空即可。
         removed = bool(self.items)
         self.items.clear()
@@ -205,7 +210,7 @@ class QuadtreeNode:
                 self.divided = False
         
         return removed
-    def visualize(self, painter: QPainter, max_depth=None, current_depth=0):
+    def visualize(self, painter: QPainter, max_depth: int | None =None, current_depth: int =0) -> None:
         """
         递归绘制四叉树结构
         :param painter: QPainter绘图对象
@@ -247,7 +252,7 @@ class QuadtreeNode:
 
 class SceneSerializer:
     @staticmethod
-    def _resource_dirs():
+    def _resource_dirs() -> list[str]:
         """按优先级返回查找场景文件的候选目录。
 
         打包后 exe 的资源可能落在不同位置，取决于 ``--add-data`` 的目标路径：
@@ -290,7 +295,7 @@ class SceneSerializer:
         return ordered
 
     @staticmethod
-    def get_json_path(relative_path=""):
+    def get_json_path(relative_path: str ="") -> str:
         """获取json文件路径
 
         Args:
@@ -326,7 +331,7 @@ class SceneSerializer:
 
 
     @staticmethod
-    def item_to_dict(item):
+    def item_to_dict(item: Any) -> dict[str, Any]:
         """Serialize one element including its design-time event bindings."""
 
         data = item.to_dict()
@@ -336,7 +341,7 @@ class SceneSerializer:
         return data
 
     @staticmethod
-    def _items_bounding_rect(scene) -> QRectF:
+    def _items_bounding_rect(scene: Any) -> QRectF:
         """Return the union of every top-level item's scene bounding rect.
 
         Group children are skipped: their scene position is already folded into
@@ -353,7 +358,7 @@ class SceneSerializer:
         return result
 
     @staticmethod
-    def _view_rect_is_stale(scene, rect: QRectF) -> bool:
+    def _view_rect_is_stale(scene: Any, rect: QRectF) -> bool:
         """True when the saved view range has drifted far from the content.
 
         ``sceneRect`` records the range that was visible when the page was last
@@ -387,7 +392,7 @@ class SceneSerializer:
         return distance > diagonal * 0.5
 
     @staticmethod
-    def serialize_scene(scene: myGraphicsScene, filename: str):
+    def serialize_scene(scene: myGraphicsScene, filename: str) -> None:
         """将场景序列化为JSON文件"""
         # ``sceneRect`` stores the scene-coordinate rectangle that is currently
         # visible.  Run mode can then reopen the page at the same view range.
@@ -437,9 +442,9 @@ class SceneSerializer:
         print(f"JSON 文件已保存至: {json_path}")
 
     @staticmethod
-    def deserialize_scene(scene: myGraphicsScene, filename: str ,mode:SceneMode= SceneMode.Design):
+    def deserialize_scene(scene: myGraphicsScene, filename: str ,mode:SceneMode= SceneMode.Design) -> None:
         """从JSON文件反序列化场景"""
-        def restore_relationship(id_item_map):
+        def restore_relationship(id_item_map: dict[int, Any]) -> None:
             # print(id_item_map)
             for  id,item in  id_item_map.items():
                 if item.m_parent_id>0 and item.m_parent is None:
@@ -600,7 +605,7 @@ class QuadTreeScene(myGraphicsScene):
 
     double_clicked_without_group = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None =None) -> None:
         super().__init__(parent=parent)
         
         self.setMinimumSize(300,300)
@@ -682,12 +687,12 @@ class QuadTreeScene(myGraphicsScene):
         """
         return True
 
-    def loadDone(self):
+    def loadDone(self) -> bool:
         return self.__load_done
     
     def mode(self)->SceneMode:
         return self._mode
-    def set_scene_mode(self,mode:SceneMode):
+    def set_scene_mode(self,mode:SceneMode) -> None:
         if mode == SceneMode.Run:
             self.show_grid(False)
             self.show_coordinate(False)
@@ -699,6 +704,16 @@ class QuadTreeScene(myGraphicsScene):
             if self._event_pressed_group is not None:
                 self._event_pressed_group.cancel_mouse_press()
             self._event_pressed_group = None
+        # 选中语义随模式对齐。进运行态的入口不都走 ``toggle_sence_mode``
+        # （不少运行窗口直接 ``set_scene_mode(Run)``），所以不能只在那边关
+        # 选中；这里统一：运行态清掉设计态遗留的选中（否则 ``paint`` 会继续
+        # 画红色 id）并禁止新选中，切回设计态恢复可选。
+        for item in self.findChildren(base_element):
+            if mode == SceneMode.Run:
+                item.set_selected_anyway(False)
+                item.set_selectable(False)
+            else:
+                item.set_selectable(True)
         # 嵌入式 QWidget 图元：两种模式都显示真实控件，区别在是否可交互
         # （运行模式可交互，设计模式只读、鼠标穿透，图元仍可选中/拖动）。
         self._sync_embedded_widgets(True, readonly=(mode != SceneMode.Run))
@@ -707,7 +722,7 @@ class QuadTreeScene(myGraphicsScene):
     # ------------------------------------------------------------------
     # Embedded QWidget elements
     # ------------------------------------------------------------------
-    def _sync_embedded_widgets(self, visible: bool, readonly: bool = False):
+    def _sync_embedded_widgets(self, visible: bool, readonly: bool = False) -> None:
         """同步所有 ``widget_element`` 的真实控件几何、显隐与只读态。
 
         - ``visible=True``：显示真实控件；``readonly=True`` 时控件只读展示
@@ -716,9 +731,12 @@ class QuadTreeScene(myGraphicsScene):
 
         缩放、平移、图元移动后也应调用（此时只刷新几何，不改显隐）。
         """
+        manager = getattr(self, "scene_manager", None)
+        if manager is None:
+            return
         widget_items = [
             item
-            for item in list(getattr(self.scene_manager, "m_items", {}).values())
+            for item in list(getattr(manager, "m_items", {}).values())
             if isinstance(item, widget_element)
         ]
         for item in widget_items:
@@ -728,16 +746,64 @@ class QuadTreeScene(myGraphicsScene):
         if visible:
             self._restack_embedded_widgets(widget_items)
 
-    def _sync_embedded_widgets_geometry(self):
-        """仅刷新已挂载控件的几何（缩放/平移后）。"""
+    def _sync_embedded_widgets_geometry(self) -> None:
+        """仅刷新已挂载控件的几何（缩放/平移/窗口尺寸变化后）。"""
+        manager = getattr(self, "scene_manager", None)
+        if manager is None:
+            return
         widget_items = []
-        for item in list(getattr(self.scene_manager, "m_items", {}).values()):
-            if isinstance(item, widget_element) and item.has_widget_layer():
+        for item in list(getattr(manager, "m_items", {}).values()):
+            if not isinstance(item, widget_element):
+                continue
+            try:
+                if not item.has_widget_layer():
+                    continue
                 item.sync_widget_geometry()
-                widget_items.append(item)
+            except RuntimeError:
+                # 图元 / 承载视图在关闭流程中被 C++ 侧提前销毁，跳过即可。
+                continue
+            widget_items.append(item)
         self._restack_embedded_widgets(widget_items)
 
-    def _restack_embedded_widgets(self, widget_items):
+    # ------------------------------------------------------------------
+    # 窗口显隐 / 尺寸变化：重新对齐嵌入式控件
+    # ------------------------------------------------------------------
+    def refresh_embedded_widgets(self) -> None:
+        """立即并延迟一帧重新对齐所有嵌入式控件。
+
+        承载控件的像素几何依赖 ``scene_origin`` / ``view_x0`` 与窗口尺寸，这些
+        要等窗口真正显示、布局收敛后才确定。构造期（例如离线运行窗口在
+        ``__init__`` 里就完成加载并切到运行模式）算出来的位置落在窗口外，
+        表现为"刚进入运行模式控件全都不显示，拖一下画布才出现"。
+
+        宿主可在窗口显示后主动调用；``showEvent`` / ``resizeEvent`` 也会自动调。
+        """
+        self._sync_embedded_widgets_geometry()
+        self._schedule_embedded_widgets_refresh()
+
+    def _schedule_embedded_widgets_refresh(self) -> None:
+        """延迟一帧再同步一次（等 splitter / tab / 对话框布局收敛）。"""
+        timer = getattr(self, "_widget_geom_timer", None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(0)
+            timer.timeout.connect(self._sync_embedded_widgets_geometry)
+            self._widget_geom_timer = timer
+        timer.start()
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        # 窗口刚显示时 scene_origin 才被置为窗口中心（见基类 showEvent），
+        # 控件几何必须按新的原点重算。
+        self.refresh_embedded_widgets()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        # 尺寸变化会改写 scene_origin / view_x0(view_y0)，承载控件要跟着重排。
+        self._sync_embedded_widgets_geometry()
+
+    def _restack_embedded_widgets(self, widget_items: list[Any]) -> None:
         """按 zValue 重排各承载视图的层叠顺序。
 
         场景内容整体由 painter 画在宿主 widget 上，所以承载视图永远在自绘内容
@@ -750,7 +816,7 @@ class QuadTreeScene(myGraphicsScene):
     # ------------------------------------------------------------------
     # Group event bindings (run mode)
     # ------------------------------------------------------------------
-    def write_variable(self, name, value, source=None, event=""):
+    def write_variable(self, name: str, value: Any, source: Any =None, event: str ="") -> bool:
         """Write one runtime variable triggered by an element event.
 
         The value is stored in ``runtime_variables`` and announced through
@@ -774,18 +840,18 @@ class QuadTreeScene(myGraphicsScene):
                 print(f"写入变量失败({name}={value!r}): {exc}")
         return True
 
-    def read_variable(self, name, default=None):
+    def read_variable(self, name: str, default: Any =None) -> Any:
         return self.runtime_variables.get(name, default)
 
-    def clear_runtime_variables(self):
+    def clear_runtime_variables(self) -> None:
         self.runtime_variables.clear()
 
-    def set_event_handler_resolver(self, resolver):
+    def set_event_handler_resolver(self, resolver: Callable[..., Any] | None) -> None:
         """Install the run-mode ``handler_name -> bool`` dispatcher."""
 
         self.event_handler_resolver = resolver if callable(resolver) else None
 
-    def invoke_event_handler(self, name, source, event, args=None, event_value=None):
+    def invoke_event_handler(self, name: str, source: Any, event: str, args: dict[str, Any] | None =None, event_value: Any =None) -> bool:
         """Resolve one design-time event handler; returns ``True`` if handled."""
 
         resolver = self.event_handler_resolver
@@ -799,7 +865,7 @@ class QuadTreeScene(myGraphicsScene):
             print(f"[运行态事件] 处理函数 {name} 执行失败: {type(exc).__name__}: {exc}")
             return False
 
-    def initialize_event_handlers(self):
+    def initialize_event_handlers(self) -> int:
         """Run every serialized ``attach`` binding once after page load.
 
         ``attach`` is not a mouse event: it lets a handler establish the
@@ -829,7 +895,7 @@ class QuadTreeScene(myGraphicsScene):
                 invoked += 1
         return invoked
 
-    def _event_scene_pos(self, event):
+    def _event_scene_pos(self, event: QMouseEvent) -> QPointF:
         """Convert a widget-space mouse event to this scene's custom coords."""
         scale = self.scale_factor if self.scale_factor else 1.0
         view_pos = QPointF(
@@ -838,12 +904,12 @@ class QuadTreeScene(myGraphicsScene):
         )
         return self.viewToScene(view_pos)
 
-    def _find_event_group_at(self, scene_pos):
+    def _find_event_group_at(self, scene_pos: QPointF) -> Any:
         """Topmost interactive item (group or checkbox) under ``scene_pos``."""
         manager = getattr(self, "scene_manager", None)
         if manager is None or scene_pos is None:
             return None
-
+       
         for item in reversed(getattr(manager, "m_sorted_items", [])):
             # 运行时点击交互目前支持两类图元：组（绑定事件/可切换）和复选框
             # （可勾选切换）。其余图元不参与点击事件路由。
@@ -857,36 +923,70 @@ class QuadTreeScene(myGraphicsScene):
                 or item.is_interactive()
             ):
                 continue
+
             rect = item.sceneBoundingRect()
             if isinstance(rect, QRectF) and rect.contains(scene_pos):
                 return item
         return None
 
-    def toggle_sence_mode(self):
+    def _find_visible_group_at(self, scene_pos: QPointF) -> Any:
+        """运行态下最顶层的可见组，用于驱动选中联动。
+
+        ``_find_event_group_at`` 只返回带事件绑定/复选框语义的图元，站点组
+        通常不在其中；而 ``selectionChanged`` 的消费者（IO 面板、站点说明）
+        只关心组名，因此这里按「可见 + 顶层组」判定。
+
+        这里刻意不看 ``get_selectable()``：运行态下隐藏-显示的往返会把
+        图元的 ``__selectable_last`` 洗成 False（见 ``base_element.
+        set_visibility``），站点组显示出来时就是不可选的。选中语义在运行态
+        由点击本身决定，与设计态的可选开关无关。
+
+        注意只改 ``current_selected``，不给图元 ``set_selected(True)``：
+        ``base_element.paint`` 会对选中图元画红色 id，那是设计期信息。
+        """
+        manager = getattr(self, "scene_manager", None)
+        if manager is None or scene_pos is None:
+            return None
+
+        for item in reversed(getattr(manager, "m_sorted_items", [])):
+            if not isinstance(item, group_element):
+                continue
+            if item.is_in_group():
+                continue
+            if not item.get_visibility():
+                continue
+            rect = item.sceneBoundingRect()
+            if isinstance(rect, QRectF) and rect.contains(scene_pos):
+                return item
+        return None
+
+    def toggle_sence_mode(self) -> None:
         if self._mode==SceneMode.Design:
             for item in self.findChildren(base_element):
                 item.set_selectable(False)
             self.set_scene_mode(SceneMode.Run)
+            print('切换到运行态')
         else:
             for item in self.findChildren(base_element):
                 item.set_selectable(True)
                 item.set_visibility(True)
             self.set_scene_mode(SceneMode.Design)
+            print('切换到设计态')
 
-    def handle_frame_count(self):
+    def handle_frame_count(self) -> None:
         # print(f"当前帧率{self.frame_count}fps")
         self.frame_count= 0
 
-    def prepareItemGeometryChange(self,item:base_element):
+    def prepareItemGeometryChange(self,item:base_element) -> None:
         self.boundingRect_old[item] = item.sceneBoundingRect()
     
-    def prepareItemDirtyChange(self,item:base_element):
+    def prepareItemDirtyChange(self,item:base_element) -> None:
         w_factor,h_factor =  self.screenToScene_factor()
         rect = item.sceneBoundingRect()
         dirty_rect = QRectF(rect.left()-10*w_factor,rect.top()-10*h_factor,rect.width()+20*w_factor,rect.height()+20*h_factor)
         self.dirtyBoundingRect_old[item] = dirty_rect
     
-    def handle_hover_sta_change(self,item:base_element):
+    def handle_hover_sta_change(self,item:base_element) -> None:
         state = item.get_hover()
         if isinstance(item,group_element):
             for i in item.m_children:
@@ -901,7 +1001,7 @@ class QuadTreeScene(myGraphicsScene):
         #     if 
             
    
-    def processOverlappingAreas(self,oldRect:QRectF,newRect:QRectF):
+    def processOverlappingAreas(self,oldRect:QRectF,newRect:QRectF) -> QRegion:
         """重叠区域处理"""
         changedRegion = QRegion()
         # 合并新旧区域确保完全覆盖变化区域
@@ -912,7 +1012,7 @@ class QuadTreeScene(myGraphicsScene):
         return changedRegion     
 
 
-    def handle_quadtree_update(self):
+    def handle_quadtree_update(self) -> None:
         if len(self.boundingRect_old):
      
             for item,rect in self.boundingRect_old.items():
@@ -921,7 +1021,7 @@ class QuadTreeScene(myGraphicsScene):
                 self.scene_manager.m_scene.quadtree.insert(item)
             self.boundingRect_old.clear()
 
-    def handle_scene_update(self):
+    def handle_scene_update(self) -> None:
         
         if len(self.dirtyBoundingRect_old):
 
@@ -929,7 +1029,7 @@ class QuadTreeScene(myGraphicsScene):
                 self.dirtyRegion_manager.markDirty(self.processOverlappingAreas( self.rect_viewToWindow( self.rect_sceneToView(rect)) ,item.windowBoundingRect()))
             self.dirtyBoundingRect_old.clear()  
             
-    def on_render_frame(self):
+    def on_render_frame(self) -> None:
         self._ready_for_update = False
 
         if self.update_callback and callable(self.update_callback):
@@ -967,7 +1067,7 @@ class QuadTreeScene(myGraphicsScene):
 
         
 
-    def setSceneRect(self, rect: QRectF):
+    def setSceneRect(self, rect: QRectF) -> None:
         """ 初始化四叉树根节点 """
         super().setSceneRect(rect)
         self.quadtree = QuadtreeNode(rect)
@@ -985,12 +1085,12 @@ class QuadTreeScene(myGraphicsScene):
             return self.quadtree.insert(item)
         return True
     
-    def removeItem(self, item: base_element):
+    def removeItem(self, item: base_element) -> None:
         super().removeItem(item)
         if self.quadtree:
              self.quadtree.remove(item)
 
-    def deleteItem(self, item: base_element):
+    def deleteItem(self, item: base_element) -> None:
         if self.quadtree:
              self.quadtree.remove(item)
         super().deleteItem(item)
@@ -1003,7 +1103,7 @@ class QuadTreeScene(myGraphicsScene):
             self.quadtree.query(area, found_items)
         return found_items
 
-    def on_mouse_move(self,pos):
+    def on_mouse_move(self,pos: QPointF) -> None:
         
         """pos:鼠标场景坐标"""
 
@@ -1072,14 +1172,14 @@ class QuadTreeScene(myGraphicsScene):
 
 
 
-    def wheelEvent(self, event):
+    def wheelEvent(self, event: QWheelEvent) -> None:
         super().wheelEvent( event)
         self.snapSys.set_snap_threshold(self.scene_units_per_grid_x/self.grid_size/self.scale_factor*10)
         # 缩放改变了 sceneToView 映射，同步嵌入式控件几何。
         self._sync_embedded_widgets_geometry()
         
 
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
 
         # ``super().mouseMoveEvent`` refreshes ``sence_pos_mouse`` from this
         # event, so evaluate snapping afterwards.  Doing it before used the
@@ -1092,7 +1192,7 @@ class QuadTreeScene(myGraphicsScene):
             self._sync_embedded_widgets_geometry()
        
     
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         super().mousePressEvent( event)
 
         if event.button() == Qt.LeftButton:
@@ -1103,11 +1203,20 @@ class QuadTreeScene(myGraphicsScene):
             previous = self._event_pressed_group
             if previous is not None:
                 previous.handle_mouse_release(False)
-            self._event_pressed_group = self._find_event_group_at(
-                self._event_scene_pos(event)
-            )
+            scene_pos = self._event_scene_pos(event)
+            self._event_pressed_group = self._find_event_group_at(scene_pos)
             if self._event_pressed_group is not None:
                 self._event_pressed_group.handle_mouse_press()
+
+            # 运行态不走进设计态那套选中逻辑（那里会 set_selected 并画设计期
+            # 红色 id），所以 current_selected 永远不会更新、selectionChanged
+            # 也永远不发。这里补一次：让站点说明面板与 IO 联动能收到通知。
+            # 属性面板运行态只认 group_element，复选框等交互图元不抢焦点。
+            anchor = self._event_pressed_group
+            
+            if anchor is not None:
+                self.set_current_select_item(anchor)
+                print(f"运行态选中组: {anchor.get_name()}({anchor.id()}) 是否可交互{anchor.is_interactive()}")
         
         if event.button() == Qt.RightButton:
             # 正在绘制的多边形：右键结束最后一个点并闭合，且不弹出右键菜单。
@@ -1140,13 +1249,8 @@ class QuadTreeScene(myGraphicsScene):
             debug_log(len(items))
 
       
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         super().mouseReleaseEvent( event)
-        
-
-
-
-
 
         if event.button() == Qt.LeftButton and self._mode == SceneMode.Run:
             group = self._event_pressed_group
@@ -1156,20 +1260,23 @@ class QuadTreeScene(myGraphicsScene):
                     group.contains_scene_pos(self._event_scene_pos(event))
                 )
 
-    def mouseDoubleClickEvent(self, event):
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         super().mouseDoubleClickEvent(event)
         if event.button() == Qt.LeftButton and self._mode == SceneMode.Run:
             group = self._find_event_group_at(self._event_scene_pos(event))
             if group is None:
                 self.double_clicked_without_group.emit()
+                self.set_current_select_item(self)
+               
 
-    def on_menu_closed(self):
+
+    def on_menu_closed(self) -> None:
         self.menu_opened = False
 
-    def extend_context_menu(self, menu):
+    def extend_context_menu(self, menu: QMenu) -> None:
         """Hook for subclasses that want to append their own actions."""
 
-    def contextMenuEvent(self, event):
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         """鼠标右键按下时（默认行为）：
             当用户按下并释放鼠标右键后，若未在 mousePressEvent 或 mouseReleaseEvent 中拦截事件，系统会自动触发 contextMenuEvent。
             显式请求上下文菜单时：
@@ -1178,7 +1285,7 @@ class QuadTreeScene(myGraphicsScene):
         if self._mode == SceneMode.Run:
             return
 
-        def set_group_zValue(item:base_element,val):
+        def set_group_zValue(item:base_element,val: int) -> None:
             if item.is_has_child():
                 item.set_zValue(val)
                 for child in item.childItems():
@@ -1186,7 +1293,7 @@ class QuadTreeScene(myGraphicsScene):
             else:
                 item.set_zValue(val)
         
-        def add_zValue_group(item:base_element,val):
+        def add_zValue_group(item:base_element,val: int) -> None:
             if item.is_has_child():
                 item.set_zValue(val+ item.zValue())
                 for child in item.childItems():
@@ -1194,8 +1301,8 @@ class QuadTreeScene(myGraphicsScene):
             else:
                 item.set_zValue(val+ item.zValue())
 
-        def handle_go_top():
-            def get_min_zValue_in_group(item:base_element):
+        def handle_go_top() -> None:
+            def get_min_zValue_in_group(item:base_element) -> int:
                 min_val =9999
                             # 当前节点的 zValue 参与比较
                 min_val = min(min_val, item.zValue())
@@ -1226,8 +1333,8 @@ class QuadTreeScene(myGraphicsScene):
                     else:
                         child.set_zValue( max_val + 1 )
 
-        def handle_go_bottom():
-            def get_max_zValue_in_group(item:base_element):
+        def handle_go_bottom() -> None:
+            def get_max_zValue_in_group(item:base_element) -> int:
                 max_val =9999
                             # 当前节点的 zValue 参与比较
                 max_val = min(max_val, item.zValue())
@@ -1579,7 +1686,7 @@ class QuadTreeScene(myGraphicsScene):
             top_window.exec()
 
 
-    def save_current_widget(self,item:text_element):
+    def save_current_widget(self,item:text_element) -> None:
         rect = self.rect_viewToWindow(self.rect_sceneToView(item.sceneBoundingRect()))
         
         pixmap = QPixmap(rect.size().toSize())
@@ -1594,7 +1701,7 @@ class QuadTreeScene(myGraphicsScene):
     #             self.quadtree.remove(child)
     #             self.scene_manager.m_items.clear()
     #             self.update()
-    def copy_selected(self):
+    def copy_selected(self) -> None:
         """复制选中图元（自动处理父子关系）"""
         self.selected_items = []
         for child in self.findChildren(base_element):
@@ -1620,12 +1727,12 @@ class QuadTreeScene(myGraphicsScene):
         self.copied_items = [item.clone() for item in top_level_items]
 
 
-        print(f"顶层复制项：{self.copied_items}")
+        debug_log(f"顶层复制项：{self.copied_items}")
         # self.paste_count = 0  # 重置粘贴计数器
 
-    def paste(self):
+    def paste(self) -> None:
         """粘贴复制的图元"""
-        def add_child_item(item:base_element):
+        def add_child_item(item:base_element) -> None:
             """该图元下的所有子项加入""" 
             if item.is_has_child():
                 for child in item.childItems():
@@ -1671,7 +1778,7 @@ class QuadTreeScene(myGraphicsScene):
             reserved_names.add(name)
             return name
 
-        def default_name_args(item: base_element):
+        def default_name_args(item: base_element) -> tuple[str, type]:
             """返回该图元默认名称的前缀与计数器。"""
 
             if isinstance(item, group_element):
@@ -1680,6 +1787,12 @@ class QuadTreeScene(myGraphicsScene):
                 return "多边形_", polygon_element
             if isinstance(item, triangle_element):
                 return "三角形_", triangle_element
+            # 控件 / 复选框都是 rect_element 的子类，必须排在矩形分支之前，
+            # 否则粘贴出来会被命名成“矩形_N”，和绘制时的“控件_/复选框_”不一致。
+            if isinstance(item, widget_element):
+                return "控件_", widget_element
+            if isinstance(item, checkbox_element):
+                return "复选框_", checkbox_element
             if isinstance(item, rect_element):
                 return "矩形_", rect_element
             if isinstance(item, line_element):
@@ -1690,7 +1803,7 @@ class QuadTreeScene(myGraphicsScene):
                 return "文本_", text_element
             return "图片_", image_element
 
-        def next_default_name(prefix: str, counter_holder) -> str:
+        def next_default_name(prefix: str, counter_holder: list[int]) -> str:
             """沿用“类型_序号”命名，跳过已被占用的名字。"""
 
             while True:
@@ -1700,7 +1813,7 @@ class QuadTreeScene(myGraphicsScene):
                     return name
                 counter_holder.count += 1
 
-        def rename_members(item: base_element, old_prefix: str, new_prefix: str):
+        def rename_members(item: base_element, old_prefix: str, new_prefix: str) -> None:
             """把子树里的组名前缀换成新组名前缀。
 
             旧工程里的成员名可能还没有组名前缀，或者改写后的名字已被占用，
@@ -1740,6 +1853,15 @@ class QuadTreeScene(myGraphicsScene):
             item.set_scene_manager_ref(self.scene_manager)
             item.completed(True)
 
+        # 控件图元这里走的是 construct_from_dict=True 分支，不会被 SceneManager
+        # .addItem 里的“交互式创建”逻辑接管，承载层就不会挂载 —— 表现为粘贴
+        # 出来的控件只剩一个占位框，和画布上绘制出来的控件外观不一致。
+        # 反序列化批量加载有 _sync_embedded_widgets 统一兜底，粘贴没有，这里补。
+        for item in self.all_copied_items:
+            if isinstance(item, widget_element):
+                item.set_widget_readonly(self.mode() != SceneMode.Run)
+                item.set_widget_visible(True)
+
         for item in self.scene_manager.m_items.values():
             if item in self.all_copied_items:
                 item.set_selected(True)
@@ -1750,7 +1872,7 @@ class QuadTreeScene(myGraphicsScene):
         self.copy_selected()
      
 
-    def delete_all_elements(self):
+    def delete_all_elements(self) -> None:
 
         # def free_all_groups(item:base_element):
         #     if isinstance(group_element):
@@ -1759,7 +1881,7 @@ class QuadTreeScene(myGraphicsScene):
 
         #         free_all_groups()
 
-        def remove_parent_item(item:base_element):
+        def remove_parent_item(item:base_element) -> None:
             """移除该图元下的所有父项"""
             if item.m_parent:
                 
@@ -1803,7 +1925,7 @@ class QuadTreeScene(myGraphicsScene):
         self.snapSys.clear_elements()
         self._hover_items.clear()
         self.update()
-    def save_element_info(self, filename="datas/data.json"):
+    def save_element_info(self, filename: str ="datas/data.json") -> None:
         """Serialize the scene.
 
         The default keeps the legacy run-mode behaviour, while design-mode
@@ -1812,7 +1934,7 @@ class QuadTreeScene(myGraphicsScene):
         SceneSerializer.serialize_scene(self, filename)
 
 
-    def load_element_info(self, filename="page1.json"):
+    def load_element_info(self, filename: str ="page1.json") -> None:
         self.delete_all_elements()
         SceneSerializer.deserialize_scene(self, filename)
         self.update()
@@ -1829,7 +1951,7 @@ class QuadTreeScene(myGraphicsScene):
     #     self.__load_done = True
 
 
-    def load_element_info_run_mode(self, filename="scene1.json"):
+    def load_element_info_run_mode(self, filename: str ="scene1.json") -> None:
         self.delete_all_elements()
         SceneSerializer.deserialize_scene(self, filename,mode= SceneMode.Run)
         self.update()
@@ -1842,7 +1964,7 @@ class QuadTreeScene(myGraphicsScene):
             self._sync_embedded_widgets(True)
         self.__load_done = True    
     
-    def right_alignment_for_selected(self):
+    def right_alignment_for_selected(self) -> None:
         """右对齐"""
         min_y = 500000.0
         self.selected_items = []
@@ -1858,7 +1980,7 @@ class QuadTreeScene(myGraphicsScene):
             pos = QPointF(item.get_scene_topLeft().x(),min_y)
             item.change_position(pos)
 
-    def left_alignment_for_selected(self):
+    def left_alignment_for_selected(self) -> None:
         """左对齐"""
         max_y = -500000.0
         self.selected_items = []
@@ -1874,7 +1996,7 @@ class QuadTreeScene(myGraphicsScene):
             pos = QPointF(item.get_scene_topLeft().x(),max_y-item.getSize().height())
             item.change_position(pos)
 
-    def bottom_alignment_for_selected(self):
+    def bottom_alignment_for_selected(self) -> None:
         """下对齐"""
         min_x = 500000.0
         self.selected_items = []
@@ -1890,7 +2012,7 @@ class QuadTreeScene(myGraphicsScene):
             pos = QPointF(min_x,item.get_scene_topLeft().y())
             item.change_position(pos)
 
-    def top_alignment_for_selected(self):
+    def top_alignment_for_selected(self) -> None:
         """上对齐"""
         max_x = -500000.0
         self.selected_items = []
@@ -1907,7 +2029,7 @@ class QuadTreeScene(myGraphicsScene):
             item.change_position(pos)
         
         
-    def set_same_horizontal_distance(self):
+    def set_same_horizontal_distance(self) -> None:
         
         min_y =  500000.0
         max_y = -500000.0
@@ -1931,7 +2053,7 @@ class QuadTreeScene(myGraphicsScene):
             pos = QPointF(item.get_scene_topLeft().x(), y_init + distance*i)
             item.change_position(pos)
 
-    def set_same_vertical_distance(self):
+    def set_same_vertical_distance(self) -> None:
         
         min_x =  500000.0
         max_x = -500000.0
@@ -1968,21 +2090,21 @@ class QuadTreeScene(myGraphicsScene):
 
 
 class IDGenerator:
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = Lock()  # 线程安全锁
         self.m_nextID = 1    # 起始ID值
 
-    def generateID(self):
+    def generateID(self) -> int:
         with self._lock:
             current_id = self.m_nextID
             self.m_nextID += 1
             return current_id
 
-    def reset(self, start=1):
+    def reset(self, start: int =1) -> None:
         with self._lock:
             self.m_nextID = start
 
-    def updateAfterLoad(self, maxLoadedID):
+    def updateAfterLoad(self, maxLoadedID: int) -> None:
         with self._lock:
             self.m_nextID = maxLoadedID + 1
 
@@ -1991,7 +2113,7 @@ class SceneManager(QObject):
     delete_item_signal = Signal(base_element)
     completed_item_signal =Signal(base_element,bool)
 
-    def __init__(self, scene:QuadTreeScene, undo_stack=None, parent=None):
+    def __init__(self, scene:QuadTreeScene, undo_stack: Any =None, parent: QObject | None =None) -> None:
         super().__init__(parent)
         self.m_items = {}           # ID->图元  映射字典
         self.m_name_items = {}      # name->id  映射字典
@@ -2008,13 +2130,13 @@ class SceneManager(QObject):
         self.completed_item_signal.connect(self.addItem,Qt.UniqueConnection)
 
     # -- 批量排序 ----------------------------------------------------
-    def begin_batch(self):
+    def begin_batch(self) -> None:
         """进入批量模式：跳过每次 addItem/deleteItem 的全量排序。"""
 
         self._suspend_sort = True
         self._sort_dirty = False
 
-    def end_batch(self):
+    def end_batch(self) -> None:
         """退出批量模式并补一次排序。"""
 
         self._suspend_sort = False
@@ -2034,7 +2156,7 @@ class SceneManager(QObject):
         
 
     # 创建图元
-    def createItem(self, item_class, *args, **kwargs):
+    def createItem(self, item_class: type, *args: Any, **kwargs: Any) -> Any:
         item = item_class(*args, **kwargs)  # 动态创建图元
         item.set_scene_ref(self.m_scene)
         item.set_scene_manager_ref(self)
@@ -2127,7 +2249,7 @@ class SceneManager(QObject):
         # self.m_undoStack.push(CreateCommand(item, self))
         return item
     
-    def sort_items_by_zValue(self):
+    def sort_items_by_zValue(self) -> None:
         """根据Z值从小到大排序"""
 
         if self._suspend_sort:
@@ -2141,14 +2263,21 @@ class SceneManager(QObject):
     #     items = [value for value in self.m_items.values()]
     #     self.m_sorted_items = sorted(items, key=lambda item: item.zValue(),reverse=True)
 
-    def addItem(self,*arg):
+    def addItem(self,*arg: Any) -> Any:
        
         item = arg[0]
         construct_from_dict = arg[1]
         # 注册到管理容器
         self.m_items[item.id()] = item
         debug_log(self.m_items.keys())
-       
+
+        # 运行态加载/创建的图元默认不可选：不少运行窗口是先
+        # ``set_scene_mode(Run)`` 再加载场景，``set_scene_mode`` 里那轮
+        # 批量设置扑空，只能在图元进场景时兜底。
+        if self.m_scene.mode() == SceneMode.Run:
+            item.set_selected_anyway(False)
+            item.set_selectable(False)
+
         self.m_scene.addItem(item)
 
         item.set_zValue(item.id())     if not construct_from_dict else None
@@ -2166,7 +2295,7 @@ class SceneManager(QObject):
         
         debug_log(f"加入id:{item.id()}type:{item.type}到了场景")
 
-    def re_addItem_to_tree(self,id):
+    def re_addItem_to_tree(self,id: int) -> None:
         
         if id in self.m_items.keys():
             item = self.findItem(id)
@@ -2174,7 +2303,7 @@ class SceneManager(QObject):
             self.m_scene.quadtree.insert(item)
             # print(f'更新图元{id}在树的位置')
     # 删除图元
-    def deleteItem(self, item:base_element):
+    def deleteItem(self, item:base_element) -> None:
         debug_log(f"准备删除id{item.id()}")
         self.m_items[item.id()] =None
         del self.m_items[item.id()]
@@ -2193,11 +2322,11 @@ class SceneManager(QObject):
         
 
     # 查找图元
-    def findItem(self, id):
+    def findItem(self, id: int) -> Optional[base_element]:
         return self.m_items.get(id, None)
 
 
-    def findItemByName(self, name):
+    def findItemByName(self, name: str) -> Optional[base_element]:
         item_id = self.m_name_items.get(name, None)
         if item_id is not None:
             return self.findItem(item_id)
@@ -2206,7 +2335,7 @@ class SceneManager(QObject):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("test")
         self.resize(1200, 800)

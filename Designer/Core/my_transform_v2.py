@@ -1,8 +1,17 @@
 
+from __future__ import annotations
+
 import math
 import enum
+from typing import List, Union
+
 from PySide6.QtCore import QPointF
-from PySide6.QtGui import QTransform 
+from PySide6.QtGui import QTransform
+
+# 3x3 行主序矩阵（Qt 的 QTransform 内部是列主序，本类自定义为行主序）
+Mat3 = List[List[float]]
+# translate() 支持 (dx, dy) 或单个 QPointF
+TranslateArg = Union[float, QPointF]
 
 
 class Transform:
@@ -14,7 +23,9 @@ class Transform:
         TxRotate                 : QTransform.TransformationType = ... # 0x4
         TxShear                  : QTransform.TransformationType = ... # 0x8
         TxProject                : QTransform.TransformationType = ... # 0x10
-    def __init__(self, matrix=None):
+    m: Mat3
+
+    def __init__(self, matrix: Mat3 | None = None) -> None:
         if matrix is None:
             self.m = [
                 [1.0, 0.0, 0.0],
@@ -29,10 +40,10 @@ class Transform:
         self._rot_key = None
         self._rot_angle = 0.0
 
-    def get_matrix(self):
+    def get_matrix(self) -> Mat3:
         return self.m
     
-    def get_rotation_angle(self):
+    def get_rotation_angle(self) -> float:
         """从2D旋转矩阵获取角度(度)。
 
         角度只依赖矩阵左上 2x2 的旋转分量。矩阵是通过整体赋值 ``self.m = ...``
@@ -45,7 +56,7 @@ class Transform:
             self._rot_angle = math.degrees(math.atan2(self.m[0][1], self.m[0][0]))
         return self._rot_angle
     
-    def translate(self, *args):
+    def translate(self, *args: TranslateArg) -> Transform:
         """在现有变换基础上叠加平移变换"""
         # 解析参数
         if len(args) == 1 and isinstance(args[0], QPointF):
@@ -74,7 +85,7 @@ class Transform:
         return self
     
 
-    def rotate(self, angle):
+    def rotate(self, angle: float) -> Transform:
         """在现有变换基础上叠加旋转变换"""
 
         rad = math.radians(angle)
@@ -93,7 +104,7 @@ class Transform:
         # self.m = R.m
         return self
     
-    def rotate_around(self, angle, pivot: QPointF):
+    def rotate_around(self, angle: float, pivot: QPointF) -> Transform:
         """绕指定点旋转"""
         # 1. 平移到原点
         self.translate(pivot.x(), pivot.y())
@@ -103,14 +114,14 @@ class Transform:
         self.translate(-pivot.x(), -pivot.y())
         return self
 
-    def determinant(self):
+    def determinant(self) -> float:
         """计算行列式（正确实现）"""
         m = self.m
         return (m[0][0] * (m[1][1]*m[2][2] - m[1][2]*m[2][1]) -
                 m[0][1] * (m[1][0]*m[2][2] - m[1][2]*m[2][0]) +
                 m[0][2] * (m[1][0]*m[2][1] - m[1][1]*m[2][0]))
     
-    def inverted(self):
+    def inverted(self) -> Transform:
         """计算逆矩阵（简化接口）"""
         det = self.determinant()
         
@@ -141,7 +152,7 @@ class Transform:
         ]
         
         return Transform(inv_m)
-    def __mul__(self, other):
+    def __mul__(self, other: Transform) -> Transform:
         """矩阵乘法（---行主序）"""
         result = [[0.0]*3 for _ in range(3)]
         for i in range(3):
@@ -159,7 +170,7 @@ class Transform:
     #         result[i][2] = self.m[i][0]*other.m[0][2] + self.m[i][1]*other.m[1][2] + self.m[i][2]*other.m[2][2]
     #     return Transform(result)
     
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Transform):
             return False
         if self is other:
@@ -177,10 +188,10 @@ class Transform:
                     return False
         return True
     
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         return not self.__eq__(other)
     
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"Transform(\n"
             f"  [{self.m[0][0]:.4f}, {self.m[0][1]:.4f}, {self.m[0][2]:.4f}]\n"
@@ -189,7 +200,7 @@ class Transform:
             ")"
         )
     
-    def map(self, point: QPointF):
+    def map(self, point: QPointF) -> QPointF:
         """应用变换到点（行主序）"""
         x, y = point.x(), point.y()
         # 用局部变量展开矩阵，避免热路径上的重复 list 索引
@@ -208,7 +219,7 @@ class Transform:
             # 当 w ≈ 0 时，返回无效点
             return QPointF(float('nan'), float('nan'))
     
-    def map_inverse(self, point):
+    def map_inverse(self, point: QPointF) -> QPointF:
         """应用逆变换到点"""
         inv = self.inverted()
         return inv.map(point)

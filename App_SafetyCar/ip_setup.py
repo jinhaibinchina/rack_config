@@ -4,7 +4,7 @@ from PySide6.QtGui import QIntValidator, QKeyEvent
 
 from . import global_variables as gv
 from .my_QWidgets import my_text_value_editable
-from .my_data_broker import DataBroker
+from common.com.modbus import DataBroker
 
 
 

@@ -598,6 +598,7 @@ class RackStatusPanelModel(QObject):
         self._dirty = False
         self.refresh()
 
+        self.group.set_visibility(False)  # 面板组默认可见
 
     def hide_all(self) -> None:
         """把所有灯和文本都隐藏起来。"""

@@ -16,8 +16,8 @@ from Designer.Core.my_common import SceneMode
 
 from dataclasses import dataclass
 from typing import List,Optional
-from .my_data_broker import DataBroker
-from .my_modbus import get_bool,set_bool,get_int
+from common.com.modbus import DataBroker
+from common.com.modbus import get_bool,set_bool,get_int
 import time
 from datetime import datetime
 
@@ -27,6 +27,8 @@ FALSE_COLOR = QColor(54,108,80)
 TRUE_COLOR = OK_COLOR  = QColor(0,255,0)
 ERR_COLOR  = QColor(255,0,0)
 YELLOW_COLOR =QColor(255,255,0)
+
+CABINET_NAMES = ("维修区/安全门","上架X4","拣选X4","安全门X1","输送线X2","Q1P拣选/Q3P拣选","Q3P托盘X2","输送线X4","主电柜")
 
 def validate_bool_list_16(value: List[bool]) -> List[bool]:
     if not isinstance(value, list) or len(value) != 16 or not all(isinstance(x, bool) for x in value):

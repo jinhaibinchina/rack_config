@@ -1,9 +1,9 @@
 {
     "sceneRect": {
-        "x": -1232.3187871850323,
-        "y": -1570.9112114052596,
-        "width": 3221.773208895125,
-        "height": 6166.633679174472
+        "x": -1175.8732429894226,
+        "y": -3818.368187275831,
+        "width": 3581.038875286519,
+        "height": 6854.285979474031
     },
     "backgroundColor": "#ffffffff",
     "items": [
@@ -22,8 +22,8 @@
                 "x": 1346.845,
                 "y": 1409.718
             },
-            "width": 96.0,
-            "height": 576.0,
+            "width": 104.0,
+            "height": 544.0,
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
@@ -55,8 +55,8 @@
                 "x": 1180.335,
                 "y": 1329.133
             },
-            "width": 96.0,
-            "height": 740.0,
+            "width": 104.0,
+            "height": 708.0,
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
@@ -88,8 +88,8 @@
                 "x": 1017.039,
                 "y": 1281.718
             },
-            "width": 96.0,
-            "height": 832.0,
+            "width": 104.0,
+            "height": 800.0,
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
@@ -121,8 +121,8 @@
                 "x": 788.116,
                 "y": 1021.389
             },
-            "width": 104.0,
-            "height": 404.0,
+            "width": 100.0,
+            "height": 252.0,
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
@@ -154,8 +154,8 @@
                 "x": 570.338,
                 "y": 1023.074
             },
-            "width": 104.0,
-            "height": 404.0,
+            "width": 100.0,
+            "height": 252.0,
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
@@ -265,6 +265,39 @@
                 "cornerRadius": 77.0
             },
             "zValue": 3
+        },
+        {
+            "id": 16,
+            "name": "控件_10",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1545.233,
+                "y": 1372.769
+            },
+            "origin_pos": {
+                "x": 1545.233,
+                "y": 1372.769
+            },
+            "width": 100.0,
+            "height": 608.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 16,
+            "widgetText": "料架全局参数设置",
+            "widgetType": "label",
+            "widgetFontSize": 14,
+            "widgetColor": "#000000",
+            "widgetBackground": "#00aaff"
         }
     ]
 }

@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 # from my_elements_v2 import rect_element, line_element, circle_element, base_element, group_element, text_element
+from typing import Any, Protocol
+
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, 
     QTreeWidget, QTreeWidgetItem, QStackedWidget, QLabel, QFrame,QScrollArea,QFileDialog,
     QListWidget, QListWidgetItem, QPushButton, QGroupBox,QColorDialog,QCheckBox,
     QTextEdit, QStyleFactory,QLineEdit,QSpinBox,QSpacerItem,QSizePolicy,QComboBox
 )
-from PySide6.QtGui import QFont,QColor
+from PySide6.QtGui import QFont,QColor,QMouseEvent
 from PySide6.QtCore import Qt,QObject,Property,QPointF,QSizeF,Signal
 # from my_elements_v2 import base_element,text_element,line_element,rect_element,image_element
 
@@ -21,10 +25,34 @@ from .elements import (
 )
 
 
+class NavigationHost(Protocol):
+    """run_property 用到的最小导航容器接口。
+
+    NavigationContentWidget 反过来会 import 本模块，直接互相 import 会成环，
+    所以这里只声明用到的成员，由 NavigationContentWidget 结构化匹配。
+    """
+
+    navigation_tree: QTreeWidget
+    _building_navigation: bool
+    # QObject 信号实例，具体类型由实现方决定
+    destory_current: Any
+
+    def add_page(self, page_id: str, title: str, widget: QWidget) -> None: ...
+
+    def select_preferred_page(self) -> None: ...
+
+
 class CabinetPropertyItem(QObject):
     """文本属性窗口 - 优化布局"""
-    
-    def __init__(self, parent=None,item:group_element=None):
+
+    item: group_element | None
+    navi: NavigationHost | None
+
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: group_element | None = None,
+    ) -> None:
         super().__init__(parent=parent)
         self.navi = None
         self.item = item
@@ -32,7 +60,7 @@ class CabinetPropertyItem(QObject):
     
     
          
-    def add_navigation_items(self,navigation):
+    def add_navigation_items(self, navigation: NavigationHost) -> None:
         # 添加顶级项
         if "维修区/安全门" in self.item.get_name():
             categories = [
@@ -166,7 +194,7 @@ class CabinetPropertyItem(QObject):
         navigation.destory_current.connect(self.on_destory_current)        
         self.handle_itemSelectionChanged()
 
-    def debug_mousePressEvent(self, event):
+    def debug_mousePressEvent(self, event: QMouseEvent) -> None:
         """调试鼠标按下事件"""
         print(f"\n鼠标按下事件: {event.pos()}")
         item = self.navi.navigation_tree.itemAt(event.pos())
@@ -177,7 +205,7 @@ class CabinetPropertyItem(QObject):
         # 调用原始事件处理
         QTreeWidget.mousePressEvent(self.navi.navigation_tree, event)
 
-    def handle_itemSelectionChanged(self):
+    def handle_itemSelectionChanged(self) -> None:
         print("\n--- handle_itemSelectionChanged被调用 ---")
         if not hasattr(self, 'navi') or not self.navi:
             print("错误: navi对象不存在")
@@ -214,11 +242,11 @@ class CabinetPropertyItem(QObject):
           
         # print(self.navi.navigation_tree.currentItem().columnCount())
                 
-    def on_destory_current(self):
+    def on_destory_current(self) -> None:
         self.item =None
         self.navi.destory_current.disconnect(self.on_destory_current)
 
-    def create_content_pages(self,navi):
+    def create_content_pages(self, navi: NavigationHost) -> None:
         # 创建内容页面
         if   "维修区/安全门" in self.item.get_name():
             navi.add_page("maintain_station",     "维修区工作站"    , self.create_page_maintain()    )
@@ -253,7 +281,7 @@ class CabinetPropertyItem(QObject):
         
         elif "主电柜" in self.item.get_name():
             navi.add_page("main_station",     "主电柜工作站"        , self.create_page_main()    )
-    def create_page_maintain(self):
+    def create_page_maintain(self) -> QWidget:
         page = QWidget()
         layout  = QVBoxLayout(page)
         tips_group=QGroupBox("维修区工作站逻辑说明")
@@ -273,7 +301,7 @@ class CabinetPropertyItem(QObject):
         layout.addWidget(tips_group)
         return page
     
-    def create_page_safedoor(self):
+    def create_page_safedoor(self) -> QWidget:
         page = QWidget()
         layout  = QVBoxLayout(page)
         tips_group=QGroupBox("安全门工作站逻辑说明")
@@ -293,7 +321,7 @@ class CabinetPropertyItem(QObject):
         layout.addWidget(tips_group)
         return page
     
-    def create_page_shangjia(self):
+    def create_page_shangjia(self) -> QWidget:
         page = QWidget()
         layout  = QVBoxLayout(page)
         tips_group=QGroupBox("上架工作站逻辑说明")
@@ -316,7 +344,7 @@ class CabinetPropertyItem(QObject):
         layout.addWidget(tips_group)
         return page
     
-    def create_page_jianxuan(self):
+    def create_page_jianxuan(self) -> QWidget:
         page = QWidget()
         layout  = QVBoxLayout(page)
         tips_group=QGroupBox("拣选工作站逻辑说明")
@@ -335,7 +363,7 @@ class CabinetPropertyItem(QObject):
         layout.addWidget(tips_group)
         return page
     
-    def create_page_convey(self):
+    def create_page_convey(self) -> QWidget:
         page = QWidget()
         layout  = QVBoxLayout(page)
         tips_group=QGroupBox("输送线工作站逻辑说明")
@@ -356,7 +384,7 @@ class CabinetPropertyItem(QObject):
         return page
     
 
-    def create_page_q3p_jianxuan(self):
+    def create_page_q3p_jianxuan(self) -> QWidget:
         page = QWidget()
         layout  = QVBoxLayout(page)
         tips_group=QGroupBox("q3p拣选工作站逻辑说明")
@@ -372,7 +400,7 @@ class CabinetPropertyItem(QObject):
         layout.addWidget(tips_group)
         return page
     
-    def create_page_q3p_tuopan(self):
+    def create_page_q3p_tuopan(self) -> QWidget:
         page = QWidget()
         layout  = QVBoxLayout(page)
         tips_group=QGroupBox("q3p托盘工作站逻辑说明")
@@ -389,7 +417,7 @@ class CabinetPropertyItem(QObject):
         return page
 
 
-    def create_page_main(self):
+    def create_page_main(self) -> QWidget:
         page = QWidget()
         layout  = QVBoxLayout(page)
         tips_group=QGroupBox("主电柜工作台逻辑说明")

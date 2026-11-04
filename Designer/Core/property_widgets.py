@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -450,7 +450,11 @@ class ColorField(QWidget):
 
     colorChanged = Signal(QColor)
 
-    def __init__(self, color: Optional[QColor] = None, parent=None):
+    def __init__(
+        self,
+        color: Optional[QColor] = None,
+        parent: Optional[QWidget] = None,
+    ) -> None:
         super().__init__(parent)
         self.setMaximumWidth(300)
         _fit_policy(self, 150)
@@ -527,7 +531,7 @@ class OpacityField(QWidget):
 
     valueChanged = Signal(int)
 
-    def __init__(self, value: int = 255, parent=None):
+    def __init__(self, value: int = 255, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setMaximumWidth(380)
         _fit_policy(self, 160)
@@ -594,7 +598,12 @@ class SectionCard(QFrame):
     值控件横跨三列，放两对时各占一列，因此同一张卡片里两种排布都对齐。
     """
 
-    def __init__(self, title: str, parent=None, expanded: bool = True):
+    def __init__(
+        self,
+        title: str,
+        parent: Optional[QWidget] = None,
+        expanded: bool = True,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("propSection")
         outer = QVBoxLayout(self)
@@ -648,7 +657,7 @@ class SectionCard(QFrame):
     def body(self) -> QWidget:
         return self._body
 
-    def add_row(self, *pairs) -> None:
+    def add_row(self, *pairs: Optional[tuple[str, QWidget]]) -> None:
         """一行放 1 或 2 组 ``(标签, 控件)``。
 
         字段的水平策略是 ``Ignored``，所以每行两个字段按 stretch 严格等分
@@ -698,7 +707,7 @@ class SectionCard(QFrame):
         self._arrow.setText("\u25be" if self._expanded else "\u25b8")
         self._body.setVisible(self._expanded)
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if obj is self._header and event.type() == event.Type.MouseButtonRelease:
             self.toggle()
             return True
@@ -712,7 +721,7 @@ class ObjectHeader(QWidget):
     设计时一眼就能确认“我改的是哪个图元”，不必回到画布上找。
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setObjectName("propHeader")
         self.setFixedHeight(52)
@@ -749,7 +758,12 @@ class ObjectHeader(QWidget):
 class EmptyState(QWidget):
     """没有可编辑对象时占位，顺带给出画布上的常用操作。"""
 
-    def __init__(self, title: str, hint: str, parent=None):
+    def __init__(
+        self,
+        title: str,
+        hint: str,
+        parent: Optional[QWidget] = None,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("propPage")
         layout = QVBoxLayout(self)
@@ -772,7 +786,7 @@ class EmptyState(QWidget):
 class PropertyPage(QWidget):
     """一个导航页的容器：纵向堆叠卡片 + 末尾留白。"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setObjectName("propPage")
         self._layout = QVBoxLayout(self)

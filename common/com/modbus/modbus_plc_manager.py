@@ -1,5 +1,5 @@
 # import snap7
-from . import my_modbus
+from common.com.modbus import modbus
 from typing import Optional,List,Union
 
 from PySide6.QtCore import QThread, QObject, Signal, Qt, Slot, QMutex
@@ -14,7 +14,7 @@ class PLCManager(QObject):
     def __init__(self,parent=None, ip: str=""):
         super().__init__(parent)
         self.ip = ip
-        self.client: Optional[my_modbus.ModbusClient] = None
+        self.client: Optional[modbus.ModbusClient] = None
         self.lock = QMutex()
         self.connected = False
         
@@ -28,7 +28,7 @@ class PLCManager(QObject):
         self.lock.lock()
         try:
             if self.client is None:
-                self.client = my_modbus.ModbusClient()
+                self.client = modbus.ModbusClient()
             if self.client.connect(self.ip):
                 self.setConnected(True)
                

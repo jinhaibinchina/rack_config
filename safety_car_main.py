@@ -64,10 +64,10 @@ from App_SafetyCar.ip_setup import ip_setup_window
 
 from Designer.modes.design.project_store import ProjectStore
 from Designer.Core.my_common import SceneMode
-from App_SafetyCar.my_data_broker import DataBroker
-from App_SafetyCar.my_modbus import get_bool, set_bool
-from App_SafetyCar.my_plc_manager import PLCManager
-from App_SafetyCar.my_plc_safety import Ui_safety_display, int_to_hex, plc_safety
+from common.com.modbus.modbus_data_broker import DataBroker
+from common.com.modbus.modbus import get_bool, set_bool
+from common.com.modbus.modbus_plc_manager import PLCManager
+from App_SafetyCar.my_plc_safety import Ui_safety_display, int_to_hex, plc_safety ,CABINET_NAMES
 from Designer.Core.myQuadTreeScene import QuadTreeScene, SceneManager
 from App_SafetyCar.parames_set_ui import Ui_Dialog as Ui_parames_set
 from App_SafetyCar.station_status_query_ui import Ui_Dialog as Ui_station_status_query
@@ -284,6 +284,8 @@ class SafetyCarWindow(QMainWindow):
         self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
         self.resizeDocks([self.project_dock, self.tool_dock], [200, 200], Qt.Horizontal)
 
+
+
         # 场景选中变化 -> 安全点位联动 + 站点说明面板
         self.scene.selectionChanged.connect(self.plc_safety.handle_selectionChanged)
         self.scene.selectionChanged.connect(self.update_property_area)
@@ -449,8 +451,22 @@ class SafetyCarWindow(QMainWindow):
 
         # 只读加载页面文件；运行态布局改动不会写回设计数据。
         self.scene.load_element_info_run_mode('safety_car_scene.json')
+
         if self.scene.mode() != SceneMode.Run:
+
             self.scene.toggle_sence_mode()
+            from Designer.Core.elements import group_element 
+            for child in self.scene_manager.m_sorted_items:
+                if isinstance(child, group_element) :
+                    for name in CABINET_NAMES:
+                        if name in child.get_name():
+                            child.set_interactive(True)
+
+            group = self.scene_manager.findItemByName("IO状态")
+            group.set_interactive(False)
+            group = self.scene_manager.findItemByName("维修区")
+            group.set_interactive(False)
+
         self.plc_safety.on_item_changed()
 
         # 未连接 PLC 前不注册渲染回调，避免访问空的 data_broker。
@@ -621,7 +637,9 @@ class SafetyCarWindow(QMainWindow):
     def update_property_area(self):
         """场景选择变化时刷新站点说明面板。"""
         selected_item = self.scene.current_selected
-        if not selected_item:
+        # ``current_selected`` 的初值就是场景自身（见 myGraphicsScene.__init__），
+        # 那不是「选中了某个图元」，不能用真值判断兜住。
+        if not selected_item or selected_item is self.scene:
             return
 
         if not self.property_dock.isVisible():

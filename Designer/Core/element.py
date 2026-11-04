@@ -8,7 +8,7 @@ import os,sys
 DEBUG_SCENE = os.environ.get("RACK_DEBUG_SCENE", "") == "1"
 
 
-def debug_log(*args, **kwargs) -> None:
+def debug_log(*args: object, **kwargs: object) -> None:
     if DEBUG_SCENE:
         print(*args, **kwargs)
 
@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, QEvent,QObject,QRegularExpression,QPointF,QPoint,QRect,Signal,QPropertyAnimation,QEasingCurve,Property,QSize,QRectF,QSizeF
 
 from math import sin,cos ,atan,pi,sqrt
-from typing import overload,Union,List,Optional,TYPE_CHECKING
+from typing import Any, overload,Union,List,Optional,TYPE_CHECKING
 from PySide6.QtGui import QFont,QColor, QPainter, QTransform, QRegion,QAction, QRegularExpressionValidator, QPalette,QPen,QPainterPath,QPainterPathStroker,QFontMetrics,QPixmap
 from .my_transform_v2 import Transform
 import time
@@ -30,7 +30,7 @@ from .my_common import SceneMode
 if TYPE_CHECKING:
     from .elements import group_element
 
-def is_group_element(item) -> bool:
+def is_group_element(item: object) -> bool:
     """判断图元是否为 group_element
 
     element 与 elements 之间存在循环导入（elements 依赖 element），
@@ -69,6 +69,33 @@ def str_to_color(color_str: str) -> QColor:
 
 class base_element(QObject):
 
+    # --- 核心状态 ------------------------------------------------------
+    # 场景与管理器类型定义在 myGraphicsScene / myQuadTreeScene，与图元互相
+    # 引用，顶层无法写出具体类型（会形成循环导入），因此统一用 Any，
+    # 由调用点按鸭子类型使用（update/rect_sceneToView/...）。
+    m_scene: Any
+    m_scene_manager: Any
+    m_parent: base_element | None
+    m_children: set[base_element]
+    m_children_ids: set[int]
+    m_parent_id: int
+    m_pos: QPointF
+    m_origin: QPointF
+    m_pos_init: QPointF
+    m_transform: Transform
+    m_angle: float
+    m_angle_init: float
+    m_veiw_dirty_region: QRegion
+    _sceneBoundingRect: QRectF
+    _select_sceneBoundingRect: QRectF
+    _m_id: int
+    _group_id: int
+    _name: str
+    _color: QColor
+    _fill_color: QColor
+    _event_bindings: dict[str, dict[str, Any]]
+    _interactive: bool
+
     geometryChangeToChild = Signal()#告知子图元位置已改变
 
     # Interactive signals.  They are declared on the base class so every
@@ -94,7 +121,7 @@ class base_element(QObject):
         EVENT_TOGGLE,
     )
 
-    def __init__(self,parent=None):
+    def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent=parent)
         self.__active = False
         self.__hover  = False
@@ -196,7 +223,7 @@ class base_element(QObject):
 
         self._interactive = False
 
-    def set_interactive(self, enable):
+    def set_interactive(self, enable: bool) -> None:
         """运行态是否参与点击命中测试。
 
         纯代码 ``clicked.connect(...)`` 不会产生事件绑定表，只有打开这个
@@ -205,29 +232,29 @@ class base_element(QObject):
         """
         self._interactive = bool(enable)
 
-    def is_interactive(self):
+    def is_interactive(self) -> bool:
         return self._interactive
 
 
-    def set_dirty_region(self,dirty_region):
+    def set_dirty_region(self,dirty_region: QRegion) -> None:
         self.m_veiw_dirty_region = dirty_region
   
-    def set_group_in_hover(self,enable):
+    def set_group_in_hover(self,enable: bool) -> None:
         if self.__selectable == False:
             self._is_group_in_hover = False
             return
         self._is_group_in_hover = enable
 
-    def get_scene_head_pos(self):
+    def get_scene_head_pos(self) -> QPointF:
         return self.mapToScene(self._head_pos)
-    def get_scene_end_pos(self):
+    def get_scene_end_pos(self) -> QPointF:
         return self.mapToScene(self._end_pos )
-    def get_scene_center_pos(self):
+    def get_scene_center_pos(self) -> QPointF:
         return self.mapToScene(self._center_pos)
-    def get_scene_OriginPoint(self):
+    def get_scene_OriginPoint(self) -> QPointF:
         return self.mapToScene(self.m_origin)
 
-    def prepareGeometryChange(self):
+    def prepareGeometryChange(self) -> None:
         """图元边界变化前调用"""
         if self.m_scene :
             if not self.m_this_frame_flag :
@@ -235,17 +262,17 @@ class base_element(QObject):
 
                 self.m_this_frame_flag =True
     
-    def prepareDirtyChange(self):
+    def prepareDirtyChange(self) -> None:
         if self.m_scene :
             if not self.m_this_frame_flag_2 :
                 self.m_scene.item_DirtyChange.emit(self)
                 self.m_this_frame_flag_2 =True
 
-    def set_scene_ref(self,scene):
+    def set_scene_ref(self,scene: Any) -> None:
         self.m_scene =scene
         self.m_scene.shine_flag_change.connect(self.handle_shine_flag)
         # print(self.m_scene)
-    def handle_shine_flag(self):
+    def handle_shine_flag(self) -> None:
         current_time = time.time()*1000
         if self.__selected:
             
@@ -254,43 +281,43 @@ class base_element(QObject):
                 self.prepareDirtyChange()
           
 
-    def set_scene_manager_ref(self,scene_manager):
+    def set_scene_manager_ref(self,scene_manager: Any) -> None:
         self.m_scene_manager =scene_manager
         # print(self.m_scene_manager)
 
-    def get_angle(self):
+    def get_angle(self) -> float:
         return self.m_angle
     
-    def set_angle(self,ang):
+    def set_angle(self,ang: float) -> None:
         self.m_angle =ang
 
-    def set_angle_init(self,ang):
+    def set_angle_init(self,ang: float) -> None:
         self.m_angle_init =ang
 
-    def get_angle_init(self):
+    def get_angle_init(self) -> float:
         return self.m_angle_init
     
-    def get_angle_to_init(self):
+    def get_angle_to_init(self) -> float:
         return self.m_angle-self.m_angle_init
     
-    def set_m_pos_init(self,pos):
+    def set_m_pos_init(self,pos: QPointF) -> None:
         self.m_pos_init =pos
 
-    def get_m_pos_init(self):
+    def get_m_pos_init(self) -> QPointF:
         return self.m_pos_init
     
-    def is_has_child(self):
+    def is_has_child(self) -> bool:
         return len(self.m_children )>0
     
-    def is_has_parent(self):
+    def is_has_parent(self) -> bool:
         return self.m_parent is not None
     
-    def parentItem(self):
+    def parentItem(self) -> base_element | None:
         return self.m_parent
-    def childItems(self):
+    def childItems(self) -> set[base_element]:
         return self.m_children
 
-    def _notify_children_geometry_change(self):
+    def _notify_children_geometry_change(self) -> None:
         """父图元移动/变换后，递归同步子图元的场景包围盒。
 
         子图元的 ``_sceneBoundingRect`` 依赖父链变换，且只在自己的
@@ -303,16 +330,16 @@ class base_element(QObject):
             child.__check_position_change()
             child._notify_children_geometry_change()
 
-    def _reset_moving_flag(self):
+    def _reset_moving_flag(self) -> None:
         self.__moving_flag = False
         # 本帧绘制已经消费掉变换缓存，同步清掉 mapToScene() 记录的
         # “正在移动”快照；否则 check_hover() 会把静止图元当成拖拽中，
         # 永远拒绝命中，运行态点击图元（电柜等分组）就会没有反应。
         self.__is_moving = False
-    def is_moving(self):
+    def is_moving(self) -> bool:
         return self.__is_moving
     
-    def update_boundingRect(self):
+    def update_boundingRect(self) -> None:
         """子类实现 ,钩子"""
         self.__moving_flag = True
 
@@ -323,7 +350,7 @@ class base_element(QObject):
        
    
     
-    def __check_position_change(self):#__check_local_geometry_change
+    def __check_position_change(self) -> None:  #__check_local_geometry_change
 
         current_transform = self.sceneTransform()
         # 缓存命中时是同一个对象，先用身份判断短路，避免 9 次浮点比较
@@ -337,7 +364,7 @@ class base_element(QObject):
         """获取位置"""
         return self.m_pos
     
-    def setPos(self, *args):
+    def setPos(self, *args: float | QPointF) -> None:
         """设置位置"""
         pos = QPointF()
         if   len(args) == 1:  # QPoint输入
@@ -367,35 +394,35 @@ class base_element(QObject):
         # 否则子图元同样会因为包围盒滞后而在拖回视口后被永久裁掉。
         self._notify_children_geometry_change()
 
-    def handle_parent_move(self):
+    def handle_parent_move(self) -> None:
         """父图元位置变化"""
         # self.__check_position_change()
         self.update_boundingRect()
 
-    def setRotation(self,ang):
+    def setRotation(self,ang: float) -> None:
         self.m_transform.rotate_around(ang,self.m_origin)
         # m_transform 是原地修改，必须让变换缓存与下一帧重绘生效
         self.invalidate_transform_cache()
         # self.__check_position_change()
     
-    def transform(self):
+    def transform(self) -> Transform:
         """获取变换矩阵"""
         return self.m_transform
     
-    def setTransform(self, transform):
+    def setTransform(self, transform: Transform) -> None:
         """设置变换矩阵"""
         self.m_transform = transform
         self.invalidate_transform_cache()
         if not self.m_parent and self.__active==False:
             self.__check_position_change()
     
-    def transformOriginPoint(self):
+    def transformOriginPoint(self) -> QPointF:
         """获取变换原点"""
         return  QPointF(self.m_origin)
-    def get_scene_transformOriginPoint(self):
+    def get_scene_transformOriginPoint(self) -> QPointF:
         return self.mapToScene(self.m_origin)
     
-    def setTransformOriginPoint(self,  *args):
+    def setTransformOriginPoint(self,  *args: float | QPointF) -> None:
         """设置变换原点"""
         pos = QPointF()
         if len(args) == 1:    # QPoint输入
@@ -411,7 +438,7 @@ class base_element(QObject):
         
         # print(f"设置初始的转中心{pos}")
    
-    def reSetTransformOriginPoint(self,  *args):#group变动之后执行会出错
+    def reSetTransformOriginPoint(self,  *args: float | QPointF) -> None:  #group变动之后执行会出错
         """设置变换原点"""
         if self.m_parent is not None :
             debug_log("图元已存在父图元")
@@ -431,12 +458,12 @@ class base_element(QObject):
         print(f"设置新的转中心 {self.m_origin}")
 
 
-    def parentItem(self):
+    def parentItem(self) -> base_element | None:
         """获取父图形项"""
         return self.m_parent
     
     
-    def __check_generation(self, parent_id):
+    def __check_generation(self, parent_id: int) -> bool:
         if self.is_has_child():
             for child in self.m_children:
                 if child.id() == parent_id:
@@ -445,7 +472,7 @@ class base_element(QObject):
                 if child.__check_generation(parent_id):
                     return True
         return False
-    def setParentItem(self, parent):
+    def setParentItem(self, parent: base_element) -> None:
         """设置父图形项 后继承变换
         +pos_scene x M独  = Tr独
         M独 =(-pos_scene)x Tr全 =((-pos_scene)xTr父)xTr子
@@ -498,7 +525,7 @@ class base_element(QObject):
 
         debug_log(parent.id(), parent.m_children)
 
-    def removeParentItem(self, force=False):
+    def removeParentItem(self, force: bool =False) -> None:
         """移除父图元后继承变换
         
         （-pos_scene）x Tr全 = M独
@@ -527,7 +554,7 @@ class base_element(QObject):
         self.m_parent   = None
         self.invalidate_transform_cache()
 
-    def Delete(self):
+    def Delete(self) -> None:
         """Remove this element, together with everything it owns, from the scene.
 
         Elements that still had children used to be skipped entirely, so a
@@ -557,13 +584,13 @@ class base_element(QObject):
             pass
         self.m_scene_manager.delete_item_signal.emit(self)
 
-    def setChildItem(self,child):
+    def setChildItem(self,child: base_element) -> None:
         child.setParentItem(self)
     
-    def removeChildItem(self,child,force=False):
+    def removeChildItem(self,child: base_element,force: bool =False) -> None:
         child.removeParentItem(force)
 
-    def removeChildsItem(self):
+    def removeChildsItem(self) -> None:
         """解除父子关系，force=True时包含group"""
         if not self.is_has_child():
             return
@@ -586,7 +613,7 @@ class base_element(QObject):
         
 
 
-    def invalidate_transform_cache(self, mark_dirty=True):
+    def invalidate_transform_cache(self, mark_dirty: bool =True) -> None:
         """几何变化后调用：丢弃变换缓存，并让 mapToScene / 下一帧绘制使用新变换。
 
         位置(m_pos)本身由 itemTransform() 的取值校验覆盖，任何直接给 m_pos
@@ -603,7 +630,7 @@ class base_element(QObject):
         if mark_dirty:
             self.prepareDirtyChange()
 
-    def itemTransform(self):
+    def itemTransform(self) -> Transform:
         """
         计算从图元局部坐标系到父坐标系的变换（带缓存）
 
@@ -629,7 +656,7 @@ class base_element(QObject):
             self._tf_item_cache = t
         return self._tf_item_cache
     
-    def sceneTransform(self):
+    def sceneTransform(self) -> Transform:
         """
         计算从图元局部坐标系到场景坐标系的变换（带缓存）
 
@@ -654,11 +681,11 @@ class base_element(QObject):
             self._tf_scene_own = own_transform
         return self._tf_scene_cache
     
-    def mapToParent(self, point):
+    def mapToParent(self, point: QPointF) -> QPointF:
         """将点从局部坐标系映射到父坐标系"""
         return self.itemTransform().map(point)
     
-    def mapToScene(self, point):
+    def mapToScene(self, point: QPointF) -> QPointF:
         """将点从局部坐标系映射到场景坐标系
 
         sceneTransform() 自带缓存且会按 m_pos 校验，因此这里总是用实时变换，
@@ -667,19 +694,19 @@ class base_element(QObject):
         self.__is_moving = self.__moving_flag
         return self.sceneTransform().map(point)
     
-    def mapFromParent(self, point):
+    def mapFromParent(self, point: QPointF) -> QPointF:
         """将点从父坐标系映射到局部坐标系"""
         # 计算逆变换
         inv_transform = self.itemTransform().inverted()
         return inv_transform.map(point)
     
-    def mapFromScene(self, point):
+    def mapFromScene(self, point: QPointF) -> QPointF:
         """将点从场景坐标系映射到局部坐标系"""
         # 计算逆变换
         inv_transform = self.sceneTransform().inverted()
         return inv_transform.map(point)
     
-    def __str__(self):
+    def __str__(self) -> str:
         """字符串表示"""
         return (f"MyGraphicsItem(\n"
                 f"  Position: ({self.m_pos.x():.2f}, {self.m_pos.y():.2f})\n"
@@ -689,7 +716,7 @@ class base_element(QObject):
                 # f"  children:{self.m_children}\n"
                 f"  type:{self.type}"
                 ")\n")
-    def completed(self,construct_from_dict=False):
+    def completed(self,construct_from_dict: bool =False) -> None:
        
         self.update_boundingRect()
       
@@ -702,7 +729,7 @@ class base_element(QObject):
       
         
 
-    def move_by(self,*args):
+    def move_by(self,*args: float | QPointF) -> None:
         pos = QPointF()
         if len(args) == 1:  # QPoint输入
             pos = args[0]
@@ -719,7 +746,7 @@ class base_element(QObject):
         self.__check_position_change()
         self._notify_children_geometry_change()
 
-    def move_to_pos(self,*args):
+    def move_to_pos(self,*args: float | QPointF) -> None:
         pos = QPointF()
         if len(args) == 1:  # QPoint输入
             pos = args[0]
@@ -737,7 +764,7 @@ class base_element(QObject):
         """将任意浮点数规范化为[0.0, 360.0)的角度值"""
         return angle % 360.0
 
-    def rotate_to_ang(self,ang):
+    def rotate_to_ang(self,ang: float) -> None:
         # if self.is_in_group() and not isinstance(self,group_element):
         #     return
         target_ang  = base_element.normalize_angle(ang+self.m_angle_init)
@@ -754,45 +781,45 @@ class base_element(QObject):
     # def findItem(self, id):
     #     return self.m_items.get(id, None)
     
-    def id(self):
+    def id(self) -> int:
         return self._m_id
 
     # 反序列化专用（禁止普通创建调用）
-    def setID(self, id):
+    def setID(self, id: int) -> None:
         assert self._m_id == 0, "ID can only be set once"
         self._m_id = id
         self.setObjectName(self.type + str(id))
 
-    def get_head_pos(self):
+    def get_head_pos(self) -> QPointF | None:
         return self._head_pos
-    def get_end_pos(self):
+    def get_end_pos(self) -> QPointF | None:
         return self._end_pos
-    def get_center_pos(self):
+    def get_center_pos(self) -> QPointF | None:
         return self._center_pos
-    def set_head_pos(self,pos:QPointF):
+    def set_head_pos(self,pos:QPointF) -> None:
         self._head_pos =pos
-    def set_center_pos(self,pos:QPointF):
+    def set_center_pos(self,pos:QPointF) -> None:
         self._center_pos =pos
-    def set_end_pos(self,pos:QPointF):
+    def set_end_pos(self,pos:QPointF) -> None:
         self._end_pos =pos
 
-    def get_scene_head_pos(self):
+    def get_scene_head_pos(self) -> QPointF:
         return self.mapToScene(self._head_pos)
-    def get_scene_end_pos(self):
+    def get_scene_end_pos(self) -> QPointF:
         return self.mapToScene(self._end_pos)
-    def get_scene_center_pos(self):
+    def get_scene_center_pos(self) -> QPointF:
         return self.mapToScene(self._center_pos)
     
-    def get_scene_topRight(self):
+    def get_scene_topRight(self) -> QPointF:
         return self.mapToScene(self._topRight)
-    def get_scene_bottomLeft(self):
+    def get_scene_bottomLeft(self) -> QPointF:
         return self.mapToScene(self._bottomLeft)
-    def get_scene_topLeft(self):
+    def get_scene_topLeft(self) -> QPointF:
         return self.mapToScene(self._topLeft)
-    def get_scene_bottomRight(self):
+    def get_scene_bottomRight(self) -> QPointF:
         return self.mapToScene(self._bottomRight)
     
-    def get_min_x(self):
+    def get_min_x(self) -> float:
         points = []
         points.append(self.get_scene_topRight())
         points.append(self.get_scene_bottomLeft())
@@ -804,7 +831,7 @@ class base_element(QObject):
                 a = pos.x()
         return a
 
-    def get_max_x(self):
+    def get_max_x(self) -> float:
         points = []
         points.append(self.get_scene_topRight())
         points.append(self.get_scene_bottomLeft())
@@ -816,7 +843,7 @@ class base_element(QObject):
                 a = pos.x()
         return a
     
-    def get_min_y(self):
+    def get_min_y(self) -> float:
         points = []
         points.append(self.get_scene_topRight())
         points.append(self.get_scene_bottomLeft())
@@ -828,7 +855,7 @@ class base_element(QObject):
                 a = pos.y()
         return a
 
-    def get_max_y(self):
+    def get_max_y(self) -> float:
         points = []
         points.append(self.get_scene_topRight())
         points.append(self.get_scene_bottomLeft())
@@ -840,16 +867,16 @@ class base_element(QObject):
                 a = pos.y()
         return a
     
-    def get_name(self):
+    def get_name(self) -> str:
         return self._name
-    def _set_name(self,name)->bool:
+    def _set_name(self,name: str)->bool:
         """反序列化使用"""
         self._name =name
         # self.m_scene_manager.m_name_items[name] = self.id()
-    def construct_name_items(self):
+    def construct_name_items(self) -> None:
         self.m_scene_manager.m_name_items[self._name] = self.id()
            
-    def set_name(self,name)->bool:
+    def set_name(self,name: str)->bool:
         """重命名图元并同步 ``m_name_items``。
 
         名字是名字表的全局键，所以重名（属于别的图元）或空名字都会被拒绝。
@@ -878,7 +905,7 @@ class base_element(QObject):
         manager.m_name_items[name] = self.id()
         return True
 
-    def _rename_item(self, name) -> bool:
+    def _rename_item(self, name: str) -> bool:
         """Rename the element and keep ``m_name_items`` in sync.
 
         Group bookkeeping renames members when a group is created, renamed or
@@ -916,7 +943,7 @@ class base_element(QObject):
     # Event bindings
     # ------------------------------------------------------------------
     @classmethod
-    def normalize_event_name(cls, event):
+    def normalize_event_name(cls, event: str | None) -> str | None:
         """Return the canonical event key, or ``None`` for an unknown event."""
         key = str(event or "").strip().lower()
         aliases = {
@@ -935,8 +962,13 @@ class base_element(QObject):
         return aliases.get(key)
 
     def set_event_binding(
-        self, event, variable, value=None, handler="", args=None
-    ):
+        self,
+        event: str,
+        variable: str | None,
+        value: object = None,
+        handler: str = "",
+        args: dict[str, Any] | str | None = None,
+    ) -> bool:
         """Bind ``event`` to a variable write or a registered handler.
 
         An empty variable and handler removes the binding.  When ``value`` is
@@ -981,20 +1013,20 @@ class base_element(QObject):
             self._toggle_enabled = True
         return True
 
-    def get_event_binding(self, event):
+    def get_event_binding(self, event: str) -> dict[str, Any] | None:
         event_name = self.normalize_event_name(event)
         binding = self._event_bindings.get(event_name)
         return copy.deepcopy(binding) if binding is not None else None
 
-    def get_event_bindings(self):
+    def get_event_bindings(self) -> dict[str, Any]:
         return copy.deepcopy(self._event_bindings)
 
-    def clear_event_binding(self, event):
+    def clear_event_binding(self, event: str) -> None:
         event_name = self.normalize_event_name(event)
         if event_name is not None:
             self._event_bindings.pop(event_name, None)
 
-    def apply_event_bindings(self, data):
+    def apply_event_bindings(self, data: object) -> None:
         """Restore bindings from serialized JSON data."""
         self._event_bindings.clear()
         if not isinstance(data, dict):
@@ -1015,32 +1047,32 @@ class base_element(QObject):
                 # Ignore future/unknown events instead of breaking page load.
                 continue
 
-    def event_bindings_to_dict(self):
+    def event_bindings_to_dict(self) -> dict[str, Any]:
         return copy.deepcopy(self._event_bindings)
 
-    def has_event_bindings(self):
+    def has_event_bindings(self) -> bool:
         return bool(self._event_bindings)
 
-    def set_toggle_enabled(self, enable):
+    def set_toggle_enabled(self, enable: bool) -> None:
         self._toggle_enabled = bool(enable)
 
-    def is_toggle_enabled(self):
+    def is_toggle_enabled(self) -> bool:
         return self._toggle_enabled
 
-    def set_checked(self, checked):
+    def set_checked(self, checked: bool) -> None:
         checked = bool(checked)
         if self._checked != checked:
             self._checked = checked
             self.prepareDirtyChange()
 
-    def is_checked(self):
+    def is_checked(self) -> bool:
         return self._checked
 
-    def is_pressed(self):
+    def is_pressed(self) -> bool:
         return self._pressed
 
     @staticmethod
-    def parse_event_value(raw):
+    def parse_event_value(raw: object) -> bool | int | float | str:
         """Convert the text stored by the property panel into a runtime value."""
         if isinstance(raw, (bool, int, float)):
             return raw
@@ -1059,7 +1091,7 @@ class base_element(QObject):
         except ValueError:
             return text
 
-    def _dispatch_event_binding(self, event, event_value):
+    def _dispatch_event_binding(self, event: str, event_value: object) -> None:
         event_name = self.normalize_event_name(event)
         binding = self._event_bindings.get(event_name)
         if not binding:
@@ -1100,7 +1132,7 @@ class base_element(QObject):
         if callable(writer):
             writer(variable, value, self, event_name)
 
-    def _emit_event(self, event, event_value):
+    def _emit_event(self, event: str, event_value: object) -> None:
         event_name = self.normalize_event_name(event)
         if event_name == self.EVENT_CLICK:
             self.clicked.emit()
@@ -1112,17 +1144,17 @@ class base_element(QObject):
             self.toggled.emit(bool(event_value))
         self._dispatch_event_binding(event_name, event_value)
 
-    def handle_mouse_press(self):
+    def handle_mouse_press(self) -> None:
         if self._pressed:
             return
         self._pressed = True
         self._emit_event(self.EVENT_PRESSED, True)
 
-    def cancel_mouse_press(self):
+    def cancel_mouse_press(self) -> None:
         """Drop a pressed state without emitting release/click events."""
         self._pressed = False
 
-    def _next_toggle_state(self):
+    def _next_toggle_state(self) -> bool:
         """Flip the bound runtime variable when possible, else the local state."""
         binding = self._event_bindings.get(self.EVENT_TOGGLE)
         if binding:
@@ -1136,14 +1168,14 @@ class base_element(QObject):
                 return not bool(current)
         return not self._checked
 
-    def toggle(self):
+    def toggle(self) -> None:
         """Programmatically toggle the checked state (when enabled)."""
         if not self._toggle_enabled:
             return
         self.set_checked(self._next_toggle_state())
         self._emit_event(self.EVENT_TOGGLE, self._checked)
 
-    def handle_mouse_release(self, inside=True):
+    def handle_mouse_release(self, inside: bool =True) -> None:
         if not self._pressed:
             return
         self._pressed = False
@@ -1155,64 +1187,65 @@ class base_element(QObject):
         self._emit_event(self.EVENT_CLICK, True)
         self.toggle()
 
-    def get_line_width(self):
+    def get_line_width(self) -> int:
         return  int(self.__width)
-    def set_line_width(self, val):
+    def set_line_width(self, val: int) -> None:
         if val!=self.__width:
             self.__width =val
             self.prepareDirtyChange()
 
-    def set_color(self,color):
+    def set_color(self,color: QColor) -> None:
         c = QColor(color.red(),color.green(),color.blue(),self.__opacity)
         if self._color!=c:
             self._color = c
             self.prepareDirtyChange()
 
-    def get_color(self):
+    def get_color(self) -> QColor:
         color = QColor(self._color.red(),self._color.green(),self._color.blue())
         return  color
     
-    def set_fill_color(self,color):
+    def set_fill_color(self,color: QColor) -> None:
         c = QColor(color.red(),color.green(),color.blue(),self.__opacity)
         if self._fill_color!=c:
             self._fill_color = c
             self.prepareDirtyChange()
      
-    def get_fill_color(self):
+    def get_fill_color(self) -> QColor:
         color = QColor(self._fill_color.red(),self._fill_color.green(),self._fill_color.blue())
         return  color
     
-    def is_in_group(self):
+    def is_in_group(self) -> bool:
         if self._group_id>0:
             return True
         return False
     
-    def is_done(self):
+    def is_done(self) -> bool:
         return self.__done==True
     
-    def set_group_id(self,val):
+    def set_group_id(self,val: int) -> None:
         self._group_id = val
 
-    def get_group_id(self):
+    def get_group_id(self) -> int:
         return self._group_id
     
-    def get_group_name(self):
+    def get_group_name(self) -> str:
         return self._group_name
-    def set_group_name(self,str):
-        self._group_name =str
+    def set_group_name(self, val: str) -> None:
+        self._group_name = val
 
-    def get_opacity(self):
+    def get_opacity(self) -> int:
         return self.__opacity
-    def set_opacity(self,val):
+    def set_opacity(self,val: int) -> None:
         if 0<val<=255:
             self.__opacity =val
             self._color.setAlpha(self.__opacity)
             self._fill_color.setAlpha(self.__opacity)
 
-    def set_selected_anyway(self,child,state):
+    def set_selected_anyway(self,state: bool) -> None:
+        """无视 ``__selectable`` 直接改选中状态（切模式清选中时用）。"""
         self.__selected =  state
 
-    def set_selected(self,state):
+    def set_selected(self,state: bool) -> None:
         if self.__selectable:
             self.__selected =  state
 
@@ -1220,40 +1253,40 @@ class base_element(QObject):
         #     for child in self.m_children:
         #         child.set_selected(state)
               
-    def get_selected(self):
+    def get_selected(self) -> bool:
         return self.__selected==True
     
-    def set_actived(self,state):
+    def set_actived(self,state: bool) -> None:
         self.__active = state
 
-    def get_actived(self):
+    def get_actived(self) -> bool:
         return self.__active==True
 
-    def set_fill(self,state):
+    def set_fill(self,state: bool) -> None:
         if state != self.__fill:
             self.__fill = state
             self.prepareDirtyChange()
     
-    def get_fill(self):
+    def get_fill(self) -> bool:
         return self.__fill==True
     
-    def set_hover(self,state):
+    def set_hover(self,state: bool) -> None:
         if self.__hover!=state:
             self.__hover = state
-    def get_hover(self):
+    def get_hover(self) -> bool:
         return self.__hover==True
     
-    def zValue(self):
+    def zValue(self) -> int:
         return self.__zValue
-    def set_zValue(self,value):
+    def set_zValue(self,value: int) -> None:
         self.__zValue = value
         if self.__active==False:
             self.m_scene_manager.sort_items_by_zValue()
 
-    def get_visibility(self):
+    def get_visibility(self) -> bool:
         return self.__invisible
     
-    def set_visibility(self,enable):
+    def set_visibility(self,enable: bool) -> None:
         if self.is_has_parent() and self.m_parent.get_visibility() == False and enable:
             return
        
@@ -1266,23 +1299,23 @@ class base_element(QObject):
             else:
                 self.__selectable = self.__selectable_last
 
-    def get_selectable(self):       
+    def get_selectable(self) -> bool:
         return self.__selectable
 
-    def set_selectable(self,enable):
+    def set_selectable(self,enable: bool) -> None:
         if enable != self.__selectable:
             self.__selectable_last=self.__selectable=enable
     
-    def check_hover(self,mouse_pos:QPointF):
+    def check_hover(self,mouse_pos:QPointF) -> None:
         if self.__hover_last!=self.__hover:
             if self.is_in_group() or is_group_element(self):
                 self.m_scene.hover_sta_change.emit(self)
         self.__hover_last  = self.__hover
         
-    def sceneBoundingRect(self):
+    def sceneBoundingRect(self) -> QRectF:
         return self._sceneBoundingRect
 
-    def contains_scene_pos(self, scene_pos):
+    def contains_scene_pos(self, scene_pos: QPointF | None) -> bool:
         """Return whether ``scene_pos`` is inside this element.
 
         Run-mode group click handling uses this instead of Qt's
@@ -1346,18 +1379,18 @@ class base_element(QObject):
                 out.lineTo(p)
         return out
 
-    def viewBoundingRect(self):
+    def viewBoundingRect(self) -> QRectF:
         return self.m_scene.rect_sceneToView(self._sceneBoundingRect)
-    def selectViewBoundingRect(self):
+    def selectViewBoundingRect(self) -> QRectF:
         return self.m_scene.rect_sceneToView(self._select_sceneBoundingRect)
 
-    def windowBoundingRect(self):
+    def windowBoundingRect(self) -> QRectF:
         return self.m_scene.rect_viewToWindow( self.viewBoundingRect() )
     
-    def check_moving(self):
+    def check_moving(self) -> None:
         self._reset_moving_flag()
         self.__check_position_change()
-    def paint(self,painter:QPainter,shine_flag:bool):
+    def paint(self,painter:QPainter,shine_flag:bool) -> None:
         # if self.__selected and (not self.is_in_group() or isinstance(self,group_element)):
         if self.__selected and self.__invisible:
             font = QFont("Arial", 10)  # 使用固定大字号
@@ -1376,5 +1409,5 @@ class base_element(QObject):
         self.m_this_frame_flag   =False
         self.m_this_frame_flag_2 =False
         
-    def clone(self):
+    def clone(self) -> base_element | None:
         pass

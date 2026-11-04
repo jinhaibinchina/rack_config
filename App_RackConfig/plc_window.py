@@ -4,10 +4,10 @@ from PySide6.QtWidgets import (QWidget, QLabel,QHBoxLayout,QSpinBox,QComboBox,QP
 from PySide6.QtCore import Qt,Signal,QTimer,QRect
 from PySide6.QtGui import QPalette,QColor,QPaintEvent,QPen,QPainter,QBrush
 from App_RackConfig.load_ui import LoadWidget,LoadDialog
-
-from App_RackConfig.plc_manager import PLCManager
 from snap7.util import *
-from App_RackConfig.data_broker import DataBroker
+from common.com.snap7 import PLCManager
+from common.com.snap7 import DataBroker
+
 from typing import List
 # from common import NameValLabel
 from functools import partial

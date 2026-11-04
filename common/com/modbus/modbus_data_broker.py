@@ -6,7 +6,7 @@ from queue import Queue
 from PySide6.QtWidgets import QGroupBox,QWidget,QVBoxLayout,QHBoxLayout,QApplication
 import time
 from functools import wraps
-from .my_plc_manager import PLCManager
+from .modbus_plc_manager import PLCManager
 
 
 

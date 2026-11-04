@@ -146,6 +146,13 @@ class OfflineRunDialog(QDialog):
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
+    def showEvent(self, event):
+        super().showEvent(event)
+        # 场景在 ``__init__`` 里就完成加载并切到运行模式，那时窗口还没显示，
+        # 嵌入式控件（widget_element）按 scene_origin=(0, 0) 布局到了窗口外。
+        # 显示后必须重新对齐一次，否则要等用户拖动画布才出现。
+        self.scene.refresh_embedded_widgets()
+
     def done(self, result: int) -> None:
         self._stop_scene_timers()
         super().done(result)

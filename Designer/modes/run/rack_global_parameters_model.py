@@ -12,9 +12,9 @@ from Designer.Core.elements import base_element, group_element, text_element,rec
 from Designer.Core.myQuadTreeScene import SceneManager
 
 from .test import ConfigWindow,Rcd
-from App_RackConfig.plc_manager import PLCManager
+from common.com.snap7 import PLCManager
 from snap7.util import *
-from App_RackConfig.data_broker import DataBroker
+from common.com.snap7 import DataBroker
 
 class RackGlobalParasModel(QObject):
     """料仓状态面板模型：按 (模块, 通道, 灯位) 访问 32 盏灯和 4 个文本。

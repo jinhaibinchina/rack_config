@@ -17,7 +17,7 @@
    <item>
     <widget class="QGroupBox" name="groupBox_display">
      <property name="title">
-      <string>图像展示</string>
+      <string>传感器库存检测结果</string>
      </property>
     </widget>
    </item>

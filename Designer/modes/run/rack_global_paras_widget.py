@@ -6,7 +6,7 @@ from Designer.Core.my_common import SceneMode
 
 from .rack_global_paras_model import RackGlobalParasModel
 
-from App_RackConfig.plc_manager import PLCManager
+from common.com.snap7.snap7_plc_manager import PLCManager
 
 class RackGlobalParasWindow(QWidget):
         
@@ -20,7 +20,8 @@ class RackGlobalParasWindow(QWidget):
         self.Scene.set_scene_manager(self.SceneManager)
         self.Scene.load_element_info_run_mode('rack_requirements_scene3.json')
         # self.Scene.goto_sence_origin()
-
+        self.Scene.set_canvas_navigation_enabled(False)
+        
         self.rack_parameters_model = RackGlobalParasModel(plc_mgr,self.SceneManager, self)
 
         layout =QVBoxLayout(self)

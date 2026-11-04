@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+from typing import Any, Callable
 
 from .element import*
 from .embedded_widget_layer import EmbeddedWidgetLayer
@@ -8,7 +11,7 @@ from res.designer_resource_manager import  resource_manager as res_mng
 _DEBUG_DESTROY = os.environ.get("RACK_DEBUG_DESTROY", "") == "1"
 
 
-def _log_destroy(kind: str, item) -> None:
+def _log_destroy(kind: str, item: Any) -> None:
     if _DEBUG_DESTROY:
         print(f"销毁{kind} id:{item.id()} name：{item.get_name()}")
 
@@ -17,7 +20,7 @@ def _log_destroy(kind: str, item) -> None:
 class line_element(base_element):
     
     count = 0
-    def __init__(self,parent=None):
+    def __init__(self,parent: QObject | None =None) -> None:
         super().__init__(parent=parent)
         self.parent= parent
         line_element.count+=1
@@ -28,10 +31,10 @@ class line_element(base_element):
         self.set_actived( True)
         self.set_selected(False)
    
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("line", self)
 
-    def update_boundingRect(self):
+    def update_boundingRect(self) -> None:
         super().update_boundingRect()
         self.prepareGeometryChange()
         
@@ -73,7 +76,7 @@ class line_element(base_element):
      
        
 
-    def completed(self,construct_from_dict=False):
+    def completed(self,construct_from_dict: bool =False) -> None:
         if construct_from_dict:
             return super().completed(True)
         
@@ -108,17 +111,17 @@ class line_element(base_element):
   
         super().completed()
     
-    def transfer_head_pos(self,pos_start:QPointF):
+    def transfer_head_pos(self,pos_start:QPointF) -> None:
         self._head_pos =pos_start
 
-    def transfer_pos(self,pos:QPointF):
+    def transfer_pos(self,pos:QPointF) -> None:
         self._end_pos =pos
 
-    def transfer_end_pos(self,pos_end:QPointF):
+    def transfer_end_pos(self,pos_end:QPointF) -> None:
         self._end_pos =pos_end
         self.completed()
     
-    def change_head_pos(self,pos):
+    def change_head_pos(self,pos: QPointF) -> None:
         if self.is_has_parent() or self.is_has_child():
             return
         self._head_pos = self.mapFromScene(pos)
@@ -138,7 +141,7 @@ class line_element(base_element):
         self.update_boundingRect()
        
     
-    def change_end_pos(self,pos):
+    def change_end_pos(self,pos: QPointF) -> None:
         if self.is_has_parent() or self.is_has_child():
             return
         self._end_pos = self.mapFromScene(pos)
@@ -157,19 +160,19 @@ class line_element(base_element):
         self.setTransformOriginPoint(self._center_pos)
         self.update_boundingRect()
 
-    def change_end_pos_to_target_scenePos(self,pos):
+    def change_end_pos_to_target_scenePos(self,pos: QPointF) -> None:
         pass
     
 
 
-    def change_position(self,pos):
+    def change_position(self,pos: QPointF) -> None:
         """"属性设置移动位置"""
         w ,h=self.getSize().width(),self.getSize().height()
    
         # print(self.getSize())
         self._head_pos_last = self.mapToScene(self._topLeft)
 
-        def identify_point(pos, points):
+        def identify_point(pos: QPointF, points: list[QPointF]) -> int:
             for i, point in enumerate(points):
                 if point == pos:  # QPointF已重载==运算符
                     if   i==0:
@@ -233,11 +236,11 @@ class line_element(base_element):
         else:
             return
 
-    def change_size(self,w,h):
+    def change_size(self,w: float,h: float) -> None:
         """"属性设置改变尺寸"""
         self._scene_size_last =copy.copy(self.scene_size)
        
-        def identify_point(pos, points):
+        def identify_point(pos: QPointF, points: list[QPointF]) -> int:
             for i, point in enumerate(points):
                 if point == pos:  # QPointF已重载==运算符
                     if   i==0:
@@ -306,7 +309,7 @@ class line_element(base_element):
     
 
 
-    def setSize(self,w,h):
+    def setSize(self,w: float,h: float) -> None:
         self.scene_size.setWidth(w)
         self.scene_size.setHeight(h)
     def getSize(self)->QSizeF:
@@ -315,7 +318,7 @@ class line_element(base_element):
 
         
 
-    def check_hover(self,mouse_pos:QPointF):
+    def check_hover(self,mouse_pos:QPointF) -> None:
         if self.is_moving() or not self.get_selectable():
             
             self.set_hover(False)
@@ -353,13 +356,13 @@ class line_element(base_element):
         self.set_hover(False)
         return False
     
-    def set_visibility(self, enable):
+    def set_visibility(self, enable: bool) -> None:
         if self.is_has_child():
             for item in self.childItems():
                 item.set_visibility(enable)
         return super().set_visibility(enable)
 
-    def paint(self,painter:QPainter,shine_flag):
+    def paint(self,painter:QPainter,shine_flag: bool) -> None:
         
         if self.get_visibility()==False:
             super().paint(painter,shine_flag)
@@ -412,7 +415,7 @@ class line_element(base_element):
 
         super().paint(painter,shine_flag)
 
-    def clone(self):
+    def clone(self) -> line_element | None:
         """深度克隆图元及其子图元"""
 
         # 创建当前图元的新实例（不复制父关系）
@@ -458,7 +461,7 @@ class line_element(base_element):
         return cloned
 
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         """将图元转换为字典"""
         parent_id = self.m_parent.id() if self.m_parent else 0
         children_ids  =[]
@@ -486,7 +489,7 @@ class line_element(base_element):
         }
     
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> line_element:
         """从字典创建图元"""
         scene_end_pos = QPointF(data["end_pos"]["x"],data["end_pos"]["y"])
         scene_head_pos = QPointF(data["head_pos"]["x"],data["head_pos"]["y"])
@@ -554,18 +557,18 @@ class rect_element(base_element):
     count = 0
 
     @overload
-    def __init__(self, parent: QObject = None): ...
+    def __init__(self, parent: QObject | None = None) -> None: ...
     
     @overload
     def __init__(
         self,
-        parent: QObject = None,
+        parent: QObject | None = None,
         width: float = 100.0,
         height: float = 100.0
        
-    ): ...
+    ) -> None: ...
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # 参数解析逻辑
         rect_element.count+=1
         parent = None
@@ -632,29 +635,41 @@ class rect_element(base_element):
             self._head_pos  =self.sence_rect.topLeft()
             self._end_pos   =self.sence_rect.bottomRight()
            
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("rect", self)
        
     
-    def update_boundingRect(self):
+    def update_boundingRect(self) -> None:
         super().update_boundingRect()
         
         self.prepareGeometryChange()
 
-        def max_of_four(*args):
+        def max_of_four(*args: float) -> float:
             max_value = args[0]
             for val in args:
                 if max_value< val:
                     max_value = val
             return max_value
-        def min_of_four(*args):
+        def min_of_four(*args: float) -> float:
             min_value = args[0]
             for val in args:
                 if min_value> val:
                     min_value = val
             return min_value
 
-        
+        # 几何四角尚未建立时（construct 途中、或克隆体漏拷几何）按自身尺寸在
+        # 本地重建。以前这里把 None 直接丢给 Transform.map，抛出
+        # AttributeError 穿出 Qt 事件循环——复制粘贴控件图元时必崩。
+        if any(p is None for p in (self._head_pos, self._end_pos,
+                                   self._topRight, self._bottomLeft)):
+            half_w = self.scene_size.width() / 2.0
+            half_h = self.scene_size.height() / 2.0
+            self._head_pos = QPointF(-half_w, -half_h)
+            self._end_pos = QPointF(half_w, half_h)
+            self._topRight = QPointF(half_w, -half_h)
+            self._bottomLeft = QPointF(-half_w, half_h)
+            self._topLeft = self._head_pos
+            self._bottomRight = self._end_pos
 
         new_topLeft    = self.mapToScene(self._head_pos)
         new_topRight   = self.mapToScene(self._topRight)
@@ -675,7 +690,7 @@ class rect_element(base_element):
         
         self._sceneBoundingRect = rect
 
-    def completed(self,construct_from_dict=False):
+    def completed(self,construct_from_dict: bool =False) -> None:
         if construct_from_dict:
             super().completed(True)
             return
@@ -711,7 +726,7 @@ class rect_element(base_element):
  
     
 
-    def check_hover(self,mouse_pos:QPointF):
+    def check_hover(self,mouse_pos:QPointF) -> None:
         if self.is_moving() or not self.get_selectable():
             self.set_hover(False)
             return False
@@ -738,11 +753,11 @@ class rect_element(base_element):
                     return  True
             
             self.set_hover(False)
-    def transfer_head_pos(self,pos_start:QPointF):
+    def transfer_head_pos(self,pos_start:QPointF) -> None:
         self._topLeft =self._head_pos =pos_start
         
 
-    def transfer_pos(self,pos:QPointF):
+    def transfer_pos(self,pos:QPointF) -> None:
         if self._head_pos is None:
             return
         self._end_pos =pos
@@ -750,14 +765,14 @@ class rect_element(base_element):
         self.scene_size.setWidth(abs(self._end_pos.x()-self._head_pos.x()))
         self.scene_size.setHeight(abs(self._end_pos.y()-self._head_pos.y()))
       
-    def transfer_end_pos(self,pos_end:QPointF):
+    def transfer_end_pos(self,pos_end:QPointF) -> None:
         self._bottomRight =self._end_pos =pos_end
         self._center_pos = (self._head_pos+self._end_pos)/2.0
         self.scene_size.setWidth(abs(self._end_pos.x()-self._head_pos.x()))
         self.scene_size.setHeight(abs(self._end_pos.y()-self._head_pos.y()))
         self.completed()
 
-    def change_position(self,pos:QPointF):
+    def change_position(self,pos:QPointF) -> None:
         w ,h=self.getSize().width(),self.getSize().height()
         self._head_pos_last = self.mapToScene(self._head_pos)
         self._head_pos      = pos
@@ -790,7 +805,7 @@ class rect_element(base_element):
         else:
             return
 
-    def change_size(self,w,h):
+    def change_size(self,w: float,h: float) -> None:
         self._scene_size_last =copy.copy(self.scene_size)
         # self.scene_size.setWidth(w)
         # self.scene_size.setHeight(h)
@@ -830,7 +845,7 @@ class rect_element(base_element):
 
 
 
-    def setSize(self,w,h):
+    def setSize(self,w: float,h: float) -> None:
         self.scene_size.setWidth(w)
         self.scene_size.setHeight(h)
         
@@ -838,7 +853,7 @@ class rect_element(base_element):
         return self.scene_size
     
     
-    def set_visibility(self, enable):
+    def set_visibility(self, enable: bool) -> None:
         if self.is_has_child():
             for item in self.childItems():
                 item.set_visibility(enable)
@@ -860,7 +875,7 @@ class rect_element(base_element):
         """圆角半径，单位为场景坐标（与宽高一致），0 表示直角。"""
         return self._corner_radius
 
-    def set_corner_radius(self, radius: float):
+    def set_corner_radius(self, radius: float) -> None:
         try:
             radius = float(radius)
         except (TypeError, ValueError):
@@ -870,7 +885,7 @@ class rect_element(base_element):
             self._corner_radius = radius
             self.prepareDirtyChange()
 
-    def paint(self,painter:QPainter,shine_flag):
+    def paint(self,painter:QPainter,shine_flag: bool) -> None:
         if self.get_visibility()==False:
             super().paint(painter,shine_flag)
             return
@@ -948,11 +963,13 @@ class rect_element(base_element):
     #     painter.restore()
     #     super().paint(painter,shine_flag)
 
-    def clone(self):
+    def clone(self) -> rect_element | None:
         """深度克隆图元及其子图元"""
 
-        # 创建当前图元的新实例（不复制父关系）
-        cloned = rect_element()
+        # 创建当前图元的新实例（不复制父关系）。用 self.__class__ 而不是写死
+        # rect_element：checkbox_element 等子类没有自己的 clone，写死会让
+        # “复制复选框 → 粘贴出矩形”，类型在此处悄悄降级。
+        cloned = self.__class__()
         # 复制名称：复制/粘贴时据此保留成员名，只替换组名前缀
         cloned._name = self._name
        
@@ -990,7 +1007,7 @@ class rect_element(base_element):
 
         return cloned
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         """将图元转换为字典"""
         parent_id = self.m_parent.id() if self.m_parent else 0
         children_ids  =[]
@@ -1025,7 +1042,7 @@ class rect_element(base_element):
         }
     
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> rect_element:
         """从字典创建图元"""
         scene_center_pos = QPointF(data["center_pos"]["x"],data["center_pos"]["y"])
         scene_origin_pos = QPointF(data["origin_pos"]["x"],data["origin_pos"]["y"])
@@ -1091,7 +1108,7 @@ class checkbox_element(rect_element):
 
     count = 0
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         checkbox_element.count += 1
         self.type = "checkbox"
@@ -1099,10 +1116,10 @@ class checkbox_element(rect_element):
         # 指示，可在属性面板关闭「可切换」。
         self.set_toggle_enabled(True)
 
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("checkbox", self)
 
-    def paint(self, painter: QPainter, shine_flag):
+    def paint(self, painter: QPainter, shine_flag: bool) -> None:
         if self.get_visibility() is False:
             super().paint(painter, shine_flag)
             return
@@ -1168,7 +1185,7 @@ class checkbox_element(rect_element):
         painter.restore()
         super().paint(painter, shine_flag)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data["checked"] = self.is_checked()
         # toggle 是否开启也应持久化，否则重新打开后勾选框无法交互。
@@ -1176,7 +1193,7 @@ class checkbox_element(rect_element):
         return data
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> checkbox_element:
         item = super().from_dict(data)
         item._checked = bool(data.get("checked", False))
         item.set_toggle_enabled(bool(data.get("toggleEnabled", True)))
@@ -1214,7 +1231,7 @@ class widget_element(rect_element):
 
     count = 0
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         widget_element.count += 1
         self.type = "widget"
@@ -1236,11 +1253,16 @@ class widget_element(rect_element):
         self._widget_factory = None
         # 只读态：设计模式下控件仅展示（鼠标穿透），运行模式恢复可交互。
         self._widget_readonly = False
+        # 场景"希望显示真实控件"的意图。与 ``EmbeddedWidgetLayer`` 内部的显隐
+        # 状态分开记：尺寸/坐标系暂时不可用（窗口还没 show、场景参数未就绪）时
+        # 几何同步会临时隐藏视图，但不能把这个意图一起抹掉，否则等几何恢复
+        # 正常后再也不会显示（表现为运行态控件一直不出现）。
+        self._widget_visible_requested = False
 
         # 默认控件工厂：一个可编辑的单行输入框，用于演示。
         self.set_widget_factory(self._default_widget_factory)
 
-    def __del__(self):
+    def __del__(self) -> None:
         try:
             self._release_widget()
         except RuntimeError:
@@ -1257,14 +1279,14 @@ class widget_element(rect_element):
         "label", "spinbox",
     )
 
-    def _default_widget_factory(self, host) -> QWidget:
+    def _default_widget_factory(self, host: QWidget) -> QWidget:
         """按 ``_widget_type_key`` 创建对应的真实 Qt 控件。"""
         widget = self._build_control(host)
         self._apply_text(widget)
         self._apply_style(widget)
         return widget
 
-    def _build_control(self, host) -> QWidget:
+    def _build_control(self, host: QWidget) -> QWidget:
         """只负责构造控件本体（不含文本/样式，由调用方统一补上）。"""
         key = getattr(self, "_widget_type_key", "textedit")
         if key == "lineedit":
@@ -1285,7 +1307,7 @@ class widget_element(rect_element):
         editor.setPlaceholderText("只读多行文本…")
         return editor
 
-    def set_widget_type(self, type_key: str):
+    def set_widget_type(self, type_key: str) -> None:
         """切换默认控件类型（lineedit/checkbox/combobox/pushbutton/textedit/label/spinbox）。
 
         只改类型键，控件本体由下次 ``_rebuild_widget`` 按新 key 重建；
@@ -1300,7 +1322,7 @@ class widget_element(rect_element):
     def widget_type(self) -> str:
         return getattr(self, "_widget_type_key", "textedit")
 
-    def set_widget_factory(self, factory):
+    def set_widget_factory(self, factory: Callable[[QWidget], QWidget] | None) -> None:
         """设置控件工厂。``factory(host_widget) -> QWidget``。
 
         调用后若已有承载层会重建，以保证工厂立即生效。
@@ -1309,7 +1331,7 @@ class widget_element(rect_element):
         if self._layer is not None:
             self._rebuild_widget()
 
-    def set_widget_text(self, text: str):
+    def set_widget_text(self, text: str) -> None:
         """设置默认控件的文本内容（对自定义控件无效）。"""
         self._widget_text = str(text)
         self._apply_text(self._leaf_widget())
@@ -1318,12 +1340,12 @@ class widget_element(rect_element):
     def widget_text(self) -> str:
         return self._widget_text
 
-    def _leaf_widget(self):
+    def _leaf_widget(self) -> QWidget | None:
         """返回当前真正的控件实例（未创建时为 None）。"""
         layer = self._layer
         return None if layer is None else layer.widget
 
-    def _apply_text(self, widget) -> None:
+    def _apply_text(self, widget: QWidget | None) -> None:
         """把 ``_widget_text`` 写回默认控件（未创建时跳过）。
 
         按控件类型区分写回方式：
@@ -1388,7 +1410,7 @@ class widget_element(rect_element):
         value = _as_int(cfg.get("value", ""), minimum)
         widget.setValue(max(minimum, min(value, maximum)))
 
-    def _apply_style(self, widget) -> None:
+    def _apply_style(self, widget: QWidget | None) -> None:
         """把字体大小、文字色、背景色应用到默认控件（未创建时跳过）。"""
         if widget is None:
             return
@@ -1405,7 +1427,7 @@ class widget_element(rect_element):
         )
 
     # -- 字体 / 配色 ----------------------------------------------------
-    def set_widget_font_size(self, size: int):
+    def set_widget_font_size(self, size: int) -> None:
         self._widget_font_size = int(size)
         self._apply_style(self._leaf_widget())
         self._auto_fit_size()
@@ -1413,14 +1435,14 @@ class widget_element(rect_element):
     def widget_font_size(self) -> int:
         return self._widget_font_size
 
-    def set_widget_color(self, color) -> None:
+    def set_widget_color(self, color: QColor) -> None:
         self._widget_color = color.name() if isinstance(color, QColor) else str(color)
         self._apply_style(self._leaf_widget())
 
     def widget_color(self) -> str:
         return self._widget_color
 
-    def set_widget_background(self, color) -> None:
+    def set_widget_background(self, color: QColor) -> None:
         self._widget_background = color.name() if isinstance(color, QColor) else str(color)
         self._apply_style(self._leaf_widget())
 
@@ -1430,7 +1452,7 @@ class widget_element(rect_element):
     # ------------------------------------------------------------------
     # 承载层的挂载 / 释放
     # ------------------------------------------------------------------
-    def _ensure_layer(self):
+    def _ensure_layer(self) -> EmbeddedWidgetLayer | None:
         """确保承载层存在（惰性创建）。"""
         if self._layer is not None:
             return self._layer
@@ -1441,7 +1463,7 @@ class widget_element(rect_element):
         self._rebuild_widget()
         return self._layer
 
-    def _rebuild_widget(self):
+    def _rebuild_widget(self) -> None:
         """按当前工厂重建控件，替换旧的。"""
         layer = self._layer
         if layer is None:
@@ -1455,7 +1477,7 @@ class widget_element(rect_element):
         self.sync_widget_geometry()
         self._auto_fit_size()
 
-    def _release_widget(self):
+    def _release_widget(self) -> None:
         """释放承载层（图元析构 / 被删除时调用）。"""
         layer = self._layer
         self._layer = None
@@ -1466,13 +1488,13 @@ class widget_element(rect_element):
         """承载层是否已创建且挂着真实控件。"""
         return self._layer is not None and self._layer.is_active()
 
-    def raise_widget_view(self):
+    def raise_widget_view(self) -> None:
         """把承载视图提到同层顶部（场景按 zValue 排序后调用）。"""
         layer = self._layer
         if layer is not None:
             layer.raise_view()
 
-    def Delete(self):
+    def Delete(self) -> None:
         """删除图元：先回收承载层，避免真实控件残留成幽灵窗口。"""
         try:
             self._release_widget()
@@ -1500,7 +1522,7 @@ class widget_element(rect_element):
         height = self.scene_size.width() * scene.grid_size / units_x
         return QSizeF(width, height)
 
-    def sync_widget_geometry(self):
+    def sync_widget_geometry(self) -> None:
         """把真实控件对齐到图元当前的场景包围盒。
 
         由场景在缩放/平移/图元移动后统一调用。设计模式下承载层隐藏，
@@ -1518,6 +1540,8 @@ class widget_element(rect_element):
 
         size = self._view_design_size()
         if size.width() <= 1.0 or size.height() <= 1.0:
+            # 几何暂时不可用（场景尺寸 / 网格参数还没就绪）：先藏起来，但保留
+            # "场景要求显示"的意图，等下一轮同步（窗口 show / resize）恢复。
             layer.set_visible(False)
             return
 
@@ -1526,6 +1550,9 @@ class widget_element(rect_element):
         )
         angle = self.sceneTransform().get_rotation_angle()
         layer.apply(center_window, size, scene.scale_factor or 1.0, angle)
+        # 上一轮可能因为几何无效被临时隐藏，这里按意图补回显示。
+        if self._widget_visible_requested and not layer.is_visible():
+            layer.set_visible(True)
 
     # ------------------------------------------------------------------
     # 边框自适应：让图元边框贴合真实控件的固有尺寸
@@ -1548,7 +1575,7 @@ class widget_element(rect_element):
         scene_h = view_w * units_y / grid
         return QSizeF(scene_w, scene_h)
 
-    def _auto_fit_size(self):
+    def _auto_fit_size(self) -> None:
         """按控件的 ``sizeHint`` 更新图元边框（中心锚定）。
 
         仅在只读态（设计模式）下生效，让边框贴合控件的自然大小；运行模式
@@ -1581,8 +1608,9 @@ class widget_element(rect_element):
         self._center_pos = QPointF(0.0, 0.0)
         self.update_boundingRect()
 
-    def set_widget_visible(self, visible: bool):
+    def set_widget_visible(self, visible: bool) -> None:
         """控制真实控件的显隐（模式切换时由场景调用）。"""
+        self._widget_visible_requested = bool(visible)
         if not visible:
             if self._layer is not None:
                 self._layer.set_visible(False)
@@ -1593,7 +1621,7 @@ class widget_element(rect_element):
         self.sync_widget_geometry()
         layer.set_visible(True)
 
-    def set_widget_readonly(self, readonly: bool):
+    def set_widget_readonly(self, readonly: bool) -> None:
         """控制控件是否只读（设计模式展示 / 运行模式交互）。
 
         ``readonly=True`` 时控件仅作展示、鼠标事件穿透到场景（图元可正常
@@ -1613,17 +1641,17 @@ class widget_element(rect_element):
     # ------------------------------------------------------------------
     # 几何变化钩子：拖动 / 移动后同步子窗口
     # ------------------------------------------------------------------
-    def setPos(self, *args):
+    def setPos(self, *args: float | QPointF) -> None:
         super().setPos(*args)
         if self._layer is not None:
             self.sync_widget_geometry()
 
-    def move_by(self, *args):
+    def move_by(self, *args: float | QPointF) -> None:
         super().move_by(*args)
         if self._layer is not None:
             self.sync_widget_geometry()
 
-    def setSize(self, w, h):
+    def setSize(self, w: float, h: float) -> None:
         super().setSize(w, h)
         if self._layer is not None:
             self.sync_widget_geometry()
@@ -1631,7 +1659,7 @@ class widget_element(rect_element):
     # ------------------------------------------------------------------
     # 绘制：真实控件已挂载显示时跳过占位框，否则退回占位框（兜底）
     # ------------------------------------------------------------------
-    def paint(self, painter: QPainter, shine_flag):
+    def paint(self, painter: QPainter, shine_flag: bool) -> None:
         if self.get_visibility() is False:
             super().paint(painter, shine_flag)
             return
@@ -1694,18 +1722,19 @@ class widget_element(rect_element):
     # ------------------------------------------------------------------
     # 序列化
     # ------------------------------------------------------------------
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data["widgetText"] = self._widget_text
         # 记录控件类型键，便于将来按类型恢复不同控件。
         data["widgetType"] = getattr(self, "_widget_type_key", "textedit")
+        # 存"实际渲染字号"，重载后属性面板显示的数值与保存前一致。
         data["widgetFontSize"] = int(getattr(self, "_widget_font_size", 12))
         data["widgetColor"] = getattr(self, "_widget_color", "#000000")
         data["widgetBackground"] = getattr(self, "_widget_background", "#ffffff")
         return data
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> widget_element:
         item = super().from_dict(data)
         item._widget_text = str(data.get("widgetText", ""))
         item._widget_type_key = str(data.get("widgetType", "textedit"))
@@ -1714,10 +1743,19 @@ class widget_element(rect_element):
         item._widget_background = str(data.get("widgetBackground", "#ffffff"))
         return item
 
-    def clone(self):
+    def clone(self) -> widget_element | None:
         cloned = widget_element()
         cloned._name = self._name
         cloned.m_pos = QPointF(self.m_pos)
+        # 几何四角必须一起复制。此处早期实现只拷了尺寸（rect_element.clone 会拷
+        # 四角），克隆体的 _head_pos 停在 None，粘贴时 setPos / completed 走到
+        # mapToScene(None) 抛 AttributeError —— 控件图元一复制粘贴就崩。
+        cloned.set_head_pos(self.get_head_pos())
+        cloned.set_end_pos(self.get_end_pos())
+        cloned.set_center_pos(self.get_center_pos())
+        for attr in ("_topLeft", "_topRight", "_bottomLeft", "_bottomRight"):
+            value = getattr(self, attr, None)
+            setattr(cloned, attr, QPointF(value) if value is not None else None)
         cloned.set_line_width(self.get_line_width())
         cloned.set_color(self.get_color())
         cloned.set_fill(self.get_fill())
@@ -1746,7 +1784,7 @@ class widget_element(rect_element):
 
 class group_element(rect_element):
     count = 0
-    def __init__(self,*args, parent: QObject = None):
+    def __init__(self,*args: Any, parent: QObject | None = None) -> None:
         super().__init__(parent)
         group_element.count+=1
         self.type="group"
@@ -1756,7 +1794,7 @@ class group_element(rect_element):
         for item in args:
             self.members.append(item)
        
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("group", self)
 
     # ------------------------------------------------------------------
@@ -1772,7 +1810,7 @@ class group_element(rect_element):
         return f"{name}_" if name else ""
 
     @staticmethod
-    def _replace_name_prefix(item, old_prefix: str, new_prefix: str) -> None:
+    def _replace_name_prefix(item: base_element, old_prefix: str, new_prefix: str) -> None:
         """Rewrite ``old_prefix`` in every name of ``item``'s subtree."""
 
         name = str(item.get_name() or "")
@@ -1784,7 +1822,7 @@ class group_element(rect_element):
             group_element._replace_name_prefix(child, old_prefix, new_prefix)
 
     @staticmethod
-    def _prefix_name_subtree(item, prefix: str) -> None:
+    def _prefix_name_subtree(item: base_element, prefix: str) -> None:
         """Prepend ``prefix`` to every name of ``item``'s subtree."""
 
         name = str(item.get_name() or "")
@@ -1811,7 +1849,7 @@ class group_element(rect_element):
         for child in list(self.m_children):
             self._replace_name_prefix(child, prefix, "")
 
-    def set_name(self, name) -> bool:
+    def set_name(self, name: str) -> bool:
         """Rename the group and carry the new prefix over to its members."""
 
         old_name = self.get_name()
@@ -1825,8 +1863,8 @@ class group_element(rect_element):
                 self._replace_name_prefix(child, old_prefix, new_prefix)
         return True
 
-    def initialize(self):
-        def get_boundRect_of_member(item:base_element):
+    def initialize(self) -> None:
+        def get_boundRect_of_member(item:base_element) -> QRectF:
             rect =item.sceneBoundingRect()
             if item.is_has_child():
                 for child in item.childItems():
@@ -1861,7 +1899,7 @@ class group_element(rect_element):
         self.apply_member_name_prefix()
 
 
-    def __disassemble_group(self):
+    def __disassemble_group(self) -> None:
         """拆解1次group"""
         if not self.is_has_child():
             return
@@ -1872,7 +1910,7 @@ class group_element(rect_element):
             child.removeParentItem(True)
             print(f"移除了id:{child.id()}类型{child.type}的父图元")
 
-    def free_group(self):
+    def free_group(self) -> None:
 
         # Restore the member names before the group loses its children.
         self._remove_member_name_prefix()
@@ -1955,20 +1993,20 @@ class group_element(rect_element):
     #         return
 
 
-    def set_visibility(self, enable):
+    def set_visibility(self, enable: bool) -> None:
         super().set_visibility(enable)
         if self.is_has_child():
             for item in self.childItems():
                 item.set_visibility(enable)
         
     
-    def set_selectable(self,enable):
+    def set_selectable(self,enable: bool) -> None:
         if self.is_has_child():
             for item in self.childItems():
                 item.set_selectable(enable)
         return super().set_selectable(enable)
     
-    def paint(self,painter:QPainter,shine_flag):
+    def paint(self,painter:QPainter,shine_flag: bool) -> None:
         
         if self.m_scene and self.m_scene.mode() == SceneMode.Run:
             # 运行态分组不绘制虚线框，但必须像其他图元一样在每帧绘制时清掉
@@ -1980,7 +2018,7 @@ class group_element(rect_element):
             super().paint(painter,shine_flag)
             return
         painter.save()
-        def create_pen_style(color):
+        def create_pen_style(color: QColor) -> QPen:
             # 创建基础画笔
             pen = QPen()
             
@@ -2017,7 +2055,7 @@ class group_element(rect_element):
         painter.restore()
         super(rect_element, self).paint(painter,shine_flag)
 
-    def clone(self):
+    def clone(self) -> group_element | None:
         """深度克隆图元及其子图元"""
 
         # 创建当前图元的新实例（不复制父关系）
@@ -2062,10 +2100,10 @@ class circle_element(base_element):
     count = 0
 
     @overload
-    def __init__(self,parent=None)->None:...
+    def __init__(self,parent: QObject | None=None)->None:...
 
     @overload
-    def __init__(self,parent=None,pos:QPointF=(0,0),radius:float=0.0,color:QColor=(0,0,0),isFill:bool=False)->None:...
+    def __init__(self,parent: QObject | None=None,pos:QPointF=(0,0),radius:float=0.0,color:QColor=(0,0,0),isFill:bool=False)->None:...
         
     
     def __init__(self,
@@ -2107,21 +2145,21 @@ class circle_element(base_element):
         self.type = "circle"
         circle_element.count += 1
     
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("circle", self)
 
-    def update_boundingRect(self):
+    def update_boundingRect(self) -> None:
         super().update_boundingRect()
         
         self.prepareGeometryChange()
 
-        def max_of_four(*args):
+        def max_of_four(*args: float) -> float:
             max_value = args[0]
             for val in args:
                 if max_value< val:
                     max_value = val
             return max_value
-        def min_of_four(*args):
+        def min_of_four(*args: float) -> float:
             min_value = args[0]
             for val in args:
                 if min_value> val:
@@ -2147,7 +2185,7 @@ class circle_element(base_element):
         self._sceneBoundingRect = rect
 
 
-    def completed(self,construct_from_dict=False):
+    def completed(self,construct_from_dict: bool =False) -> None:
         if construct_from_dict:
             return super().completed(True)
         
@@ -2176,12 +2214,12 @@ class circle_element(base_element):
            
  
     
-    def transfer_head_pos(self,pos_start:QPointF):
+    def transfer_head_pos(self,pos_start:QPointF) -> None:
         self._head_pos  =pos_start
         self._center_pos =pos_start
 
 
-    def transfer_pos(self,pos:QPointF):
+    def transfer_pos(self,pos:QPointF) -> None:
         if isinstance(pos,QPointF):
             self._end_pos =pos
             a=(self._end_pos-self._center_pos)
@@ -2190,7 +2228,7 @@ class circle_element(base_element):
             w=h = self.radius*2.0
             self.scene_size = QSizeF(w,h)
 
-    def transfer_end_pos(self,pos_end:QPointF):
+    def transfer_end_pos(self,pos_end:QPointF) -> None:
         self._end_pos =pos_end
         a=(self._end_pos-self._center_pos)
         self.radius = sqrt(a.x()*a.x()+ a.y()*a.y())
@@ -2198,10 +2236,10 @@ class circle_element(base_element):
         w=h = self.radius*2.0
         self.scene_size = QSizeF(w,h)
         self.completed()
-    def set_center_pos(self,pos):
+    def set_center_pos(self,pos: QPointF) -> None:
         self._center_pos = pos
     
-    def setSize(self,w,h):
+    def setSize(self,w: float,h: float) -> None:
        
         self.scene_size.setWidth(w)
         self.scene_size.setHeight(h)
@@ -2235,7 +2273,7 @@ class circle_element(base_element):
     #     self.update_boundingRect()
 
     
-    def change_position(self,pos):
+    def change_position(self,pos: QPointF) -> None:
         w ,h=self.getSize().width(),self.getSize().height()
         self._head_pos_last = self.mapToScene(self._topLeft)
         # self._head_pos =pos
@@ -2262,7 +2300,7 @@ class circle_element(base_element):
         else:
             return
 
-    def change_size(self,w,h):
+    def change_size(self,w: float,h: float) -> None:
         self._scene_size_last =copy.copy(self.scene_size)
         self.setSize(w,h)
         
@@ -2299,7 +2337,7 @@ class circle_element(base_element):
     
 
 
-    def check_hover(self,mouse_pos:QPointF):
+    def check_hover(self,mouse_pos:QPointF) -> None:
         """((x - x0)² / a²) + ((y - y0)² / b²) ≤ 1"""
         if self.is_moving() or not self.get_selectable():
             self.set_hover(False)
@@ -2325,13 +2363,13 @@ class circle_element(base_element):
             self.set_hover( result_max and result_min)
         return self.get_hover()
 
-    def set_visibility(self, enable):
+    def set_visibility(self, enable: bool) -> None:
         if self.is_has_child():
             for item in self.childItems():
                 item.set_visibility(enable)
         return super().set_visibility(enable)
 
-    def paint(self,painter:QPainter,shine_flag):
+    def paint(self,painter:QPainter,shine_flag: bool) -> None:
         if self.get_visibility()==False:
             super().paint(painter,shine_flag)
             return
@@ -2372,7 +2410,7 @@ class circle_element(base_element):
         painter.restore()
         super().paint(painter,shine_flag)
 
-    def clone(self):
+    def clone(self) -> circle_element | None:
         """深度克隆图元及其子图元"""
 
         # 创建当前图元的新实例（不复制父关系）
@@ -2420,7 +2458,7 @@ class circle_element(base_element):
         return cloned
 
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         """将图元转换为字典"""
         parent_id = self.m_parent.id() if self.m_parent else 0
         children_ids  =[]
@@ -2450,7 +2488,7 @@ class circle_element(base_element):
         }
     
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> circle_element:
         """从字典创建图元"""
         scene_center_pos = QPointF(data["center_pos"]["x"],data["center_pos"]["y"])
         scenr_origin_pos = QPointF(data["origin_pos"]["x"],data["origin_pos"]["y"])
@@ -2532,7 +2570,7 @@ class text_element(base_element):
     #: 内容变化时是否把文本框左侧钉住（False 恢复成左右对称扩展的老行为）
     keep_left_on_context_change = True
     contextChanged = Signal(str)
-    def __init__(self,parent=None,text_height=100,bg_color=QColor(0,255,0,50)):
+    def __init__(self,parent: QObject | None =None,text_height: float =100,bg_color: QColor =QColor(0,255,0,50)) -> None:
         super().__init__(parent=parent)
         self.parent= parent
         text_element.count += 1
@@ -2554,20 +2592,20 @@ class text_element(base_element):
         self.contextChanged.connect(self.handle_context_change)
 
     @Property(str, notify=contextChanged)
-    def context(self):
+    def context(self) -> str:
         return self._context
         
     @context.setter
-    def context(self, str):
-        new_str = " " + str + " "
+    def context(self, val: str) -> None:
+        new_str = " " + val + " "
         if self._context != new_str:
             self._context = new_str
             self.contextChanged.emit(new_str)
 
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("text", self)
 
-    def calc_font_size(self, target_height, text) -> float:
+    def calc_font_size(self, target_height: float, text: str) -> float:
         # 创建临时绘图设备
         pixmap = QPixmap(100, 100)
         painter = QPainter(pixmap)
@@ -2650,18 +2688,18 @@ class text_element(base_element):
         # x = (rect.width() - text_width) // 2+rect.left()
         # y = rect.height() +rect.top()# 基线在容器底部
 
-    def update_boundingRect(self):
+    def update_boundingRect(self) -> None:
         super().update_boundingRect()
         
         self.prepareGeometryChange()
 
-        def max_of_four(*args):
+        def max_of_four(*args: float) -> float:
             max_value = args[0]
             for val in args:
                 if max_value< val:
                     max_value = val
             return max_value
-        def min_of_four(*args):
+        def min_of_four(*args: float) -> float:
             min_value = args[0]
             for val in args:
                 if min_value> val:
@@ -2692,7 +2730,7 @@ class text_element(base_element):
      
        
 
-    def completed(self,construct_from_dict=False):
+    def completed(self,construct_from_dict: bool =False) -> None:
         if construct_from_dict:
             return super().completed(True)
        
@@ -2731,7 +2769,7 @@ class text_element(base_element):
     
 
     
-    def setSize(self,w,h):
+    def setSize(self,w: float,h: float) -> None:
         self._scene_size.setWidth(w)
         self._scene_size.setHeight(h)
     def getSize(self)->QSizeF:
@@ -2739,7 +2777,7 @@ class text_element(base_element):
 
     
 
-    def transfer_pos(self,pos:QPointF):
+    def transfer_pos(self,pos:QPointF) -> None:
         """鼠标移动时位置更新"""
         self._center_pos =  pos
         text_height_view =  self.width* self.m_scene.grid_size  / self.m_scene.scene_units_per_grid_x
@@ -2754,7 +2792,7 @@ class text_element(base_element):
 
 
         
-    def anchor_left_edge(self, old_height, new_height):
+    def anchor_left_edge(self, old_height: float, new_height: float) -> None:
         """内容长度变化后，让屏幕上左侧那条边保持不动，只向右（或向左）伸缩。
 
         文本的长度方向是局部 y（不是局部 x）：
@@ -2783,7 +2821,7 @@ class text_element(base_element):
         delta = sign * (half_old - half_new)
         self._center_pos = QPointF(self._center_pos.x(), self._center_pos.y() + delta)
 
-    def handle_context_change(self):
+    def handle_context_change(self) -> None:
         old_height = self._scene_size.height()
         self.width  =self.getSize().width()
         text_height_view =  self.width* self.m_scene.grid_size  / self.m_scene.scene_units_per_grid_x
@@ -2801,7 +2839,7 @@ class text_element(base_element):
         self._bottomRight=self._end_pos
         self.update_boundingRect()
 
-    def transfer_head_pos(self,pos:QPointF):
+    def transfer_head_pos(self,pos:QPointF) -> None:
         self._center_pos =  pos
         text_height_view =  self.width* self.m_scene.grid_size  / self.m_scene.scene_units_per_grid_x
         text_width_view  =  self.calc_font_size(text_height_view,self._context)
@@ -2817,7 +2855,7 @@ class text_element(base_element):
         
     
 
-    def change_position(self,pos):
+    def change_position(self,pos: QPointF) -> None:
         w ,h=self.getSize().width(),self.getSize().height()
         self._head_pos_last = self.mapToScene(self._topLeft)
     
@@ -2849,7 +2887,7 @@ class text_element(base_element):
         else:
             return
 
-    def change_size(self,w,h):
+    def change_size(self,w: float,h: float) -> None:
     
         self.setSize(w,h)
         self.width = w
@@ -2895,7 +2933,7 @@ class text_element(base_element):
             return
     
 
-    def check_hover(self,mouse_pos:QPointF):
+    def check_hover(self,mouse_pos:QPointF) -> None:
         if self.is_moving() or not self.get_selectable():
             self.set_hover(False)
             return False
@@ -2911,13 +2949,13 @@ class text_element(base_element):
         return False
         
     
-    def set_visibility(self, enable):
+    def set_visibility(self, enable: bool) -> None:
         if self.is_has_child():
             for item in self.childItems():
                 item.set_visibility(enable)
         return super().set_visibility(enable)
     
-    def paint(self,painter:QPainter,shine_flag):
+    def paint(self,painter:QPainter,shine_flag: bool) -> None:
         if self.get_visibility()==False:
             super().paint(painter,shine_flag)
             return
@@ -2979,7 +3017,7 @@ class text_element(base_element):
 
         super().paint(painter,shine_flag)
 
-    def clone(self):
+    def clone(self) -> text_element | None:
         """深度克隆图元及其子图元"""
 
         # 创建当前图元的新实例（不复制父关系）
@@ -3024,7 +3062,7 @@ class text_element(base_element):
 
         return cloned
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         """将图元转换为字典"""
         parent_id = self.m_parent.id() if self.m_parent else 0
         children_ids  =[]
@@ -3061,7 +3099,7 @@ class text_element(base_element):
         }
     
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> text_element:
         """从字典创建图元"""
         scene_center_pos = QPointF(data["center_pos"]["x"],data["center_pos"]["y"])
         scenr_origin_pos = QPointF(data["origin_pos"]["x"],data["origin_pos"]["y"])
@@ -3120,7 +3158,7 @@ class text_element(base_element):
 class image_element(base_element):
     count = 0
 
-    def __init__(self,parent=None):
+    def __init__(self,parent: QObject | None =None) -> None:
         super().__init__(parent=parent)
         self.parent= parent
         image_element.count += 1
@@ -3145,13 +3183,13 @@ class image_element(base_element):
         self.set_actived( True)
         self.set_selected(False)
            
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("image", self)
 
-    def image_path(self):
+    def image_path(self) -> str:
             return self.img_file
     
-    def set_image_path(self,path):
+    def set_image_path(self,path: str) -> None:
         self.img_file = path
         self.img_path = res_mng.get_img_path(path)
     
@@ -3189,18 +3227,18 @@ class image_element(base_element):
     #         path = path.replace("\\", "/")
     #         self.img_path = os.path.normpath(os.path.join(base_dir, path))
     
-    def update_boundingRect(self):
+    def update_boundingRect(self) -> None:
         super().update_boundingRect()
         
         self.prepareGeometryChange()
 
-        def max_of_four(*args):
+        def max_of_four(*args: float) -> float:
             max_value = args[0]
             for val in args:
                 if max_value< val:
                     max_value = val
             return max_value
-        def min_of_four(*args):
+        def min_of_four(*args: float) -> float:
             min_value = args[0]
             for val in args:
                 if min_value> val:
@@ -3223,7 +3261,7 @@ class image_element(base_element):
 
         self._sceneBoundingRect = rect
 
-    def completed(self,construct_from_dict=False):
+    def completed(self,construct_from_dict: bool =False) -> None:
         if construct_from_dict:
             super().completed(True)
             return
@@ -3259,7 +3297,7 @@ class image_element(base_element):
  
     
 
-    def check_hover(self,mouse_pos:QPointF):
+    def check_hover(self,mouse_pos:QPointF) -> None:
         if self.is_moving() or not self.get_selectable():
             self.set_hover(False)
             return False
@@ -3273,21 +3311,21 @@ class image_element(base_element):
         return False
 
 
-    def transfer_pos(self,pos:QPointF):
+    def transfer_pos(self,pos:QPointF) -> None:
         
         self._head_pos  =pos
         w,h=self.scene_size.width(),self.scene_size.height()
         self._end_pos   = pos + QPointF(w,h)
         self._center_pos = (self._head_pos+self._end_pos)/2.0
     
-    def transfer_end_pos(self,pos_end:QPointF):
+    def transfer_end_pos(self,pos_end:QPointF) -> None:
         self._head_pos  =pos_end
         w,h=self.scene_size.width(),self.scene_size.height()
         self._end_pos   = pos_end + QPointF(w,h)
         self._center_pos = (self._head_pos+self._end_pos)/2.0
         self.completed()
 
-    def change_position(self,pos):
+    def change_position(self,pos: QPointF) -> None:
         w ,h=self.getSize().width(),self.getSize().height()
         self._head_pos_last = self.mapToScene(self._head_pos)
         self._head_pos      = pos
@@ -3314,7 +3352,7 @@ class image_element(base_element):
         else:
             return
 
-    def change_size(self,w,h):
+    def change_size(self,w: float,h: float) -> None:
         self._scene_size_last =copy.copy(self.scene_size)
         self.setSize(w,h)
         self._bottomRight =self._end_pos  =   QPointF(w,h) + self._head_pos
@@ -3350,7 +3388,7 @@ class image_element(base_element):
 
 
 
-    def setSize(self,w,h):
+    def setSize(self,w: float,h: float) -> None:
         self.scene_size.setWidth(w)
         self.scene_size.setHeight(h)
         
@@ -3358,13 +3396,13 @@ class image_element(base_element):
         return self.scene_size
     
     
-    def set_visibility(self, enable):
+    def set_visibility(self, enable: bool) -> None:
         if self.is_has_child():
             for item in self.childItems():
                 item.set_visibility(enable)
         return super().set_visibility(enable)
     
-    def paint(self,painter:QPainter,shine_flag):
+    def paint(self,painter:QPainter,shine_flag: bool) -> None:
         if self.get_visibility()==False:
             super().paint(painter,shine_flag)
             return
@@ -3378,7 +3416,7 @@ class image_element(base_element):
         # 关键：启用渲染提示以提高绘制质量
         painter.setRenderHint(QPainter.Antialiasing, True)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-        def create_pen_style(color):
+        def create_pen_style(color: QColor) -> QPen:
             # 创建基础画笔
             pen = QPen()
             
@@ -3442,7 +3480,7 @@ class image_element(base_element):
 
 
 
-    def clone(self):
+    def clone(self) -> image_element | None:
         """深度克隆图元及其子图元"""
 
         # 创建当前图元的新实例（不复制父关系）
@@ -3484,7 +3522,7 @@ class image_element(base_element):
 
         return cloned
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         """将图元转换为字典"""
         parent_id = self.m_parent.id() if self.m_parent else 0
         children_ids  =[]
@@ -3517,7 +3555,7 @@ class image_element(base_element):
         }
     
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> image_element:
         """从字典创建图元"""
         scene_center_pos = QPointF(data["center_pos"]["x"],data["center_pos"]["y"])
         scene_origin_pos = QPointF(data["origin_pos"]["x"],data["origin_pos"]["y"])
@@ -3589,7 +3627,7 @@ class triangle_element(rect_element):
 
     count = 0
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         triangle_element.count += 1
         super().__init__(*args, **kwargs)
         self.type = "triangle"
@@ -3601,10 +3639,10 @@ class triangle_element(rect_element):
             )
             self._refresh_local_bounds()
 
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("triangle", self)
 
-    def _default_local_vertices(self, width, height) -> List[QPointF]:
+    def _default_local_vertices(self, width: float, height: float) -> List[QPointF]:
         """Return the legacy apex-up triangle fitted into ``width``/``height``."""
         width = float(width)
         height = float(height)
@@ -3615,7 +3653,7 @@ class triangle_element(rect_element):
         ]
 
     @staticmethod
-    def _parse_scene_vertices(value) -> List[QPointF]:
+    def _parse_scene_vertices(value: object) -> List[QPointF]:
         if not isinstance(value, (list, tuple)) or len(value) != 3:
             return []
         vertices = []
@@ -3639,7 +3677,7 @@ class triangle_element(rect_element):
     def _local_bounding_rect(self) -> QRectF:
         return self._bounding_rect(self._vertices_local)
 
-    def _refresh_local_bounds(self):
+    def _refresh_local_bounds(self) -> None:
         """Keep the rect-compatible bbox fields in sync with the vertices."""
         rect = self._local_bounding_rect()
         if self._vertices_local:
@@ -3662,7 +3700,7 @@ class triangle_element(rect_element):
             self.scene_size = QSizeF(0.0, 0.0)
 
     def _apply_scene_vertices(self, scene_vertices: List[QPointF], angle: float = 0.0,
-                              origin_scene: Optional[QPointF] = None):
+                              origin_scene: Optional[QPointF] = None) -> bool:
         """Define the triangle from three scene points.
 
         The local origin is normalised to the centre of the local bounding
@@ -3733,7 +3771,7 @@ class triangle_element(rect_element):
             scene_vertices, angle=self.m_angle, origin_scene=origin_scene
         )
 
-    def set_default_geometry(self, top_left: QPointF, width: float, height: float):
+    def set_default_geometry(self, top_left: QPointF, width: float, height: float) -> None:
         """Create the legacy apex-up triangle inside an axis aligned rect."""
         center = QPointF(
             float(top_left.x()) + float(width) / 2.0,
@@ -3758,13 +3796,13 @@ class triangle_element(rect_element):
             self.completed()
         return True
 
-    def transfer_head_pos(self, pos: QPointF):
+    def transfer_head_pos(self, pos: QPointF) -> None:
         self.add_draw_vertex(pos)
 
-    def transfer_end_pos(self, pos: QPointF):
+    def transfer_end_pos(self, pos: QPointF) -> None:
         self.add_draw_vertex(pos)
 
-    def update_boundingRect(self):
+    def update_boundingRect(self) -> None:
         base_element.update_boundingRect(self)
         self.prepareGeometryChange()
 
@@ -3779,7 +3817,7 @@ class triangle_element(rect_element):
             min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
         )
 
-    def completed(self, construct_from_dict=False):
+    def completed(self, construct_from_dict: bool =False) -> None:
         if construct_from_dict:
             base_element.completed(self, True)
             return True
@@ -3788,7 +3826,7 @@ class triangle_element(rect_element):
         base_element.completed(self, False)
         return True
 
-    def change_position(self, pos: QPointF):
+    def change_position(self, pos: QPointF) -> None:
         """Move the whole triangle so its bbox top-left follows the property box."""
         if not self._vertices_local:
             return
@@ -3801,7 +3839,7 @@ class triangle_element(rect_element):
         self.m_pos_init = self.m_pos_init + delta
         self.update_boundingRect()
 
-    def change_size(self, width, height):
+    def change_size(self, width: float, height: float) -> None:
         """Scale the vertices so their bbox matches the requested size.
 
         The scale is anchored at the local bounding-box top-left, matching
@@ -3858,7 +3896,7 @@ class triangle_element(rect_element):
         """三角形面域，映射到场景坐标。"""
         return self._map_local_path_to_scene(self._triangle_path())
 
-    def check_hover(self, mouse_pos: QPointF):
+    def check_hover(self, mouse_pos: QPointF) -> None:
         if self.is_moving() or not self.get_selectable() or not self._vertices_local:
             self.set_hover(False)
             return False
@@ -3879,7 +3917,7 @@ class triangle_element(rect_element):
         self.set_hover(bool(hovered))
         return bool(hovered)
 
-    def paint(self, painter: QPainter, shine_flag):
+    def paint(self, painter: QPainter, shine_flag: bool) -> None:
         if self.get_visibility() == False:
             base_element.paint(self, painter, shine_flag)
             return
@@ -3915,7 +3953,7 @@ class triangle_element(rect_element):
 
         base_element.paint(self, painter, shine_flag)
 
-    def clone(self):
+    def clone(self) -> triangle_element | None:
         """深度克隆图元及其子图元"""
         cloned = triangle_element()
         # 复制名称：复制/粘贴时据此保留成员名，只替换组名前缀
@@ -3946,7 +3984,7 @@ class triangle_element(rect_element):
 
         return cloned
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the three vertices in scene coordinates."""
         data = super().to_dict()
         transform = self.sceneTransform()
@@ -3967,7 +4005,7 @@ class triangle_element(rect_element):
         return data
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> triangle_element:
         """Restore the triangle from its vertices, with a bbox fallback for old files."""
         item = super().from_dict(data)
         vertices = cls._parse_scene_vertices(data.get("vertices"))
@@ -4012,7 +4050,7 @@ class polygon_element(triangle_element):
 
     count = 0
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         polygon_element.count += 1
         super().__init__(*args, **kwargs)
         self.type = "polygon"
@@ -4021,12 +4059,12 @@ class polygon_element(triangle_element):
         self._draft_scene_vertices: List[QPointF] = []
         self._refresh_local_bounds()
 
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("polygon", self)
 
     # ------------------------------------------------------------------ 顶点约束放宽
     @staticmethod
-    def _parse_scene_vertices(value) -> List[QPointF]:
+    def _parse_scene_vertices(value: object) -> List[QPointF]:
         if not isinstance(value, (list, tuple)) or len(value) < 3:
             return []
         vertices = []
@@ -4040,7 +4078,7 @@ class polygon_element(triangle_element):
         return vertices
 
     def _apply_scene_vertices(self, scene_vertices: List[QPointF], angle: float = 0.0,
-                              origin_scene: Optional[QPointF] = None):
+                              origin_scene: Optional[QPointF] = None) -> bool:
         """与三角形一致，但允许任意 ≥3 个顶点。"""
         points = [QPointF(point) for point in scene_vertices]
         if len(points) < 3:
@@ -4089,7 +4127,7 @@ class polygon_element(triangle_element):
         self._draft_scene_vertices.append(QPointF(scene_pos))
         return True
 
-    def set_default_geometry(self, top_left: QPointF, width: float, height: float):
+    def set_default_geometry(self, top_left: QPointF, width: float, height: float) -> None:
         """工具箱拖拽放下时生成一个默认正六边形（顶点数 6）。
 
         与 ``triangle_element.set_default_geometry`` 语义一致：在给定包围盒
@@ -4116,7 +4154,7 @@ class polygon_element(triangle_element):
         self._apply_scene_vertices(scene_vertices, angle=0.0)
         self.completed()
 
-    def clone(self):
+    def clone(self) -> polygon_element | None:
         """深度克隆多边形（顶点数任意），与 ``triangle_element.clone`` 一致。"""
         cloned = polygon_element()
         cloned._name = self._name
@@ -4158,7 +4196,7 @@ class polygon_element(triangle_element):
         return True
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> polygon_element:
         """从任意数量的顶点恢复多边形。"""
         item = super().from_dict(data)
         vertices = cls._parse_scene_vertices(data.get("vertices"))
@@ -4200,7 +4238,7 @@ class path_element(base_element):
 
     count = 0
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QObject | None =None) -> None:
         super().__init__(parent=parent)
         self.parent = parent
         path_element.count += 1
@@ -4222,11 +4260,11 @@ class path_element(base_element):
         self.set_actived(True)
         self.set_selected(False)
 
-    def __del__(self):
+    def __del__(self) -> None:
         _log_destroy("path", self)
 
     # ------------------------------------------------------------------ 几何
-    def set_path(self, path: QPainterPath):
+    def set_path(self, path: QPainterPath) -> None:
         self._path = QPainterPath(path)
         self.update_boundingRect()
 
@@ -4237,7 +4275,7 @@ class path_element(base_element):
         # 恒等变换下局部路径就是场景路径
         return QPainterPath(self._path)
 
-    def update_boundingRect(self):
+    def update_boundingRect(self) -> None:
         super().update_boundingRect()
         self.prepareGeometryChange()
         rect = self._path.boundingRect()
@@ -4258,14 +4296,14 @@ class path_element(base_element):
         self._center_pos = rect.center()
         self.scene_size = QSizeF(rect.width(), rect.height())
 
-    def completed(self, construct_from_dict=False):
+    def completed(self, construct_from_dict: bool =False) -> None:
         self.update_boundingRect()
         super().completed(construct_from_dict)
 
     def getSize(self) -> QSizeF:
         return self.scene_size
 
-    def setSize(self, w, h):
+    def setSize(self, w: float, h: float) -> None:
         # 缩放整个路径，使其包围盒变为 w×h（等比缩放，中心锚定）
         rect = self._path.boundingRect()
         if rect.isEmpty() or rect.width() <= 0 or rect.height() <= 0:
@@ -4280,7 +4318,7 @@ class path_element(base_element):
         self._path.translate(center.x(), center.y())
         self.update_boundingRect()
 
-    def change_position(self, pos: QPointF):
+    def change_position(self, pos: QPointF) -> None:
         rect = self._path.boundingRect()
         if rect.isEmpty():
             return
@@ -4288,10 +4326,10 @@ class path_element(base_element):
         self._path.translate(delta.x(), delta.y())
         self.update_boundingRect()
 
-    def change_size(self, w, h):
+    def change_size(self, w: float, h: float) -> None:
         self.setSize(w, h)
 
-    def check_hover(self, mouse_pos: QPointF):
+    def check_hover(self, mouse_pos: QPointF) -> None:
         if self.is_moving() or not self.get_selectable():
             self.set_hover(False)
             return False
@@ -4308,7 +4346,7 @@ class path_element(base_element):
         return bool(hovered)
 
     # ------------------------------------------------------------------ 绘制
-    def paint(self, painter: QPainter, shine_flag):
+    def paint(self, painter: QPainter, shine_flag: bool) -> None:
         if self.get_visibility() is False:
             base_element.paint(self, painter, shine_flag)
             return
@@ -4350,7 +4388,7 @@ class path_element(base_element):
         base_element.paint(self, painter, shine_flag)
 
     # ------------------------------------------------------------------ 序列化
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         parent_id = self.m_parent.id() if self.m_parent else 0
         children_ids = [child.id() for child in self.m_children]
         rect = self._path.boundingRect()
@@ -4384,7 +4422,7 @@ class path_element(base_element):
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> path_element:
         item = cls()
         item.setID(data["id"])
         item._set_name(data["name"])
@@ -4411,7 +4449,7 @@ class path_element(base_element):
         item.update_boundingRect()
         return item
 
-    def clone(self):
+    def clone(self) -> path_element | None:
         cloned = path_element()
         cloned._name = self._name
         cloned._path = QPainterPath(self._path)
@@ -4434,7 +4472,7 @@ BOOL_INTERSECT = "intersect"  # 交集 intersected
 BOOL_SUBTRACT = "subtract"    # 差集 subtracted（a - b）
 
 
-def boolean_elements(manager, items, op=BOOL_UNION):
+def boolean_elements(manager: Any, items: list[Any], op: str =BOOL_UNION) -> list[Any]:
     """对多个图元的面域做布尔运算，生成一个新的 ``path_element``。
 
     Args:

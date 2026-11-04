@@ -1,14 +1,33 @@
+from __future__ import annotations
+
 import math
 import sys
 from collections import defaultdict
+from typing import Any, Callable, Iterable, TypedDict
+
 from PySide6.QtCore import Qt, QPointF,QPoint, QRectF,Signal,QTimer,QObject
 from PySide6.QtGui import QCursor,QPainter,QPen, QColor
+
+# 吸附点统一用 (x, y) 浮点元组表示（可哈希，直接进 set）
+SnapPointTuple = tuple[float, float]
+# 参与交点计算的几何元素描述，例如 {"type": "line", "start": (x, y), "end": (x, y)}
+GeometricElement = dict[str, Any]
+
+
+class SnapInfo(TypedDict, total=False):
+    """get_snap_info() 的返回结构；交点类型会额外带 elements 字段。"""
+
+    point: SnapPointTuple
+    type: str
+    distance: float
+    elements: list[GeometricElement]
+
 
 # 吸附调试输出开关，与场景的 DEBUG_SCENE 保持同样的用法。
 DEBUG_SNAP = False
 
 
-def debug_log(*args, **kwargs) -> None:
+def debug_log(*args: object, **kwargs: object) -> None:
     if DEBUG_SNAP:
         print(*args, **kwargs)
 
@@ -52,7 +71,28 @@ def warp_cursor(pos: QPoint) -> None:
 
 class SnapSystem(QObject):
     move_item_to_snap_pos =Signal(QPointF)
-    def __init__(self,parent=None, threshold=10 ,map_scene_to_screen=None):
+
+    snap_points: dict[str, set[SnapPointTuple]]
+    mapToScreen: Callable[[SnapPointTuple], QPoint] | None
+    snap_threshold: float
+    active_types: list[str]
+    current_snap: tuple[SnapPointTuple, str] | None
+    current_snap_pos: SnapPointTuple | None
+    snap_indicator: object | None
+    show_grid: bool
+    grid_size: float
+    geometric_elements: list[GeometricElement]
+    intersection_cache: defaultdict[SnapPointTuple, list[GeometricElement]]
+    distance_when_found_snap_pos: float
+    flag_when_found_snap_pos: bool
+    last_cursor_pos: QPointF | None
+
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        threshold: float = 10,
+        map_scene_to_screen: Callable[[SnapPointTuple], QPoint] | None = None,
+    ) -> None:
         super().__init__(parent=parent)
         # 捕捉点集合
         self.snap_points = {
@@ -85,11 +125,12 @@ class SnapSystem(QObject):
 
         # self.timer = QTimer()
     
-    def update_endpoints(self,poses):
+    def update_endpoints(self, poses: Iterable[QPointF]) -> None:
         self.snap_points['endpoints'].clear()
         for pos in poses:
             self.snap_points['endpoints'].add(pos.toTuple())
-    def update_midpoints(self,poses):
+
+    def update_midpoints(self, poses: Iterable[QPointF]) -> None:
         self.snap_points['midpoints'].clear()
         for pos in poses:
             self.snap_points['midpoints'].add(pos.toTuple())
@@ -97,8 +138,12 @@ class SnapSystem(QObject):
 
 
 
-    def move_cursor_to_snaped_pos(self,snaped_pos,mouse_pos):
-        def calc_distance(p1:QPointF,p2:QPointF):
+    def move_cursor_to_snaped_pos(
+        self,
+        snaped_pos: SnapPointTuple | None,
+        mouse_pos: QPointF,
+    ) -> None:
+        def calc_distance(p1: QPointF, p2: QPointF) -> float:
             dx = p1.x() - p2.x()
             dy = p1.y() - p2.y()
             return math.sqrt(dx*dx + dy*dy)
@@ -118,7 +163,11 @@ class SnapSystem(QObject):
             self.flag_when_found_snap_pos = False    
             self.distance_when_found_snap_pos = 0.0
 
-    def move_cursor_to_snaped_pos_V2(self,snaped_pos,enable):
+    def move_cursor_to_snaped_pos_V2(
+        self,
+        snaped_pos: SnapPointTuple | None,
+        enable: bool,
+    ) -> None:
         if snaped_pos and enable :
             target_cursor_pos=self.mapToScreen(snaped_pos)#目标吸附点
             dpos = QCursor.pos() - target_cursor_pos
@@ -131,17 +180,17 @@ class SnapSystem(QObject):
             
             
         
-    def set_snap_threshold(self,threshold):
+    def set_snap_threshold(self, threshold: float) -> None:
         self.snap_threshold = threshold
 
-    def add_element(self, element):
+    def add_element(self, element: GeometricElement) -> None:
         """添加几何元素（直线、圆等）"""
         if element in self.geometric_elements:
             return
         self.geometric_elements.append(element)
         self.update_intersections(element)
 
-    def remove_element(self, element):
+    def remove_element(self, element: GeometricElement) -> None:
         """删除几何元素，并清掉它参与的所有交点。
 
         旧实现只增不减：图元被删掉后仍留在 ``geometric_elements`` 中，
@@ -153,13 +202,13 @@ class SnapSystem(QObject):
             return
         self.update_intersections()
 
-    def clear_elements(self):
+    def clear_elements(self) -> None:
         """清空几何元素与交点缓存（切换页面/清空场景时调用）。"""
         self.geometric_elements.clear()
         self.intersection_cache.clear()
         self.snap_points['intersections'].clear()
 
-    def update_intersections(self, new_element=None):
+    def update_intersections(self, new_element: GeometricElement | None = None) -> None:
         """更新所有交点（可针对新元素优化计算）"""
         self.snap_points['intersections'].clear()
         # 交点缓存与点集必须同步失效，否则缓存会随元素增删无限增长。
@@ -187,9 +236,13 @@ class SnapSystem(QObject):
                     if elem2 not in bucket:
                         bucket.append(elem2)
 
-    def calculate_intersection(self, elem1, elem2):
+    def calculate_intersection(
+        self,
+        elem1: GeometricElement,
+        elem2: GeometricElement,
+    ) -> set[SnapPointTuple]:
         """计算两条几何元素的交点（这里以直线为例）"""
-        intersections = set()
+        intersections: set[SnapPointTuple] = set()
         
         # 直线-直线交点计算
         if elem1['type'] == 'line' and elem2['type'] == 'line':
@@ -213,7 +266,7 @@ class SnapSystem(QObject):
         # 可以添加其他几何元素的交点计算（如直线-圆、圆-圆等）
         return intersections
 
-    def get_nearest_grid_point(self, cursor_pos):
+    def get_nearest_grid_point(self, cursor_pos: QPointF) -> SnapPointTuple:
         """返回离光标最近的网格交点。
 
         网格是规则点阵，最近交点可以直接算出来，不需要先枚举整片区域。
@@ -222,7 +275,7 @@ class SnapSystem(QObject):
         gy = round(cursor_pos.y() / self.grid_size) * self.grid_size
         return (gx, gy)
 
-    def snap_to_point(self, cursor_pos):
+    def snap_to_point(self, cursor_pos: QPointF) -> SnapPointTuple | None:
         """尝试捕捉到最近的捕捉点。
 
         网格点不再依赖 ``update_grid`` 预先枚举：视口放大到 20000x10000 时
@@ -230,7 +283,7 @@ class SnapSystem(QObject):
         直接算出最近的网格交点，其余类型（端点/中点/中心/交点）只来自
         鼠标附近区域的图元，规模很小。
         """
-        closest_point = None
+        closest_point: tuple[SnapPointTuple, str] | None = None
         self.last_cursor_pos = cursor_pos
         # 用平方距离比较，省掉每次开方。
         min_distance_sq = self.snap_threshold * self.snap_threshold
@@ -263,7 +316,11 @@ class SnapSystem(QObject):
         return closest_point[0] if closest_point else None
 
 
-    def draw_snap_indicator(self, painter:QPainter, map_scene_to_view):
+    def draw_snap_indicator(
+        self,
+        painter: QPainter,
+        map_scene_to_view: Callable[[float, float], QPointF],
+    ) -> None:
         """绘制捕捉指示器（红色十字）。
 
         各捕捉类型统一用同一个红色十字，避免两套完全相同的绘制分支。
@@ -287,7 +344,7 @@ class SnapSystem(QObject):
         )
         painter.restore()
 
-    def get_snap_info(self):
+    def get_snap_info(self) -> SnapInfo | None:
         """获取当前捕捉点的详细信息"""
         if not self.current_snap:
             return None
@@ -298,11 +355,11 @@ class SnapSystem(QObject):
         if cursor is not None:
             distance = math.hypot(point[0] - cursor.x(), point[1] - cursor.y())
 
-        info = {
-            'point': point,
-            'type': snap_type,
-            'distance': distance
-        }
+        info = SnapInfo(
+            point=point,
+            type=snap_type,
+            distance=distance,
+        )
         
         # 如果是交点，添加相关元素信息
         if snap_type == 'intersections':
@@ -310,7 +367,7 @@ class SnapSystem(QObject):
         
         return info
 
-    def update_grid(self, scene_area:QRectF):
+    def update_grid(self, scene_area: QRectF) -> None:
         """枚举可见区域内的所有网格点（保留 API，热路径已不再调用）。
 
         ``snap_to_point`` 现在直接计算最近的网格交点，因此鼠标移动时无需

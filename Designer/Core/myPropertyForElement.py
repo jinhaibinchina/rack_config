@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import math
 import os
+from typing import Any, Callable, Protocol
 
 from PySide6.QtCore import Property, QObject, QPointF, QSizeF, Qt
 from PySide6.QtGui import QColor
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QTextEdit,
+    QTreeWidget,
     QTreeWidgetItem,
     QWidget,
 )
@@ -83,12 +85,42 @@ def _fmt(value: float, digits: int = 1) -> str:
     return f"{float(value):.{digits}f}"
 
 
+class PropertyNavigationHost(Protocol):
+    """属性分页宿主需要提供的最小接口。
+
+    宿主是 ``NavigationContentWidget``，但它反过来会 import 本模块，
+    直接互相 import 会成环，因此这里只声明用到的成员，由宿主结构化匹配。
+    """
+
+    navigation_tree: QTreeWidget
+    _building_navigation: bool
+    # 面板登记当前属性页对象，用于几何变化时增量刷新
+    _current_property_item: Any
+    # QObject 信号实例，具体类型由实现方决定
+    destory_current: Any
+
+    def add_page(self, page_id: str, title: str, widget: QWidget) -> None: ...
+
+    def select_preferred_page(self) -> None: ...
+
+
 class PropertyItem(QObject):
     """一类图元的属性页基类。"""
 
-    def __init__(self, parent=None, item: base_element = None):
+    # 绑定的图元；on_destory_current() 之后为 None（此时面板已被销毁，
+    # 不会再读取这些字段），因此内部实现按"非 None"处理。
+    item: base_element
+    navi: PropertyNavigationHost | None
+    # (控件, 取值回调)：图元几何变化时按此表增量刷新
+    _geometry_widgets: list[tuple[QWidget, Callable[[], Any]]]
+
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: base_element | None = None,
+    ) -> None:
         super().__init__()
-        self.item = item
+        self.item = item  # type: ignore[assignment]  # None 表示暂未绑定图元
         self.navi = None
         # 几何字段注册表：geo_key -> (控件, 取值回调)。图元在画布上被拖动/缩放时，
         # 场景发出 item_GeometryChange，属性面板据此增量刷新这些字段，而不重建整页
@@ -98,12 +130,16 @@ class PropertyItem(QObject):
     # ------------------------------------------------------------------
     # 几何字段增量刷新
     # ------------------------------------------------------------------
-    def _bind_geo(self, widget, value_fn):
+    def _bind_geo(
+        self,
+        widget: QWidget,
+        value_fn: Callable[[], Any],
+    ) -> None:
         """注册一个几何字段控件及其取值回调，供 refresh_geometry() 增量更新。"""
 
         self._geometry_widgets.append((widget, value_fn))
 
-    def refresh_geometry(self):
+    def refresh_geometry(self) -> None:
         """图元几何变化后，把已注册字段的最新值写回控件（不触发写回信号）。"""
 
         if self.item is None:
@@ -126,104 +162,104 @@ class PropertyItem(QObject):
     # Qt 属性：内部分页通过 setattr(self, "xxx", v) 调用
     # ------------------------------------------------------------------
     @Property(float)
-    def sizeHeight(self):
+    def sizeHeight(self) -> float:
         return self.item.getSize().height()
 
     @sizeHeight.setter
-    def sizeHeight(self, val):
+    def sizeHeight(self, val: float) -> None:
         if self.item.getSize().height() != val:
             w = self.item.getSize().width()
             self.item.change_size(w, val)
 
     @Property(float)
-    def sizeWidth(self):
+    def sizeWidth(self) -> float:
         return self.item.getSize().width()
 
     @sizeWidth.setter
-    def sizeWidth(self, val):
+    def sizeWidth(self, val: float) -> None:
         if self.item.getSize().width() != val:
             h = self.item.getSize().height()
             self.item.change_size(val, h)
 
     @Property(QSizeF)
-    def size(self):
+    def size(self) -> QSizeF:
         return self.item.getSize()
 
     @size.setter
-    def size(self, size):  # 接收一个QSizeF对象
+    def size(self, size: QSizeF) -> None:  # 接收一个QSizeF对象
         if self.item.getSize() != size:  # 直接比较QSizeF对象
             self.item.change_size(size.width(), size.height())
 
     @Property(float)
-    def posX(self):
+    def posX(self) -> float:
         return self.item.pos().x()
 
     @posX.setter
-    def posX(self, val):
+    def posX(self, val: float) -> None:
         if self.item.pos().x() != val:
             y = self.item.pos().y()
             self.item.setPos(val, y)
 
     @Property(float)
-    def posY(self):
+    def posY(self) -> float:
         return self.item.pos().y()
 
     @posY.setter
-    def posY(self, val):
+    def posY(self, val: float) -> None:
         if self.item.pos().y() != val:
             x = self.item.pos().x()
             self.item.setPos(x, val)
 
     @Property(float)
-    def head_posX(self):
+    def head_posX(self) -> float:
         return self.item.get_scene_head_pos().x()
 
     @head_posX.setter
-    def head_posX(self, val):
+    def head_posX(self, val: float) -> None:
         current = self.item.get_scene_head_pos()
         if current.x() != val:
             self.item.change_position(QPointF(val, current.y()))
 
     @Property(float)
-    def head_posY(self):
+    def head_posY(self) -> float:
         return self.item.get_scene_head_pos().y()
 
     @head_posY.setter
-    def head_posY(self, val):
+    def head_posY(self, val: float) -> None:
         current = self.item.get_scene_head_pos()
         if current.y() != val:
             self.item.change_position(QPointF(current.x(), val))
 
     @Property(int)
-    def lineWidth(self):
+    def lineWidth(self) -> int:
         return self.item.get_line_width()
 
     @lineWidth.setter
-    def lineWidth(self, val):
+    def lineWidth(self, val: int) -> None:
         if self.item.get_line_width() != val:
             self.item.set_line_width(val)
 
     @Property(int)
-    def opacity(self):
+    def opacity(self) -> int:
         return self.item.get_opacity()
 
     @opacity.setter
-    def opacity(self, val):
+    def opacity(self, val: int) -> None:
         if self.item.get_opacity() != val:
             self.item.set_opacity(val)
 
     @Property(str)
-    def name(self):
+    def name(self) -> str:
         return self.item.get_name()
 
     @name.setter
-    def name(self, str):
+    def name(self, val: str) -> None:
         self.item.set_name(str)
 
     # ------------------------------------------------------------------
     # 名称编辑
     # ------------------------------------------------------------------
-    def apply_name_edit(self, name_edit) -> bool:
+    def apply_name_edit(self, name_edit: QLineEdit) -> bool:
         """把输入框里的名字应用到图元，失败时恢复显示。
 
         名字全局唯一，``set_name`` 遇到已被别的图元占用的名字会返回 False。
@@ -277,12 +313,12 @@ class PropertyItem(QObject):
     # ------------------------------------------------------------------
     # 导航
     # ------------------------------------------------------------------
-    def navigation_items(self):
+    def navigation_items(self) -> list[tuple[str, str]]:
         """左侧导航的顶层项：``[(标题, 页面 key), ...]``。"""
 
         return [("常规", "general"), ("外观", "appearance"), ("布局", "layout")]
 
-    def add_navigation_items(self, navigation):
+    def add_navigation_items(self, navigation: PropertyNavigationHost) -> None:
         tree = navigation.navigation_tree
         for title, key in self.navigation_items():
             node = QTreeWidgetItem([title])
@@ -297,15 +333,15 @@ class PropertyItem(QObject):
         # 把当前属性页对象登记到面板，供几何变化时的增量刷新使用。
         navigation._current_property_item = self
 
-    def on_destory_current(self):
-        self.item = None
+    def on_destory_current(self) -> None:
+        self.item = None  # type: ignore[assignment]  # 面板销毁后不再读取
         if self.navi is not None:
             try:
                 self.navi.destory_current.disconnect(self.on_destory_current)
             except (RuntimeError, TypeError):
                 pass
 
-    def create_content_pages(self, navi):
+    def create_content_pages(self, navi: PropertyNavigationHost) -> None:
         navi.add_page("general", "常规", self.create_general_page())
         navi.add_page("appearance", "外观", self.create_appearance_page())
         navi.add_page("layout", "布局", self.create_layout_page())
@@ -313,7 +349,7 @@ class PropertyItem(QObject):
     # ------------------------------------------------------------------
     # 卡片：常规
     # ------------------------------------------------------------------
-    def create_general_page(self):
+    def create_general_page(self) -> PropertyPage:
         page = PropertyPage()
         page.add_card(self._basic_card())
         page.add_card(self._state_card())
@@ -322,7 +358,7 @@ class PropertyItem(QObject):
             page.add_card(card)
         return page
 
-    def _general_extra_cards(self):
+    def _general_extra_cards(self) -> list[SectionCard]:
         return []
 
     def _basic_card(self) -> SectionCard:
@@ -367,7 +403,7 @@ class PropertyItem(QObject):
     # ------------------------------------------------------------------
     # 卡片：外观
     # ------------------------------------------------------------------
-    def create_appearance_page(self):
+    def create_appearance_page(self) -> PropertyPage:
         page = PropertyPage()
         page.add_card(self._appearance_card())
         return page
@@ -423,7 +459,7 @@ class PropertyItem(QObject):
     # ------------------------------------------------------------------
     # 卡片：布局
     # ------------------------------------------------------------------
-    def create_layout_page(self):
+    def create_layout_page(self) -> PropertyPage:
         page = PropertyPage()
         page.add_card(self._geometry_card())
         extra = self._layout_extra_cards()
@@ -431,7 +467,7 @@ class PropertyItem(QObject):
             page.add_card(card)
         return page
 
-    def _layout_extra_cards(self):
+    def _layout_extra_cards(self) -> list[SectionCard]:
         return []
 
     def _geometry_card(self, height_editable: bool = True) -> SectionCard:
@@ -475,15 +511,19 @@ class PropertyItem(QObject):
 class RectPropertyItem(PropertyItem):
     """矩形、复选框、控件、三角形的公共实现。"""
 
-    def __init__(self, parent=None, item: rect_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: rect_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
     @Property(float)
-    def cornerRadius(self):
+    def cornerRadius(self) -> float:
         return self.item.get_corner_radius()
 
     @cornerRadius.setter
-    def cornerRadius(self, val):
+    def cornerRadius(self, val: float) -> None:
         if self.item.get_corner_radius() != val:
             self.item.set_corner_radius(val)
 
@@ -514,17 +554,25 @@ class PathPropertyItem(RectPropertyItem):
     尺寸全部沿用父类实现。
     """
 
-    def __init__(self, parent=None, item: path_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: path_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
 
 class TrianglePropertyItem(RectPropertyItem):
     """三角形：位置 + 三个顶点。"""
 
-    def __init__(self, parent=None, item: triangle_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: triangle_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
-    def _layout_extra_cards(self):
+    def _layout_extra_cards(self) -> list[SectionCard]:
         card = SectionCard("顶点坐标")
         vertices = self.item.get_scene_vertices()
         for index, label in enumerate(("A", "B", "C")):
@@ -557,7 +605,12 @@ class TrianglePropertyItem(RectPropertyItem):
         card.add_hint("三个顶点决定三角形形状；改动顶点不会同时移动整体位置。")
         return [card]
 
-    def _apply_vertex_axis(self, index: int, x=None, y=None) -> None:
+    def _apply_vertex_axis(
+        self,
+        index: int,
+        x: float | None = None,
+        y: float | None = None,
+    ) -> None:
         vertices = self.item.get_scene_vertices()
         if len(vertices) != 3:
             return
@@ -573,10 +626,14 @@ class TrianglePropertyItem(RectPropertyItem):
 class PolygonPropertyItem(TrianglePropertyItem):
     """任意多边形：复用三角形的外观/位置页，顶点坐标按实际数量动态列出。"""
 
-    def __init__(self, parent=None, item: polygon_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: polygon_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
-    def _layout_extra_cards(self):
+    def _layout_extra_cards(self) -> list[SectionCard]:
         card = SectionCard("顶点坐标")
         vertices = self.item.get_scene_vertices()
         for index in range(len(vertices)):
@@ -609,7 +666,12 @@ class PolygonPropertyItem(TrianglePropertyItem):
         card.add_hint(f"共 {len(vertices)} 个顶点；改动顶点不会同时移动整体位置。")
         return [card]
 
-    def _apply_vertex_axis(self, index: int, x=None, y=None) -> None:
+    def _apply_vertex_axis(
+        self,
+        index: int,
+        x: float | None = None,
+        y: float | None = None,
+    ) -> None:
         vertices = self.item.get_scene_vertices()
         if index < 0 or index >= len(vertices):
             return
@@ -624,10 +686,14 @@ class PolygonPropertyItem(TrianglePropertyItem):
 
 class CirclePropertyItem(PropertyItem):
     """圆形：外观 + 直径 / 半径。"""
-    def __init__(self, parent=None, item: circle_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: circle_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
-    def _layout_extra_cards(self):
+    def _layout_extra_cards(self) -> list[SectionCard]:
         size = self.item.getSize()
         short_edge = min(size.width(), size.height())
         card = SectionCard("尺寸换算")
@@ -654,50 +720,54 @@ class CirclePropertyItem(PropertyItem):
 class LinePropertyItem(PropertyItem):
     """直线：两端点坐标 + 长度/角度。"""
 
-    def __init__(self, parent=None, item: line_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: line_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
     @Property(float)
-    def head_posX(self):
+    def head_posX(self) -> float:
         return self.item.get_scene_head_pos().x()
 
     @head_posX.setter
-    def head_posX(self, val):
+    def head_posX(self, val: float) -> None:
         current = self.item.get_scene_head_pos()
         if current.x() != val:
             self.item.change_head_pos(QPointF(val, current.y()))
 
     @Property(float)
-    def head_posY(self):
+    def head_posY(self) -> float:
         return self.item.get_scene_head_pos().y()
 
     @head_posY.setter
-    def head_posY(self, val):
+    def head_posY(self, val: float) -> None:
         current = self.item.get_scene_head_pos()
         if current.y() != val:
             self.item.change_head_pos(QPointF(current.x(), val))
 
     @Property(float)
-    def end_posX(self):
+    def end_posX(self) -> float:
         return self.item.get_scene_end_pos().x()
 
     @end_posX.setter
-    def end_posX(self, val):
+    def end_posX(self, val: float) -> None:
         current = self.item.get_scene_end_pos()
         if current.x() != val:
             self.item.change_end_pos(QPointF(val, current.y()))
 
     @Property(float)
-    def end_posY(self):
+    def end_posY(self) -> float:
         return self.item.get_scene_end_pos().y()
 
     @end_posY.setter
-    def end_posY(self, val):
+    def end_posY(self, val: float) -> None:
         current = self.item.get_scene_end_pos()
         if current.y() != val:
             self.item.change_end_pos(QPointF(current.x(), val))
 
-    def create_appearance_page(self):
+    def create_appearance_page(self) -> PropertyPage:
         page = PropertyPage()
         card = SectionCard("线条样式")
         color = ColorField(self.item.get_color())
@@ -714,7 +784,7 @@ class LinePropertyItem(PropertyItem):
         page.add_card(card)
         return page
 
-    def create_layout_page(self):
+    def create_layout_page(self) -> PropertyPage:
         page = PropertyPage()
         card = SectionCard("端点坐标")
 
@@ -736,7 +806,7 @@ class LinePropertyItem(PropertyItem):
         self._bind_geo(end_y, lambda: self.item.get_scene_end_pos().y())
         card.add_row(("终点 X", end_x), ("终点 Y", end_y))
 
-        def _derived():
+        def _derived() -> tuple[float, float]:
             head = self.item.get_scene_head_pos() or QPointF(0, 0)
             end = self.item.get_scene_end_pos() or QPointF(0, 0)
             dx = end.x() - head.x()
@@ -762,10 +832,14 @@ class LinePropertyItem(PropertyItem):
 class TextPropertyItem(PropertyItem):
     """文本：内容 / 外观 / 布局（高度由内容自动计算）。"""
 
-    def __init__(self, parent=None, item: text_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: text_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
-    def navigation_items(self):
+    def navigation_items(self) -> list[tuple[str, str]]:
         return [
             ("文本内容", "context"),
             ("常规", "general"),
@@ -773,13 +847,13 @@ class TextPropertyItem(PropertyItem):
             ("布局", "layout"),
         ]
 
-    def create_content_pages(self, navi):
+    def create_content_pages(self, navi: PropertyNavigationHost) -> None:
         navi.add_page("context", "文本内容", self.create_context_page())
         navi.add_page("general", "常规", self.create_general_page())
         navi.add_page("appearance", "外观", self.create_appearance_page())
         navi.add_page("layout", "布局", self.create_layout_page())
 
-    def create_context_page(self):
+    def create_context_page(self) -> PropertyPage:
         page = PropertyPage()
         card = SectionCard("文本内容")
 
@@ -812,10 +886,14 @@ class TextPropertyItem(PropertyItem):
 class GroupPropertyItem(PropertyItem):
     """组合组：事件绑定 + 常规（含成员管理）+ 外观 + 布局。"""
 
-    def __init__(self, parent=None, item: group_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: group_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
-    def navigation_items(self):
+    def navigation_items(self) -> list[tuple[str, str]]:
         return [
             ("事件绑定", "events"),
             ("常规", "general"),
@@ -829,7 +907,7 @@ class GroupPropertyItem(PropertyItem):
     def _group_field_value(self) -> str:
         return f"组合组 · {len(self.item.childItems())} 个"
 
-    def create_content_pages(self, navi):
+    def create_content_pages(self, navi: PropertyNavigationHost) -> None:
         navi.add_page("events", "事件绑定", self.create_events_page())
         navi.add_page("general", "常规", self.create_general_page())
         navi.add_page("appearance", "外观", self.create_appearance_page())
@@ -838,7 +916,7 @@ class GroupPropertyItem(PropertyItem):
     # ------------------------------------------------------------------
     # 事件
     # ------------------------------------------------------------------
-    def create_events_page(self):
+    def create_events_page(self) -> PropertyPage:
         page = PropertyPage()
 
         intro = SectionCard("事件说明")
@@ -906,8 +984,13 @@ class GroupPropertyItem(PropertyItem):
         return card
 
     def save_event_binding(
-        self, event_name, variable_edit, value_edit, handler_edit=None, args_edit=None
-    ):
+        self,
+        event_name: str,
+        variable_edit: QLineEdit,
+        value_edit: QLineEdit,
+        handler_edit: QLineEdit | None = None,
+        args_edit: QLineEdit | None = None,
+    ) -> None:
         handler = handler_edit.text().strip() if handler_edit is not None else ""
         args = None
         args_text = args_edit.text().strip() if args_edit is not None else ""
@@ -942,17 +1025,17 @@ class GroupPropertyItem(PropertyItem):
             # machine automatically so the event can actually fire.
             self.toggle_enabled_checkbox.setChecked(True)
 
-    def handle_toggle_enabled_change(self, checked):
+    def handle_toggle_enabled_change(self, checked: bool) -> None:
         self.item.set_toggle_enabled(checked)
         self.toggle_checked_checkbox.setEnabled(checked)
 
-    def handle_toggle_checked_change(self, checked):
+    def handle_toggle_checked_change(self, checked: bool) -> None:
         self.item.set_checked(checked)
 
     # ------------------------------------------------------------------
     # 成员
     # ------------------------------------------------------------------
-    def _general_extra_cards(self):
+    def _general_extra_cards(self) -> list[SectionCard]:
         return [self._members_card()]
 
     def _members_card(self) -> SectionCard:
@@ -989,14 +1072,14 @@ class GroupPropertyItem(PropertyItem):
         card.add_row(("名称", name_edit), ("可见", visible_check))
         card.add_widget(listing)
 
-        def current_member():
+        def current_member() -> base_element | None:
             member_id = combo.currentData()
             manager = getattr(self.item, "m_scene_manager", None)
             if manager is None or member_id is None:
                 return None
             return manager.findItem(int(member_id))
 
-        def sync_fields():
+        def sync_fields() -> None:
             member = current_member()
             if member is None:
                 return
@@ -1005,7 +1088,7 @@ class GroupPropertyItem(PropertyItem):
             visible_check.setChecked(bool(member.get_visibility()))
             visible_check.blockSignals(False)
 
-        def apply_visibility(checked):
+        def apply_visibility(checked: bool) -> None:
             member = current_member()
             if member is not None:
                 member.set_visibility(bool(checked))
@@ -1022,10 +1105,14 @@ class GroupPropertyItem(PropertyItem):
 class ImagePropertyItem(PropertyItem):
     """图片：源文件 + 填充色 + 尺寸。"""
 
-    def __init__(self, parent=None, item: image_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: image_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
-    def create_appearance_page(self):
+    def create_appearance_page(self) -> PropertyPage:
         page = PropertyPage()
 
         source = SectionCard("图片来源")
@@ -1047,7 +1134,7 @@ class ImagePropertyItem(PropertyItem):
         page.add_card(self._appearance_card())
         return page
 
-    def select_image(self):
+    def select_image(self) -> None:
         import sys
 
         parent = self.navi if self.navi else None
@@ -1068,10 +1155,14 @@ class ImagePropertyItem(PropertyItem):
 class CheckboxPropertyItem(RectPropertyItem):
     """复选框：外观/布局之外补上勾选相关的交互设置。"""
 
-    def __init__(self, parent=None, item: checkbox_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: checkbox_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
-    def navigation_items(self):
+    def navigation_items(self) -> list[tuple[str, str]]:
         return [
             ("常规", "general"),
             ("外观", "appearance"),
@@ -1079,11 +1170,11 @@ class CheckboxPropertyItem(RectPropertyItem):
             ("交互", "interaction"),
         ]
 
-    def create_content_pages(self, navi):
+    def create_content_pages(self, navi: PropertyNavigationHost) -> None:
         super().create_content_pages(navi)
         navi.add_page("interaction", "交互", self.create_interaction_page())
 
-    def create_interaction_page(self):
+    def create_interaction_page(self) -> PropertyPage:
         page = PropertyPage()
         card = SectionCard("勾选状态")
         toggle = make_check(
@@ -1103,10 +1194,14 @@ class CheckboxPropertyItem(RectPropertyItem):
 class WidgetPropertyItem(RectPropertyItem):
     """嵌入式控件：补上控件文本与承载说明。"""
 
-    def __init__(self, parent=None, item: widget_element = None):
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        item: widget_element | None = None,
+    ) -> None:
         super().__init__(parent=parent, item=item)
 
-    def navigation_items(self):
+    def navigation_items(self) -> list[tuple[str, str]]:
         return [
             ("常规", "general"),
             ("外观", "appearance"),
@@ -1114,11 +1209,11 @@ class WidgetPropertyItem(RectPropertyItem):
             ("控件", "widget"),
         ]
 
-    def create_content_pages(self, navi):
+    def create_content_pages(self, navi: PropertyNavigationHost) -> None:
         super().create_content_pages(navi)
         navi.add_page("widget", "控件", self.create_widget_page())
 
-    def create_widget_page(self):
+    def create_widget_page(self) -> PropertyPage:
         page = PropertyPage()
         card = SectionCard("控件内容")
         text_edit = make_textarea(

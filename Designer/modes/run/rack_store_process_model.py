@@ -49,7 +49,7 @@ class RackProcessModel(QObject):
         self.out3:rect_element = scene_manager.findItemByName(f"流程_OUT3")
         self.out4:rect_element = scene_manager.findItemByName(f"流程_OUT4")
         self.group:group_element = scene_manager.findItemByName("流程")  
-
+        self.group.set_visibility(False)
         self.warnings: List[str] = []
 
         self.task_contexts={0:"无任务",2:"小AGV取托盘",1:"小AGV放托盘",3:"小AGV泊车",5:"悬臂AGV取",4:"悬臂AGV放"}

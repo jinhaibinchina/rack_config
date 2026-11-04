@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFrame,
     QGraphicsItem,
+    QGraphicsProxyWidget,
     QGraphicsScene,
     QGraphicsView,
     QWidget,
@@ -66,7 +67,31 @@ class EmbeddedWidgetLayer(QObject):
     滚轮不拦（让 QGraphicsView 自己 ignore 后冒泡给场景缩放）。
     """
 
-    def __init__(self, host: QWidget):
+    # 承载层可能被 dispose() 回收，以下 Qt 对象在回收后为 None，
+    # 使用处统一按 Optional 处理。
+    view: QGraphicsView | None
+    inner_scene: QGraphicsScene | None
+    proxy: QGraphicsProxyWidget | None
+    widget: QWidget | None
+
+    _host: QWidget
+    _center: QPointF
+    _design: QSizeF
+    _scale: float
+    _angle: float
+    _visible: bool
+    _interactive: bool
+    _viewport: QWidget | None
+    _press_pos: QPoint | None
+    _press_global: QPoint | None
+    _press_pending: bool
+    _panning: bool
+    _pan_last: QPoint | None
+    _injecting: bool
+    _last_click_ms: float
+    _last_click_pos: QPoint | None
+
+    def __init__(self, host: QWidget) -> None:
         # 不挂 parent：层由图元显式 dispose() 回收（parent=host 时 scene 销毁
         # 会在 C++ 侧提前删掉本对象，Python 侧对 self.view 的访问就会炸）。
         super().__init__()
@@ -133,7 +158,7 @@ class EmbeddedWidgetLayer(QObject):
     # ------------------------------------------------------------------
     # 控件
     # ------------------------------------------------------------------
-    def set_widget(self, widget):
+    def set_widget(self, widget: QWidget | None) -> None:
         """替换被承载的控件（工厂重建时调用）。"""
         self.clear_widget()
         if widget is None:
@@ -162,7 +187,7 @@ class EmbeddedWidgetLayer(QObject):
         self._apply_transform()
         self._apply_interactive()
 
-    def clear_widget(self):
+    def clear_widget(self) -> None:
         proxy = self.proxy
         self.proxy = None
         if proxy is None:
@@ -183,7 +208,13 @@ class EmbeddedWidgetLayer(QObject):
     # ------------------------------------------------------------------
     # 布局
     # ------------------------------------------------------------------
-    def apply(self, center: QPointF, design_size: QSizeF, scale: float, angle: float):
+    def apply(
+        self,
+        center: QPointF,
+        design_size: QSizeF,
+        scale: float,
+        angle: float,
+    ) -> None:
         """同步中心点 / 设计尺寸 / 缩放 / 角度。"""
         self._center = QPointF(center)
         self._design = QSizeF(max(1.0, design_size.width()),
@@ -192,18 +223,19 @@ class EmbeddedWidgetLayer(QObject):
         self._angle = float(angle)
         self._apply_transform()
 
-    def set_visible(self, visible: bool):
+    def set_visible(self, visible: bool) -> None:
         self._visible = bool(visible)
+        view = self._require_view()
         if self.proxy is None:
-            self.view.hide()
+            view.hide()
             return
         if self._visible:
-            self.view.show()
-            self.view.raise_()
+            view.show()
+            view.raise_()
         else:
-            self.view.hide()
+            view.hide()
 
-    def set_interactive(self, interactive: bool):
+    def set_interactive(self, interactive: bool) -> None:
         """控制控件是否可交互。
 
         只读（``interactive=False``）时，视图与控件都设
@@ -213,7 +245,7 @@ class EmbeddedWidgetLayer(QObject):
         self._interactive = bool(interactive)
         self._apply_interactive()
 
-    def _apply_interactive(self):
+    def _apply_interactive(self) -> None:
         view = self.view
         if view is not None:
             view.setAttribute(Qt.WA_TransparentForMouseEvents, not self._interactive)
@@ -234,21 +266,29 @@ class EmbeddedWidgetLayer(QObject):
                 else Qt.FocusPolicy.NoFocus
             )
 
-    def raise_view(self):
-        if self.view.isVisible():
-            self.view.raise_()
+    def raise_view(self) -> None:
+        view = self.view
+        if view is not None and view.isVisible():
+            view.raise_()
 
     def is_active(self) -> bool:
         return self.proxy is not None and self.widget is not None
 
+    def is_visible(self) -> bool:
+        """当前是否处于"要求显示"状态（供宿主在几何修正后补回显示）。"""
+        return self._visible
+
     # ------------------------------------------------------------------
     # 鼠标：点一下进控件，拖一下平移画布
     # ------------------------------------------------------------------
-    def eventFilter(self, watched, event):
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if watched is not self._viewport or self._injecting:
             return False
         # 只读态（设计模式展示）：不拦截任何事件，让场景照常处理选中/拖动。
         if not self._interactive:
+            return False
+        # 下面只关心鼠标事件（上面已按 QEvent.Type 过滤），这里收窄类型。
+        if not isinstance(event, QMouseEvent):
             return False
 
         etype = event.type()
@@ -300,13 +340,19 @@ class EmbeddedWidgetLayer(QObject):
 
     def _start_pan(self, global_pos: QPoint) -> None:
         """进入拖动画布状态，复用场景自己的 ``panning`` / ``offset`` 约定。"""
+        host = self._host
+        # 宿主（场景）可能禁止手动平移（运行态钉死视图时常见）。禁用时保持
+        # 未进入 pan 状态，按键仍按"点击控件"处理，release 时照常派发点击。
+        pan_checker = getattr(host, "is_pan_enabled", None)
+        if callable(pan_checker) and not pan_checker():
+            return
         self._panning = True
         # 拖动过就不该再和上一次点击凑成双击。
         self._last_click_pos = None
         self._last_click_ms = 0
         self._pan_last = self._host.mapFromGlobal(global_pos)
         if hasattr(self._host, "panning"):
-            self._host.panning = True
+            setattr(self._host, "panning", True)
         viewport = self._viewport
         if viewport is not None:
             try:
@@ -328,9 +374,11 @@ class EmbeddedWidgetLayer(QObject):
         offset = getattr(host, "offset", None)
         if offset is None:  # 宿主不是场景，放弃平移
             return
-        host.offset = offset + QPointF(delta)
+        # 宿主是场景类，offset/panning/last_pos 不属于 QWidget 接口，
+        # 用 setattr 显式写入，避免把宿主类型扩成 Any。
+        setattr(host, "offset", offset + QPointF(delta))
         if hasattr(host, "last_pos"):
-            host.last_pos = pos
+            setattr(host, "last_pos", pos)
         if hasattr(host, "update_coordinate"):
             host.update_coordinate()
         host.update()
@@ -343,7 +391,7 @@ class EmbeddedWidgetLayer(QObject):
 
     def _end_pan(self) -> None:
         if hasattr(self._host, "panning"):
-            self._host.panning = False
+            setattr(self._host, "panning", False)
         self._pan_last = None
         viewport = self._viewport
         if viewport is not None:
@@ -360,6 +408,7 @@ class EmbeddedWidgetLayer(QObject):
         """
         viewport = self._viewport
         view = self.view
+        assert viewport is not None, "承载层已 dispose，viewport 不可用"
         self._injecting = True
         try:
             # 真实点击时窗口系统会先给 view 取焦；这里是自己补发事件，得手动
@@ -434,7 +483,7 @@ class EmbeddedWidgetLayer(QObject):
     # ------------------------------------------------------------------
     # 内部
     # ------------------------------------------------------------------
-    def _apply_transform(self):
+    def _apply_transform(self) -> None:
         width = self._design.width()
         height = self._design.height()
 
@@ -449,16 +498,19 @@ class EmbeddedWidgetLayer(QObject):
             # 与 rect_element / painter.rotate(-angle) 同向：Qt 里正角度为顺时针。
             proxy.setRotation(-self._angle)
 
-        self.view.setTransform(QTransform().scale(self._scale, self._scale))
+        self._require_view().setTransform(
+            QTransform().scale(self._scale, self._scale)
+        )
         self._update_geometry()
 
-    def _update_geometry(self):
+    def _update_geometry(self) -> None:
         proxy = self.proxy
+        view = self._require_view()
         if proxy is None:
-            self.view.hide()
+            view.hide()
             return
         bbox = proxy.mapToScene(proxy.boundingRect()).boundingRect()
-        self.view.setSceneRect(bbox)
+        view.setSceneRect(bbox)
 
         size = bbox.size() * self._scale
         geo = QRect(
@@ -467,14 +519,21 @@ class EmbeddedWidgetLayer(QObject):
             max(1, int(round(size.width()))),
             max(1, int(round(size.height()))),
         )
-        self.view.setGeometry(geo)
+        view.setGeometry(geo)
         if self._visible:
-            self.view.show()
+            view.show()
+
+    def _require_view(self) -> QGraphicsView:
+        """取承载视图；已 dispose 时视为编码错误，显式失败而不是静默。"""
+        view = self.view
+        if view is None:
+            raise RuntimeError("EmbeddedWidgetLayer 已 dispose，view 不可用")
+        return view
 
     # ------------------------------------------------------------------
     # 回收
     # ------------------------------------------------------------------
-    def dispose(self):
+    def dispose(self) -> None:
         """销毁视图与内部场景（图元删除 / 页面切换 / 程序退出时调用）。"""
         self.clear_widget()
         viewport = self._viewport

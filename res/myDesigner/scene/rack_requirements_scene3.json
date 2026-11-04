@@ -1,9 +1,9 @@
 {
     "sceneRect": {
-        "x": -1.800533139874915,
-        "y": -339.4395509125602,
-        "width": 1652.7236330747733,
-        "height": 3163.3949869431194
+        "x": -1536.978926929763,
+        "y": 751.4440105940982,
+        "width": 3222.934987757867,
+        "height": 1086.1043262806425
     },
     "backgroundColor": "#ffffffff",
     "items": [
@@ -265,6 +265,39 @@
                 "cornerRadius": 77.0
             },
             "zValue": 3
+        },
+        {
+            "id": 16,
+            "name": "控件_10",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1545.233,
+                "y": 1372.769
+            },
+            "origin_pos": {
+                "x": 1545.233,
+                "y": 1372.769
+            },
+            "width": 100.0,
+            "height": 608.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 16,
+            "widgetText": "料架全局参数设置",
+            "widgetType": "label",
+            "widgetFontSize": 14,
+            "widgetColor": "#000000",
+            "widgetBackground": "#00aaff"
         }
     ]
 }

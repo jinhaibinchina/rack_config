@@ -9,7 +9,10 @@
 本模块只负责分派、布局和整体样式，以及“选中页面背景”时的页面属性。
 """
 
+from __future__ import annotations
+
 import sys
+from typing import Any, Protocol
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -42,6 +45,7 @@ from .elements import (
     widget_element,
 )
 from .myGraphicsScene import myGraphicsScene
+from .myQuadTreeScene import QuadTreeScene
 from .property_widgets import (
     PROPERTY_PANEL_QSS,
     ColorField,
@@ -84,10 +88,42 @@ GLYPHS = {
 }
 
 
+class RefreshableProperty(Protocol):
+    """属性分页对象需要支持的最小接口（几何变化时被回调刷新）。"""
+
+    def refresh_geometry(self) -> None: ...
+
+
 class NavigationContentWidget(QWidget):
     destory_current = Signal()
 
-    def __init__(self, parent=None, scene=None):
+    # 当前选中的属性页对象（*PropertyItem / CabinetPropertyItem）
+    _current_property_item: RefreshableProperty | None
+    _current_selected: object | None
+    _current_namespace: str
+    _building_navigation: bool
+    _last_page_keys: dict[str, str]
+    property_items: dict[str, Any]
+
+    # 属性面板始终挂在 QuadTreeScene 上（mode() 定义在该子类），
+    # 这里不用基类 myGraphicsScene，否则拿不到 mode 接口。
+    item: QuadTreeScene | None
+    scene: QuadTreeScene | None
+    header: ObjectHeader
+    splitter: QSplitter
+    navigation_scroll: QScrollArea
+    navigation_tree: QTreeWidget
+    content_scroll: QScrollArea
+    content_container: QWidget
+    content_layout: QVBoxLayout
+    content_stack: QStackedWidget
+    bg_color_btn: ColorField
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        scene: QuadTreeScene | None = None,
+    ) -> None:
         super().__init__(parent)
         self.property_items = {}
         self._last_page_keys = {}
@@ -134,7 +170,7 @@ class NavigationContentWidget(QWidget):
     # ------------------------------------------------------------------
     # 布局
     # ------------------------------------------------------------------
-    def create_navigation_scroll(self):
+    def create_navigation_scroll(self) -> QScrollArea:
         """左侧分页索引（窄列，跟着内容一起滚动）。"""
 
         scroll_area = QScrollArea()
@@ -157,7 +193,7 @@ class NavigationContentWidget(QWidget):
         scroll_area.setWidget(container)
         return scroll_area
 
-    def create_content_scroll(self):
+    def create_content_scroll(self) -> QScrollArea:
         scroll_area = QScrollArea()
         scroll_area.setObjectName("propPageScroll")
         scroll_area.setWidgetResizable(True)
@@ -175,13 +211,13 @@ class NavigationContentWidget(QWidget):
         self.content_layout.addWidget(self.content_stack)
         return scroll_area
 
-    def apply_style(self):
+    def apply_style(self) -> None:
         # Fusion 让自绘控件（滑块、微调框按钮）在各平台表现一致，
         # 面板本身的配色再交给属性样式表覆盖。
         QApplication.setStyle(QStyleFactory.create("Fusion"))
         self.setStyleSheet(PROPERTY_PANEL_QSS)
 
-    def create_navigation_tree(self):
+    def create_navigation_tree(self) -> QTreeWidget:
         tree = QTreeWidget()
         tree.setObjectName("propNavTree")
         tree.setHeaderHidden(True)
@@ -197,7 +233,7 @@ class NavigationContentWidget(QWidget):
     # ------------------------------------------------------------------
     # 选中对象 → 分页
     # ------------------------------------------------------------------
-    def update_for_selected(self, selected_obj):
+    def update_for_selected(self, selected_obj: object | None) -> None:
         # 分页记忆按「对象类别」隔离：页面背景（场景）与图元各用一套记忆，
         # 避免场景页回退选中时把图元上次停留的分页冲掉。
         self._current_namespace = self._namespace_for(selected_obj)
@@ -215,12 +251,12 @@ class NavigationContentWidget(QWidget):
         self.select_preferred_page()
         self._refresh_header(selected_obj)
 
-    def _namespace_for(self, selected_obj):
+    def _namespace_for(self, selected_obj: object | None) -> str:
         if isinstance(selected_obj, myGraphicsScene):
             return "scene"
         return "element"
 
-    def _populate_pages(self, selected_obj):
+    def _populate_pages(self, selected_obj: object | None) -> None:
         if self.scene is not None and self.scene.mode() == SceneMode.Design:
             if isinstance(selected_obj, myGraphicsScene):
                 self._show_scene_pages()
@@ -265,7 +301,7 @@ class NavigationContentWidget(QWidget):
                     "运行模式下属性面板只显示工作站逻辑说明，选中对应的电柜分组即可查看。",
                 )
 
-    def _show_scene_pages(self):
+    def _show_scene_pages(self) -> None:
         self.item = self.scene
         self.add_navigation_items()
 
@@ -278,7 +314,7 @@ class NavigationContentWidget(QWidget):
         scroll.setWidget(page)
         self.content_stack.addWidget(scroll)
 
-    def _refresh_header(self, selected_obj) -> None:
+    def _refresh_header(self, selected_obj: object | None) -> None:
         if isinstance(selected_obj, myGraphicsScene):
             scene = selected_obj
             manager = getattr(scene, "scene_manager", None)
@@ -310,7 +346,7 @@ class NavigationContentWidget(QWidget):
     # ------------------------------------------------------------------
     # 页面背景（场景自身）
     # ------------------------------------------------------------------
-    def add_navigation_items(self):
+    def add_navigation_items(self) -> None:
         tree = self.navigation_tree
         for title, key in (("页面背景", "appearance"), ("画布设置", "canvas")):
             node = QTreeWidgetItem([title])
@@ -321,11 +357,11 @@ class NavigationContentWidget(QWidget):
         if not self._building_navigation:
             self.select_preferred_page()
 
-    def create_content_pages(self):
+    def create_content_pages(self) -> None:
         self.add_page("appearance", "页面背景", self.create_appearance_page())
         self.add_page("canvas", "画布设置", self.create_canvas_page())
 
-    def create_appearance_page(self):
+    def create_appearance_page(self) -> PropertyPage:
         page = PropertyPage()
         card = SectionCard("页面背景")
 
@@ -337,9 +373,11 @@ class NavigationContentWidget(QWidget):
         page.add_card(card)
         return page
 
-    def create_canvas_page(self):
+    def create_canvas_page(self) -> PropertyPage:
         page = PropertyPage()
         scene = self.item
+        if scene is None:
+            return page
 
         grid_size = getattr(scene, "grid_size", 0) or 0
         units_x = getattr(scene, "scene_units_per_grid_x", 0) or 0
@@ -394,7 +432,7 @@ class NavigationContentWidget(QWidget):
     # ------------------------------------------------------------------
     # 导航与堆栈
     # ------------------------------------------------------------------
-    def add_page(self, page_id, title, widget):
+    def add_page(self, page_id: str, title: str, widget: QWidget) -> None:
         scroll_widget = QScrollArea()
         scroll_widget.setObjectName("propPageScroll")
         scroll_widget.setWidget(widget)
@@ -404,14 +442,18 @@ class NavigationContentWidget(QWidget):
         scroll_widget.setObjectName(page_id)
         self.content_stack.addWidget(scroll_widget)
 
-    def clear_stacked_widget(self):
+    def clear_stacked_widget(self) -> None:
         while self.content_stack.count() > 0:
             widget = self.content_stack.widget(0)
             self.content_stack.removeWidget(widget)
             widget.deleteLater()
         self.destory_current.emit()
 
-    def on_navigation_changed(self, current, previous):
+    def on_navigation_changed(
+        self,
+        current: QTreeWidgetItem | None,
+        previous: QTreeWidgetItem | None,
+    ) -> None:
         if current is not None:
             page_id = current.data(0, Qt.UserRole)
             if page_id:
@@ -424,7 +466,7 @@ class NavigationContentWidget(QWidget):
                             self._last_page_keys[self._current_namespace] = page_id
                         return
 
-    def select_preferred_page(self):
+    def select_preferred_page(self) -> None:
         """选中上一次停留的导航页，不存在时回退到第一项。"""
 
         preferred = self._last_page_keys.get(self._current_namespace)
@@ -439,7 +481,7 @@ class NavigationContentWidget(QWidget):
         else:
             tree.setCurrentItem(first_category)
 
-    def _select_navigation_key(self, page_key):
+    def _select_navigation_key(self, page_key: str) -> bool:
         tree = self.navigation_tree
         for i in range(tree.topLevelItemCount()):
             category_item = tree.topLevelItem(i)
@@ -453,7 +495,7 @@ class NavigationContentWidget(QWidget):
                     return True
         return False
 
-    def _has_page(self, page_key):
+    def _has_page(self, page_key: str) -> bool:
         for i in range(self.content_stack.count()):
             if self.content_stack.widget(i).objectName() == page_key:
                 return True
@@ -462,7 +504,7 @@ class NavigationContentWidget(QWidget):
     # ------------------------------------------------------------------
     # 图元几何变化 → 增量刷新
     # ------------------------------------------------------------------
-    def on_item_geometry_changed(self, item):
+    def on_item_geometry_changed(self, item: base_element | None) -> None:
         """场景里某个图元的几何变化后回调；只刷新当前选中图元的字段。"""
 
         if item is None or self._current_property_item is None:

@@ -7,8 +7,8 @@ from PySide6.QtGui import QCloseEvent,QIcon
 from typing import Dict, Optional
 
 from App_RackConfig.plc_window import ConfigWindow ,WindowContainer
-from App_RackConfig.plc_manager import PLCManager
-from App_RackConfig.data_broker import DataBroker
+from common.com.snap7 import PLCManager
+from common.com.snap7 import DataBroker
 
 
 # 主窗口类

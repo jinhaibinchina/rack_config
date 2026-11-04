@@ -1,15 +1,24 @@
+from __future__ import annotations
+
 import sys
+from typing import Sequence
+
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFrame, 
     QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, QComboBox, 
-    QSlider, QProgressBar, QMenu, QSizePolicy
+    QSlider, QProgressBar, QMenu, QSizePolicy, QLayout
 )
-from PySide6.QtCore import Qt, QByteArray, QPoint, QEvent, QMimeData
-from PySide6.QtGui import QDrag, QPainter, QPixmap, QPainterPath
+from PySide6.QtCore import Qt, QByteArray, QPoint, QEvent, QMimeData, QObject
+from PySide6.QtGui import (
+    QDrag, QPainter, QPixmap, QPainterPath,
+    QMouseEvent, QDragEnterEvent, QDropEvent,
+)
 
 
 class ToolButton(QPushButton):
-    def __init__(self, tool_name, parent=None):
+    m_toolName: str
+
+    def __init__(self, tool_name: str, parent: QWidget | None = None) -> None:
         super().__init__(tool_name, parent)
         self.m_toolName = tool_name
         self.setMinimumSize(80, 40)
@@ -27,7 +36,7 @@ class ToolButton(QPushButton):
             }
         """)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
             # 创建拖拽对象
             drag = QDrag(self)
@@ -58,11 +67,11 @@ class ToolButton(QPushButton):
 
 
 class ToolboxWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(8)
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -113,12 +122,17 @@ class ToolboxWidget(QWidget):
             border-radius: 5px;
         """)
 
-    def add_tool_button(self, display_name, tool_name, layout):
+    def add_tool_button(self, display_name: str, tool_name: str, layout: QVBoxLayout) -> None:
         button = ToolButton(display_name, self)
         button.setProperty("toolType", tool_name)  # 存储控件类型
         layout.addWidget(button)
     
-    def add_tool_group(self, group_name, tools, main_layout):
+    def add_tool_group(
+        self,
+        group_name: str,
+        tools: Sequence[tuple[str, str]],
+        main_layout: QVBoxLayout,
+    ) -> None:
         # 分组标签
         group_label = QLabel(group_name, self)
         group_label.setStyleSheet("""
@@ -135,7 +149,10 @@ class ToolboxWidget(QWidget):
 
 
 class DesignArea(QWidget):
-    def __init__(self, parent=None):
+    selected_widget: QWidget | None
+    resize_handles: list[QWidget]
+
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setAcceptDrops(True)  # 启用拖拽接收
         self.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -156,13 +173,13 @@ class DesignArea(QWidget):
         hint_label.setGeometry(0, 0, self.width(), self.height())
         hint_label.show()
 
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasFormat("application/x-toolbox-item"):
             event.acceptProposedAction()
         else:
             event.ignore()
 
-    def dropEvent(self, event):
+    def dropEvent(self, event: QDropEvent) -> None:
         if event.mimeData().hasFormat("application/x-toolbox-item"):
             # 获取控件类型
             item_data = event.mimeData().data("application/x-toolbox-item")
@@ -175,7 +192,7 @@ class DesignArea(QWidget):
         else:
             event.ignore()
 
-    def on_context_menu(self, pos):
+    def on_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
         delete_action = menu.addAction("删除控件")
         delete_action.triggered.connect(lambda: self.delete_control(pos))
@@ -191,14 +208,14 @@ class DesignArea(QWidget):
         
         menu.exec(self.mapToGlobal(pos))
 
-    def delete_control(self, pos):
+    def delete_control(self, pos: QPoint) -> None:
         # 查找点击位置下的控件
         child = self.childAt(pos)
         if child and child != self:
             child.deleteLater()
             self.clear_selection()
 
-    def create_control(self, tool_type, pos):
+    def create_control(self, tool_type: str, pos: QPoint) -> None:
         # 清除选择
         self.clear_selection()
         
@@ -255,7 +272,7 @@ class DesignArea(QWidget):
             # 添加调整大小句柄
             self.add_resize_handles(control)
 
-    def select_widget(self, widget):
+    def select_widget(self, widget: QWidget) -> None:
         """选择指定控件并高亮显示"""
         # 清除之前的选择
         self.clear_selection()
@@ -267,7 +284,7 @@ class DesignArea(QWidget):
         # 显示调整大小句柄
         self.show_resize_handles(widget)
     
-    def clear_selection(self):
+    def clear_selection(self) -> None:
         """清除当前选择"""
         if self.selected_widget:
             # 恢复原始样式
@@ -276,7 +293,7 @@ class DesignArea(QWidget):
             self.hide_resize_handles()
             self.selected_widget = None
 
-    def add_resize_handles(self, widget):
+    def add_resize_handles(self, widget: QWidget) -> None:
         """为控件添加调整大小句柄"""
         # 创建8个句柄（4个角 + 4个边）
         self.resize_handles = []
@@ -294,7 +311,7 @@ class DesignArea(QWidget):
         # 更新句柄位置
         self.update_resize_handle_positions(widget)
     
-    def update_resize_handle_positions(self, widget):
+    def update_resize_handle_positions(self, widget: QWidget) -> None:
         """更新调整大小句柄的位置"""
         if not hasattr(self, 'resize_handles') or not widget:
             return
@@ -313,7 +330,7 @@ class DesignArea(QWidget):
         self.resize_handles[6].move(rect.left() + rect.width()//2 - 4, rect.bottom() - 4)    # 下
         self.resize_handles[7].move(rect.left() - 4, rect.top() + rect.height()//2 - 4)      # 左
     
-    def show_resize_handles(self, widget):
+    def show_resize_handles(self, widget: QWidget) -> None:
         """显示调整大小句柄"""
         if hasattr(self, 'resize_handles'):
             self.update_resize_handle_positions(widget)
@@ -321,14 +338,14 @@ class DesignArea(QWidget):
                 handle.setVisible(True)
                 handle.raise_()  # 确保句柄在控件上方
     
-    def hide_resize_handles(self):
+    def hide_resize_handles(self) -> None:
         """隐藏调整大小句柄"""
         if hasattr(self, 'resize_handles'):
             for handle in self.resize_handles:
                 handle.setVisible(False)
 
     # 事件过滤器用于实现控件交互
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         # 处理控件选择
         if event.type() == QEvent.MouseButtonPress:
             if event.button() == Qt.LeftButton:
@@ -355,13 +372,15 @@ class DesignArea(QWidget):
 
 
 class MainWindow(QWidget):
-    def __init__(self):
+    design_area: DesignArea
+
+    def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("UI设计工具")
         self.setGeometry(100, 100, 1000, 700)
         self.setup_ui()
     
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         main_layout = QHBoxLayout(self)
         main_layout.setSpacing(10)
         main_layout.setContentsMargins(15, 15, 15, 15)
