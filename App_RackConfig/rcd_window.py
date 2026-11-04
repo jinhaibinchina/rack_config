@@ -1,13 +1,13 @@
-from PySide6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QMessageBox,QLabel,QLineEdit,QPushButton,QApplication,QPlainTextEdit
 import sys,os
-from App_RackConfig.global_config import global_cfg
-from PySide6.QtCore import Signal
-
-from App_RackConfig.load_ui import LoadDialog
 from typing import List, Optional, Dict, Any
 from pathlib import Path
+from PySide6.QtWidgets import QDialog,QFileDialog,QHBoxLayout,QMessageBox,QLabel,QLineEdit,QPushButton,QApplication,QPlainTextEdit
 
-from PySide6.QtWidgets import QInputDialog,QFileDialog
+from App_RackConfig.global_config import global_cfg
+from common.tool import LoadDialog
+
+
+
 from res.app_rack_config_resource_manager import resource_manager as res_mng
 def convert_with_error_handling(input_file, output_file):
     """

@@ -381,17 +381,29 @@ class PropertyItem(QObject):
     def _group_field_value(self) -> str:
         return self.group_label()
 
+    def _visibility_widget(self) -> QWidget:
+        """「可见性」字段的控件。
+
+        默认只读展示：单个图元藏起来以后画布上就点不中了，只能靠改数据找回，
+        所以不给入口。组合组重写这里换成可勾选的开关（组可以从「页面背景 →
+        已隐藏的组」恢复）。
+        """
+        return make_value_label(self.visibility_label())
+
+    def _state_hint(self) -> str:
+        return "层级与可见性由场景和分组统一维护，这里只做展示，避免误操作把图元藏起来。"
+
     def _state_card(self) -> SectionCard:
         card = SectionCard("显示与层级")
         card.add_row(
             ("层级 Z", make_value_label(f"{self.item.zValue():g}")),
-            ("可见性", make_value_label(self.visibility_label())),
+            ("可见性", self._visibility_widget()),
         )
         card.add_row(
             ("可选中", make_value_label("是" if self.item.get_selectable() else "否")),
             ("中心点", make_value_label(self._center_text())),
         )
-        card.add_hint("层级与可见性由场景和分组统一维护，这里只做展示，避免误操作把图元藏起来。")
+        card.add_hint(self._state_hint())
         return card
 
     def _center_text(self) -> str:
@@ -1037,6 +1049,35 @@ class GroupPropertyItem(PropertyItem):
     # ------------------------------------------------------------------
     def _general_extra_cards(self) -> list[SectionCard]:
         return [self._members_card()]
+
+    # ------------------------------------------------------------------
+    # 可见性
+    # ------------------------------------------------------------------
+    def _visibility_widget(self) -> QWidget:
+        box = make_check(
+            "显示",
+            bool(self.item.get_visibility()),
+            tooltip="取消后整组（含所有成员）都不绘制；需要时可在「页面背景 → 已隐藏的组」里恢复",
+        )
+        box.toggled.connect(self.handle_visibility_change)
+        self.visibility_checkbox = box
+        return box
+
+    def _state_hint(self) -> str:
+        return (
+            "隐藏只影响绘制，不影响保存的数据，也不影响运行态由 PLC 控制的显隐。"
+            "隐藏后画布上点不中该组，可在「页面背景 → 已隐藏的组」里重新显示。"
+        )
+
+    def handle_visibility_change(self, checked: bool) -> None:
+        if self.item is None:
+            return
+        self.item.set_visibility(bool(checked))
+        # 隐藏后画布上再也点不中它；把面板钉在当前这一组上，用户才能立刻改回来。
+        # 相同对象不会触发 selectionChanged，面板不会重建（复选框保持原状）。
+        scene = getattr(self.item, "m_scene", None)
+        if scene is not None:
+            scene.set_current_select_item(self.item)
 
     def _members_card(self) -> SectionCard:
         card = SectionCard("成员")

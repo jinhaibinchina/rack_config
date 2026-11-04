@@ -1789,6 +1789,8 @@ class group_element(rect_element):
         group_element.count+=1
         self.type="group"
         self.members = []
+        # 隐藏前各成员的可见性快照，显示回来时按它还原（id(item) -> bool）
+        self._visibility_snapshot: dict[int, bool] = {}
         # self.child_group_id_group_name = {}
         
         for item in args:
@@ -1994,10 +1996,24 @@ class group_element(rect_element):
 
 
     def set_visibility(self, enable: bool) -> None:
+        # 隐藏前记下每个成员自己的可见性，显示回来时按快照还原。
+        # 否则「组隐藏 → 组显示」会把组内原本单独隐藏的成员一起点亮，
+        # 运行态切站（hide_all_station + set_visibility(True)）反复几次就会
+        # 把整场景的成员可见性冲成一片 True。
+        if not enable and self.get_visibility():
+            self._visibility_snapshot = {
+                id(item): item.get_visibility()
+                for item in self.childItems()
+                if isinstance(item, base_element)
+            }
         super().set_visibility(enable)
         if self.is_has_child():
+            snapshot = self._visibility_snapshot if enable else None
             for item in self.childItems():
-                item.set_visibility(enable)
+                if snapshot is not None and id(item) in snapshot:
+                    item.set_visibility(snapshot[id(item)])
+                else:
+                    item.set_visibility(enable)
         
     
     def set_selectable(self,enable: bool) -> None:

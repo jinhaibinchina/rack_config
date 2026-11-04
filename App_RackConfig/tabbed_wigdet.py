@@ -1,14 +1,15 @@
 from __future__ import annotations
+from typing import Dict, Optional
+
 from PySide6.QtWidgets import (QApplication, QWidget,  QTabWidget, QVBoxLayout, QSizePolicy,
                             QHBoxLayout, QPushButton,  QMenu, QMessageBox, QDialog,QSpacerItem,
                             QInputDialog)
 from PySide6.QtCore import Signal, Slot, Qt,QObject
 from PySide6.QtGui import QCloseEvent,QIcon
-from typing import Dict, Optional
 
 from App_RackConfig.plc_window import ConfigWindow ,WindowContainer
-from common.com.snap7 import PLCManager
-from common.com.snap7 import DataBroker
+from common.com.snap7 import PLCManager,DataBroker
+
 
 
 # 主窗口类

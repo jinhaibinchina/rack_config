@@ -1,18 +1,19 @@
 
+
+from typing import List
+from functools import partial
+from snap7.util import *
+
 from PySide6.QtWidgets import (QWidget, QLabel,QHBoxLayout,QSpinBox,QComboBox,QPushButton,QToolButton,QCheckBox,QVBoxLayout,QTabWidget,QFrame,QListWidget,QFrame
 ,QLineEdit,QSizePolicy,QMessageBox,QGroupBox,QDialogButtonBox)
 from PySide6.QtCore import Qt,Signal,QTimer,QRect
 from PySide6.QtGui import QPalette,QColor,QPaintEvent,QPen,QPainter,QBrush
-from App_RackConfig.load_ui import LoadWidget,LoadDialog
-from snap7.util import *
+
+from common.tool import LoadWidget,LoadDialog
+
 from common.com.snap7 import PLCManager
 from common.com.snap7 import DataBroker
 
-from typing import List
-# from common import NameValLabel
-from functools import partial
-
-# from myDesigner import RackStoreWindow,RackStoresWindow
 from Designer.modes.run import  RackStoreWindow,RackStoresWindow
 
 from App_RackConfig.global_config import global_cfg

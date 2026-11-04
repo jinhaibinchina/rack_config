@@ -642,6 +642,14 @@ class SafetyCarWindow(QMainWindow):
         if not selected_item or selected_item is self.scene:
             return
 
+        # 运行态的事件路由会把复选框等可交互图元也写成 current_selected
+        # （myQuadTreeScene._find_event_group_at 的返回集合），站点说明面板
+        # 只服务于站点组，其它图元不刷新，免得面板被切成图元属性页。
+        from Designer.Core.elements import group_element
+
+        if not isinstance(selected_item, group_element):
+            return
+
         if not self.property_dock.isVisible():
             self.property_dock.show()
 

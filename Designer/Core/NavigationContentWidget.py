@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFrame,
     QHBoxLayout,
+    QPushButton,
     QScrollArea,
     QSplitter,
     QStackedWidget,
@@ -47,6 +48,7 @@ from .elements import (
 from .myGraphicsScene import myGraphicsScene
 from .myQuadTreeScene import QuadTreeScene
 from .property_widgets import (
+    FIELD_HEIGHT,
     PROPERTY_PANEL_QSS,
     ColorField,
     EmptyState,
@@ -371,7 +373,59 @@ class NavigationContentWidget(QWidget):
         card.add_row(("背景色", self.bg_color_btn))
         card.add_hint("背景色会随页面一起保存，运行态沿用它作为画布底色。")
         page.add_card(card)
+
+        hidden_card = self._hidden_groups_card()
+        if hidden_card is not None:
+            page.add_card(hidden_card)
         return page
+
+    def _hidden_groups_card(self) -> SectionCard | None:
+        """列出本页所有被隐藏的顶层组，提供恢复入口。
+
+        隐藏的组在设计态 ``get_selectable()`` 为 False、画布上点不中，
+        没有这张列表就再也找不回来。
+        """
+        scene = self.item
+        manager = getattr(scene, "scene_manager", None) if scene is not None else None
+        if manager is None:
+            return None
+
+        hidden = [
+            item
+            for item in manager.m_items.values()
+            if isinstance(item, group_element)
+            and not item.is_has_parent()
+            and not item.get_visibility()
+        ]
+        if not hidden:
+            return None
+        hidden.sort(key=lambda item: item.id())
+
+        card = SectionCard("已隐藏的组")
+        card.set_badge(str(len(hidden)))
+        card.add_hint("隐藏的组在设计态点不中，只能从这里恢复显示。")
+        for item in hidden:
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(8)
+            label = make_value_label(f"{item.id()} · {item.get_name() or '未命名组'}")
+            button = QPushButton("显示")
+            button.setObjectName("propField")
+            button.setFixedHeight(FIELD_HEIGHT)
+            button.clicked.connect(lambda _checked=False, target=item: self._restore_group(target))
+            row_layout.addWidget(label, 1)
+            row_layout.addWidget(button)
+            card.add_widget(row)
+        return card
+
+    def _restore_group(self, item: group_element) -> None:
+        """恢复显示并把面板切到该组，方便继续改它的属性。"""
+        item.set_visibility(True)
+        scene = self.scene
+        if scene is None:
+            return
+        scene.set_current_select_item(item)
 
     def create_canvas_page(self) -> PropertyPage:
         page = PropertyPage()

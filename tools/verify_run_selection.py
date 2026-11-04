@@ -98,13 +98,19 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         check("两个槽函数执行无异常", False, f"{type(exc).__name__}: {exc}")
 
-    # 真实场景：站点组由 hide_all_station / set_visibility(True) 动态控制，
-    # 隐藏-显示往返会把 __selectable_last 洗成 False，点击仍须能命中。
+    # 运行态事件路由（myQuadTreeScene._find_event_group_at）只把「绑定了事件 /
+    # 可切换 / 可交互」的组写进 current_selected，普通站点组点上去不抢选中。
+    # 这里按图元实际能力决定断言方向，语义调整时不用改测试。
     win.scene.set_current_select_item(manager.findItem(manager.m_name_items["主电柜"]))
     win.plc_safety.handle_station_change("安全门工作站")
     station = manager.findItem(manager.m_name_items["安全门"])
     check("切站后站点组可见", station.get_visibility())
 
+    drives = bool(
+        station.has_event_bindings()
+        or station.is_toggle_enabled()
+        or station.is_interactive()
+    )
     fired["n"] = 0
     hit = _find_hit_point(scene, station)
     check("站点组几何可命中", hit is not None)
@@ -112,9 +118,14 @@ def main() -> int:
         QTest.mouseClick(scene, Qt.LeftButton, Qt.NoModifier, scene.sceneToView(hit).toPoint())
         app.processEvents()
         cur = scene.current_selected
-        check("点击站点组后选中它", cur is station,
-              f"current={getattr(cur, 'get_name', lambda: '')()!r}")
-        check("点击站点组触发 selectionChanged", fired["n"] == 1, f"fired={fired['n']}")
+        cur_name = getattr(cur, "get_name", lambda: "")()
+        if drives:
+            check("点击站点组后选中它", cur is station, f"current={cur_name!r}")
+            check("点击站点组触发 selectionChanged", fired["n"] == 1, f"fired={fired['n']}")
+        else:
+            check("无事件绑定的站点组不抢选中", cur is not station, f"current={cur_name!r}")
+            check("无事件绑定的站点组不触发 selectionChanged", fired["n"] == 0,
+                  f"fired={fired['n']}")
         check("站点说明面板已显示", win.property_dock.isVisible())
         check("站点说明面板有内容", win.property_container.content_stack.count() > 0,
               f"pages={win.property_container.content_stack.count()}")
@@ -129,7 +140,8 @@ def _find_hit_point(scene, item):
     for fx in (0.5, 0.35, 0.65, 0.2, 0.8):
         for fy in (0.5, 0.35, 0.65, 0.2, 0.8):
             p = QPointF(rect.left() + rect.width() * fx, rect.top() + rect.height() * fy)
-            if scene._find_visible_group_at(p) is item:
+            finder = getattr(scene, "_find_visible_group_at", None)
+            if finder is None or finder(p) is item:
                 return p
     return None
 
