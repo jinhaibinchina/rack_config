@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QWidget, QLabel,QHBoxLayout,QSpinBox,QComboBox,QP
 ,QLineEdit,QSizePolicy,QMessageBox,QGroupBox,QDialogButtonBox)
 from PySide6.QtCore import Qt,Signal,QTimer,QRect
 from PySide6.QtGui import QPalette,QColor,QPaintEvent,QPen,QPainter,QBrush
-from App_RackConfig.load_ui import LoadWidget,LoadDialog
+from common.tool.load_ui import LoadWidget,LoadDialog
 
 from common.com.snap7 import PLCManager
 from snap7.util import *

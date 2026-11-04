@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "current_page": "page_1",
+    "current_page": "page_9",
     "pages": [
         {
             "id": "page_1",
@@ -31,6 +31,21 @@
             "id": "page_6",
             "name": "PopPick",
             "file": "datas/design/pages/page_6.json"
+        },
+        {
+            "id": "page_7",
+            "name": "页面 7",
+            "file": "datas/design/pages/page_7.json"
+        },
+        {
+            "id": "page_8",
+            "name": "页面 8",
+            "file": "datas/design/pages/page_8.json"
+        },
+        {
+            "id": "page_9",
+            "name": "页面 9",
+            "file": "datas/design/pages/page_9.json"
         }
     ]
 }

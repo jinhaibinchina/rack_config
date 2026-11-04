@@ -14,13 +14,13 @@ from common.tool import LoadWidget,LoadDialog
 from common.com.snap7 import PLCManager
 from common.com.snap7 import DataBroker
 
-from Designer.modes.run import  RackStoreWindow,RackStoresWindow
+from App_RackConfig.run import  RackStoreWindow,RackStoresWindow
 
 from App_RackConfig.global_config import global_cfg
 
 from App_RackConfig.flip_clock import FlipDigit_Time_display
 
-from Designer.modes.run.rack_global_paras_widget import RackGlobalParasWindow
+from App_RackConfig.run.rack_global_paras_widget import RackGlobalParasWindow
 
 from res.app_rack_config_resource_manager import resource_manager as res_mng
 

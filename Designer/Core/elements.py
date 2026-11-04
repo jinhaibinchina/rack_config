@@ -1258,6 +1258,13 @@ class widget_element(rect_element):
         # 几何同步会临时隐藏视图，但不能把这个意图一起抹掉，否则等几何恢复
         # 正常后再也不会显示（表现为运行态控件一直不出现）。
         self._widget_visible_requested = False
+        # 动画期间是否改用位图缓存渲染控件（见 set_motion_cache）。
+        # 记在图元上而不是只记在承载层里：承载层可能因为更换控件工厂重建，
+        # 重建后要按这个意图把缓存模式补回去。
+        self._widget_motion_cache = False
+        # 真实控件已覆盖时是否跳过占位框绘制（见 set_widget_fast_paint）。
+        # 默认 False，保持设计器里现有观感；运行态动画期间由宿主显式打开。
+        self._widget_skip_placeholder = False
 
         # 默认控件工厂：一个可编辑的单行输入框，用于演示。
         self.set_widget_factory(self._default_widget_factory)
@@ -1474,6 +1481,9 @@ class widget_element(rect_element):
         layer.set_widget(child)
         self._apply_text(child)
         layer.set_interactive(not self._widget_readonly)
+        # set_widget 会把缓存模式重置成 NoCache，动画进行中重建控件要补回来
+        if self._widget_motion_cache:
+            layer.set_motion_cache(True)
         self.sync_widget_geometry()
         self._auto_fit_size()
 
@@ -1493,6 +1503,56 @@ class widget_element(rect_element):
         layer = self._layer
         if layer is not None:
             layer.raise_view()
+
+    def set_motion_cache(self, active: bool) -> None:
+        """动画期间改用位图快照渲染控件（省掉逐帧重渲染真实控件）。
+
+        典型用法是「动画开始打开、动画结束关掉」：
+
+        ```python
+        for card in cards:
+            card.set_motion_cache(True)   # 烘焙一次，之后每帧只贴图
+        ...
+        for card in cards:
+            card.set_motion_cache(False)  # 回到矢量渲染，静止画面保持清晰
+        ```
+
+        必须在动画期间给**所有**可见的卡片打开，而不只是正在移动的那两张：
+        父窗口一脏，该区域下所有承载视图都会被重画，没开快照的静止卡每帧都
+        要把控件从头渲染一遍（实测这是放大后卡顿的主因）。
+
+        快照的分辨率与几何细节见 ``EmbeddedWidgetLayer.set_motion_cache``。
+
+        承载层还没创建时只记状态，等 ``_rebuild_widget`` 时应用。
+        """
+        self._widget_motion_cache = bool(active)
+        layer = self._layer
+        if layer is not None:
+            layer.set_motion_cache(self._widget_motion_cache)
+
+    def is_motion_cache(self) -> bool:
+        return self._widget_motion_cache
+
+    def set_widget_fast_paint(self, active: bool) -> None:
+        """真实控件已覆盖时，占位框只描边、不填底。
+
+        占位框（``rect_element.paint`` 画的那张旋转矩形）在真实控件挂载后
+        **100% 被盖住**，但它每帧仍要按图元当前尺寸做一次抗锯齿填充 + 描边。
+        放大后一张卡就是几千像素见方，6 张一起实测每帧 20~30ms —— 动画卡顿的
+        大头之一。省掉的是"填底"这块纯像素填充。
+
+        **边框必须留着**：卡片的轮廓全靠它，省掉后页面糊成一片白，看截图就是
+        "画面失真"。描四条边几乎没有填充开销。
+
+        默认关闭，保持设计器里现有观感；运行态动画期间由宿主打开。
+
+        注意跳过的只是填充与 "Widget" 占位字，父类 ``base_element`` 的记账
+        （``_reset_moving_flag`` / 位置变化检测）照常执行。
+        """
+        self._widget_skip_placeholder = bool(active)
+
+    def is_widget_fast_paint(self) -> bool:
+        return self._widget_skip_placeholder
 
     def Delete(self) -> None:
         """删除图元：先回收承载层，避免真实控件残留成幽灵窗口。"""
@@ -1575,16 +1635,25 @@ class widget_element(rect_element):
         scene_h = view_w * units_y / grid
         return QSizeF(scene_w, scene_h)
 
-    def _auto_fit_size(self) -> None:
+    def _auto_fit_size(self, force: bool = False) -> None:
         """按控件的 ``sizeHint`` 更新图元边框（中心锚定）。
 
         仅在只读态（设计模式）下生效，让边框贴合控件的自然大小；运行模式
         保持用户手动拉伸的尺寸，不随内容回弹。
+
+        **已经在用尺寸就不回弹**：``scene_size`` 有效说明用户拖画/拉伸/在属性
+        面板里定过尺寸，此时再按 sizeHint 覆盖会把尺寸和旋转中心一起冲掉。
+        粘贴（``set_widget_visible`` → ``_ensure_layer`` → ``_rebuild_widget``）、
+        切回设计模式、重新打开文件都会走到这里，所以这条判断是必需的，否则
+        复制出来的控件图元永远回到控件固有大小、旋转中心回到 (0,0)。
+        需要强制重新贴合（例如换了控件类型）时显式传 ``force=True``。
         """
         if not self._widget_readonly:
             return
         widget = self._leaf_widget()
         if widget is None:
+            return
+        if not force and self.scene_size.width() > 0.0 and self.scene_size.height() > 0.0:
             return
         hint = widget.sizeHint()
         if hint.width() <= 0 or hint.height() <= 0:
@@ -1666,6 +1735,17 @@ class widget_element(rect_element):
         # 真实控件已挂载且可见时，该区域由控件覆盖，占位框不再参与绘制。
         # （设计模式同样会加载真实控件，因此两种模式都跳过占位框。）
         if self.has_widget_layer() and self._layer is not None:
+            if self._widget_skip_placeholder and self._layer.is_shown():
+                # 快速模式：只描边，不填底。
+                # 填底是纯像素填充（放大后一张卡几千像素见方，6 张就是每帧
+                # 几十兆像素），而这块区域本来就被控件盖住了；但**边框不能
+                # 省** —— 卡片的轮廓全靠它，省掉后页面会糊成一片白，看起来
+                # 就是"画面失真"。
+                self._paint_widget_outline(painter)
+                # base_element 的记账必须照做：那里会清 moving 标记、同步变换
+                # 缓存，漏了会让图元被当成"拖拽中"而拒绝命中。
+                base_element.paint(self, painter, shine_flag)
+                return
             super().paint(painter, shine_flag)
             return
         if not (self.m_veiw_dirty_region.intersects(self.viewBoundingRect().toRect())):
@@ -1718,6 +1798,47 @@ class widget_element(rect_element):
 
         painter.restore()
         super().paint(painter, shine_flag)
+
+    def _paint_widget_outline(self, painter: QPainter) -> None:
+        """只画控件图元的边框（不填底、不画 "Widget" 占位字）。
+
+        与 :meth:`paint` 走同一套换算（场景尺寸 → 视图单位、AGV 的 x/y 交换、
+        绕中心旋转），保证轮廓和真实控件的边缘严丝合缝。
+        """
+        if self._head_pos is None:
+            return
+        if not (self.m_veiw_dirty_region.intersects(self.viewBoundingRect().toRect())):
+            return
+        painter.save()
+        color = self._color
+        if self.get_hover() or (self.is_in_group() and self._is_group_in_hover):
+            color = QColor(14, 248, 236)
+
+        center_pos_view = self.m_scene.sceneToView(self.get_scene_center_pos())
+        h = self.scene_size.width() * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_x
+        w = self.scene_size.height() * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_y
+        bg_rect = QRectF(-w / 2.0, -h / 2.0, w, h)
+
+        painter.translate(center_pos_view)
+        painter.rotate(-self.sceneTransform().get_rotation_angle())
+
+        # 一定要显式 NoBrush：这里省掉的正是填底，别继承上一个图元留下的画刷。
+        painter.setBrush(Qt.NoBrush)
+        if self.get_line_width() > 0:
+            painter.setPen(QPen(color, self.get_line_width()))
+        else:
+            painter.setPen(QPen(self._fill_color, 0))
+
+        radius = self.get_corner_radius()
+        if radius > 0:
+            radius_x = radius * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_y
+            radius_y = radius * self.m_scene.grid_size / self.m_scene.scene_units_per_grid_x
+            radius_x = min(radius_x, w / 2.0)
+            radius_y = min(radius_y, h / 2.0)
+            painter.drawRoundedRect(bg_rect, radius_x, radius_y)
+        else:
+            painter.drawRect(bg_rect)
+        painter.restore()
 
     # ------------------------------------------------------------------
     # 序列化

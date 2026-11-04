@@ -33,7 +33,8 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 def main() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
 
-    from safety_car_main import SafetyCarWindow
+    # 包内实现已改名 safety_car_entry，走包导出更稳（不再依赖内部文件名）
+    from App_SafetyCar import SafetyCarWindow
 
     win = SafetyCarWindow(enable_plc=False)
     win.resize(1600, 1000)

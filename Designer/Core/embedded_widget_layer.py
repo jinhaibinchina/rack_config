@@ -36,11 +36,12 @@ from __future__ import annotations
 import time
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QSizeF, Qt
-from PySide6.QtGui import QMouseEvent, QPainter, QTransform
+from PySide6.QtGui import QMouseEvent, QPainter, QPixmap, QRegion, QTransform
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
     QGraphicsItem,
+    QGraphicsPixmapItem,
     QGraphicsProxyWidget,
     QGraphicsScene,
     QGraphicsView,
@@ -74,6 +75,14 @@ class EmbeddedWidgetLayer(QObject):
     proxy: QGraphicsProxyWidget | None
     widget: QWidget | None
 
+    # 动画快照的最大像素倍率与单边上限。
+    # 快照按"场景缩放 × 屏幕 DPR"烘焙，保证放大后仍是原分辨率，不会被拉伸；
+    # 倍率与单边都设上限，避免高 DPI + 大控件时一张卡吃掉几十兆内存。
+    # 4.0 覆盖到画布允许的最大缩放（10 倍时会退化成 1.6 倍上采样，但那一档
+    # 一张卡就占满整屏，动画本身也没人看得清细节）。
+    MOTION_SNAPSHOT_MAX_RATIO = 4.0
+    MOTION_SNAPSHOT_MAX_SIDE = 4096
+
     _host: QWidget
     _center: QPointF
     _design: QSizeF
@@ -81,6 +90,9 @@ class EmbeddedWidgetLayer(QObject):
     _angle: float
     _visible: bool
     _interactive: bool
+    _motion_cache: bool
+    _snapshot: QGraphicsPixmapItem | None
+    _snapshot_ratio: float
     _viewport: QWidget | None
     _press_pos: QPoint | None
     _press_global: QPoint | None
@@ -105,6 +117,11 @@ class EmbeddedWidgetLayer(QObject):
         # 只读模式：设计态下控件只作展示，鼠标事件穿透给场景，保证图元仍可
         # 选中/拖动/缩放。运行时置 False 恢复可交互。
         self._interactive = True
+        # 动画期间是否改用位图快照渲染（见 set_motion_cache）
+        self._motion_cache = False
+        # 动画期间的控件快照（替代 proxy 逐帧渲染）
+        self._snapshot = None
+        self._snapshot_ratio = 1.0
 
         view = QGraphicsView(host)
         view.setObjectName("embeddedWidgetView")
@@ -177,17 +194,22 @@ class EmbeddedWidgetLayer(QObject):
         if proxy.widget() is not widget:
             # 兜底：真接管失败时至少不让控件游离在场景外。
             widget.setParent(self.view.viewport())
-        # NoCache：每次重绘都真渲染，放大时文字更锐。
+        # 默认 NoCache：每次重绘都真渲染，放大时文字更锐。
+        # （动画期间会由 set_motion_cache 临时换成位图缓存，重建控件后要补回来）
         proxy.setCacheMode(QGraphicsItem.NoCache)
         proxy.setTransformOriginPoint(
             widget.width() / 2.0, widget.height() / 2.0
         )
         self.proxy = proxy
         self.widget = widget
+        if self._motion_cache:
+            self.set_motion_cache(True)
         self._apply_transform()
         self._apply_interactive()
 
     def clear_widget(self) -> None:
+        # 先摘掉动画快照，否则 removeItem(proxy) 之后内层场景里还留着它的位图。
+        self._remove_snapshot(show_proxy=False)
         proxy = self.proxy
         self.proxy = None
         if proxy is None:
@@ -277,6 +299,145 @@ class EmbeddedWidgetLayer(QObject):
     def is_visible(self) -> bool:
         """当前是否处于"要求显示"状态（供宿主在几何修正后补回显示）。"""
         return self._visible
+
+    def is_shown(self) -> bool:
+        """承载视图此刻是否真的在屏幕上。
+
+        与 :meth:`is_visible` 的区别：后者是"意图"（调用方要求显示），这里问的
+        是 Qt 的实际状态（视图及其所有祖先都可见）。判断"控件是否已经盖住图元
+        那块区域"时必须用这个，否则在窗口还没 show 的构造期会误判成已覆盖。
+        """
+        view = self.view
+        return view is not None and view.isVisible()
+
+    # ------------------------------------------------------------------
+    # 动画期间的位图快照
+    # ------------------------------------------------------------------
+    def set_motion_cache(self, active: bool) -> None:
+        """位姿连续变化（旋转/缩放动画）期间，改用位图快照渲染控件。
+
+        为什么需要
+        ----------
+        proxy 一旦带旋转，``QGraphicsProxyWidget::paint`` 每帧都要把控件**从头
+        渲染一遍**（QTextEdit 这种上千像素的控件一次十几毫秒，放大后还要按设备
+        像素翻倍）。更糟的是父窗口一脏，该区域下**所有**承载视图都会被重画：
+        6 张卡里只有 2 张在动，另外 4 张却一帧不落地重新渲染。实测 2~3 倍缩放
+        时一帧 60~90ms，只剩十几帧，就是"画面放大后动画明显卡顿"的来源。
+
+        怎么做的
+        --------
+        动画开始时把控件按"场景缩放 × 屏幕 DPR"渲染成一张位图，插进内层场景
+        顶替 proxy；proxy 本身只是隐藏（几何仍由它决定，``_update_geometry``
+        照常取它的包围盒）。逐帧只剩"把位图按角度贴上去"，控件不再重渲染。
+        动画结束移除快照、恢复 proxy 的矢量绘制。
+
+        为什么不用 ``QGraphicsItem.ItemCoordinateCache``
+        ------------------------------------------------
+        试过，并且踩了坑：``setCacheMode(ItemCoordinateCache, QSize(w*r, h*r))``
+        里的尺寸**不是**"缓存分辨率"，Qt 会按这个逻辑尺寸去渲染控件——整张卡
+        连同文字被放大 r 倍塞进视图，看起来就是"文字撑到卡片外面、白底和边框
+        对不上、边角被裁成台阶"。实测同一帧里数字笔画数从 28 掉到 12（放大
+        2.3 倍）。不用尺寸参数时则退化成 1:1 烘焙，放大后糊成一片。自己烘
+        快照能同时避开这两点：分辨率自己定，几何完全不动。
+        """
+        self._motion_cache = bool(active)
+        if self._motion_cache:
+            self._install_snapshot()
+        else:
+            self._remove_snapshot()
+
+    def is_motion_cache(self) -> bool:
+        return self._motion_cache
+
+    def _motion_ratio(self) -> float:
+        """快照的像素倍率：跟当前缩放与屏幕 DPR 走，但有上限。"""
+        ratio = max(1.0, self._scale)
+        host = self._host
+        if host is not None:
+            ratio *= max(1.0, float(host.devicePixelRatioF()))
+        ratio = min(ratio, self.MOTION_SNAPSHOT_MAX_RATIO)
+        longest = max(self._design.width(), self._design.height())
+        if longest > 1.0 and longest * ratio > self.MOTION_SNAPSHOT_MAX_SIDE:
+            ratio = self.MOTION_SNAPSHOT_MAX_SIDE / longest
+        return max(1.0, ratio)
+
+    def _install_snapshot(self) -> None:
+        proxy = self.proxy
+        widget = self.widget
+        scene = self.inner_scene
+        if proxy is None or widget is None or scene is None:
+            return
+        ratio = self._motion_ratio()
+        if self._snapshot is not None:
+            if abs(self._snapshot_ratio - ratio) < 0.01:
+                # 缩放没变（同一次动画内）：沿用旧快照，只同步位姿。
+                self._update_snapshot_transform()
+                return
+            self._remove_snapshot(show_proxy=False)
+
+        w = max(1, int(round(self._design.width())))
+        h = max(1, int(round(self._design.height())))
+        pixmap = QPixmap(max(1, int(round(w * ratio))), max(1, int(round(h * ratio))))
+        if pixmap.isNull():
+            return
+        pixmap.fill(Qt.GlobalColor.transparent)
+        # 内容自己按 ratio 烘好，不再让 Qt 二次缩放（DPR 固定 1.0）。
+        pixmap.setDevicePixelRatio(1.0)
+        painter = QPainter(pixmap)
+        try:
+            painter.setRenderHints(
+                QPainter.Antialiasing
+                | QPainter.TextAntialiasing
+                | QPainter.SmoothPixmapTransform
+            )
+            painter.scale(ratio, ratio)
+            widget.render(painter, QPoint(0, 0), QRegion(), QWidget.DrawChildren)
+        finally:
+            painter.end()
+
+        item = QGraphicsPixmapItem(pixmap)
+        # rotate/flip 时用平滑插值，否则放大后边缘是硬锯齿。
+        item.setTransformationMode(Qt.SmoothTransformation)
+        scene.addItem(item)
+        self._snapshot = item
+        self._snapshot_ratio = ratio
+        proxy.setVisible(False)
+        self._update_snapshot_transform()
+
+    def _update_snapshot_transform(self) -> None:
+        """让快照与 proxy 保持同一套 位姿（位图是放大过的，先缩回逻辑尺寸）。"""
+        item = self._snapshot
+        proxy = self.proxy
+        if item is None or proxy is None:
+            return
+        w = self._design.width()
+        h = self._design.height()
+        transform = QTransform()
+        # QTransform 后调用的先作用：先把位图缩回逻辑尺寸，再绕中心旋转（与
+        # proxy.setRotation(-angle) 同向、同支点），平移交给 setPos。
+        transform.translate(w / 2.0, h / 2.0)
+        transform.rotate(-self._angle)
+        transform.translate(-w / 2.0, -h / 2.0)
+        transform.scale(1.0 / self._snapshot_ratio, 1.0 / self._snapshot_ratio)
+        item.setTransform(transform)
+        item.setPos(proxy.pos())
+
+    def _remove_snapshot(self, show_proxy: bool = True) -> None:
+        item = self._snapshot
+        self._snapshot = None
+        self._snapshot_ratio = 1.0
+        if item is not None:
+            scene = self.inner_scene
+            if scene is not None:
+                try:
+                    scene.removeItem(item)
+                except RuntimeError:
+                    pass
+        proxy = self.proxy
+        if proxy is not None and show_proxy:
+            proxy.setVisible(True)
+            # 恢复矢量绘制后必须重画一次，否则屏幕上留的还是那张位图。
+            proxy.update()
 
     # ------------------------------------------------------------------
     # 鼠标：点一下进控件，拖一下平移画布
@@ -501,6 +662,9 @@ class EmbeddedWidgetLayer(QObject):
         self._require_view().setTransform(
             QTransform().scale(self._scale, self._scale)
         )
+        # 动画期间渲染的是快照位图，位姿得同步给它一份。
+        if self._snapshot is not None:
+            self._update_snapshot_transform()
         self._update_geometry()
 
     def _update_geometry(self) -> None:
