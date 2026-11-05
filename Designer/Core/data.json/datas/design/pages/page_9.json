@@ -1,30 +1,30 @@
 {
     "sceneRect": {
-        "x": -166.753034773099,
-        "y": -1254.8231927042868,
-        "width": 1608.795369860869,
-        "height": 3079.314112890721
+        "x": -1705.8574638436367,
+        "y": -16091.524140338797,
+        "width": 10895.174238161726,
+        "height": 20853.903748415345
     },
     "backgroundColor": "#ffebffa1",
     "items": [
         {
-            "id": 1,
+            "id": 6,
             "name": "Page5",
             "type": "widget",
             "parent_id": 0,
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 706.892,
-                "y": 520.452
+                "x": 3599.213,
+                "y": -3676.798
             },
             "origin_pos": {
-                "x": 399.488,
-                "y": 799.605
+                "x": 2413.229,
+                "y": -2579.713
             },
-            "width": 1024.0,
-            "height": 800.0,
-            "rotate": 31.99999999999999,
+            "width": 4000.0,
+            "height": 3000.0,
+            "rotate": 25.500000000000004,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 0,
@@ -34,30 +34,30 @@
                 "cornerRadius": 0.0
             },
             "zValue": 1,
-            "widgetText": "5555555555555",
+            "widgetText": "00000000000000",
             "widgetType": "textedit",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
             "widgetBackground": "#ffffff"
         },
         {
-            "id": 2,
+            "id": 8,
             "name": "Page4",
             "type": "widget",
             "parent_id": 0,
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 664.172,
-                "y": 477.955
+                "x": 3478.632,
+                "y": -3801.086
             },
             "origin_pos": {
-                "x": 401.406,
-                "y": 799.48
+                "x": 2392.778,
+                "y": -2604.811
             },
-            "width": 1024.0,
-            "height": 800.0,
-            "rotate": 23.49999999999999,
+            "width": 4000.0,
+            "height": 3000.0,
+            "rotate": 20.499999999999993,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 0,
@@ -67,63 +67,30 @@
                 "cornerRadius": 0.0
             },
             "zValue": 1,
-            "widgetText": "44444444444",
+            "widgetText": "00000000000000",
             "widgetType": "textedit",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
             "widgetBackground": "#ffffff"
         },
         {
-            "id": 3,
-            "name": "控件_11",
-            "type": "widget",
-            "parent_id": 0,
-            "children_ids": [],
-            "group_id": 0,
-            "center_pos": {
-                "x": 610.361,
-                "y": 442.861
-            },
-            "origin_pos": {
-                "x": 404.265,
-                "y": 803.345
-            },
-            "width": 1024.0,
-            "height": 800.0,
-            "rotate": 13.999999999999998,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 0,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 1,
-            "widgetText": "33333333333",
-            "widgetType": "textedit",
-            "widgetFontSize": 12,
-            "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
-        },
-        {
-            "id": 4,
+            "id": 9,
             "name": "Page3",
             "type": "widget",
             "parent_id": 0,
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 560.606,
-                "y": 414.681
+                "x": 3348.32,
+                "y": -3918.88
             },
             "origin_pos": {
-                "x": 403.325,
-                "y": 798.981
+                "x": 2416.35,
+                "y": -2599.189
             },
-            "width": 1024.0,
-            "height": 800.0,
-            "rotate": 6.499999999999997,
+            "width": 4000.0,
+            "height": 3000.0,
+            "rotate": 13.500000000000004,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 0,
@@ -133,62 +100,62 @@
                 "cornerRadius": 0.0
             },
             "zValue": 1,
-            "widgetText": "2222222222",
+            "widgetText": "00000000000000",
             "widgetType": "textedit",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
             "widgetBackground": "#ffffff"
         },
         {
-            "id": 5,
+            "id": 10,
+            "name": "Page2",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3190.041,
+                "y": -4013.795
+            },
+            "origin_pos": {
+                "x": 2413.455,
+                "y": -2597.085
+            },
+            "width": 4000.0,
+            "height": 3000.0,
+            "rotate": 6.999999999999999,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 1,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 11,
             "name": "Page1",
             "type": "widget",
             "parent_id": 0,
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 518.495,
-                "y": 398.508
+                "x": 3010.125,
+                "y": -4105.289
             },
             "origin_pos": {
-                "x": 405.731,
-                "y": 798.143
+                "x": 2411.981,
+                "y": -2604.497
             },
-            "width": 1024.0,
-            "height": 800.0,
-            "rotate": 0.0,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 0,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 1,
-            "widgetText": "111111111111111111",
-            "widgetType": "textedit",
-            "widgetFontSize": 12,
-            "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
-        },
-        {
-            "id": 6,
-            "name": "Page0",
-            "type": "widget",
-            "parent_id": 0,
-            "children_ids": [],
-            "group_id": 0,
-            "center_pos": {
-                "x": 513.72,
-                "y": -509.086
-            },
-            "origin_pos": {
-                "x": 400.955,
-                "y": -109.451
-            },
-            "width": 1024.0,
-            "height": 800.0,
+            "width": 4000.0,
+            "height": 3000.0,
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
@@ -204,6 +171,67 @@
             "widgetFontSize": 12,
             "widgetColor": "#000000",
             "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 12,
+            "name": "Page0",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3000.073,
+                "y": -7499.433
+            },
+            "origin_pos": {
+                "x": 2401.929,
+                "y": -5998.642
+            },
+            "width": 4000.0,
+            "height": 3000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 1,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 13,
+            "name": "图片_1",
+            "type": "image",
+            "image_path": "bg.jpg",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3349.81,
+                "y": -5642.843
+            },
+            "origin_pos": {
+                "x": 3349.81,
+                "y": -5642.843
+            },
+            "width": 6000.0,
+            "height": 12000.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255
+            },
+            "zValue": 13
         }
     ]
 }

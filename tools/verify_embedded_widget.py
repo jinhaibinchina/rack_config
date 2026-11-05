@@ -31,7 +31,7 @@ from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QTextEdit
 
-from Designer.Core.elements import widget_element
+from Designer.Core.elements import rect_element, widget_element
 from Designer.Core.my_common import SceneMode
 from tools.bench_scene import DEFAULT_PAGE, build_scene
 
@@ -99,6 +99,42 @@ def main() -> int:
 
     scene.scale_factor = 1.0
     center_element()
+
+    # --- 0b. 命中范围：整块矩形都可命中（不是只有边框） --------------
+    #
+    # 回归点：``rect_element.check_hover`` 对无填充矩形只认"边框往里 10px /
+    # 往外 10~20px"那条带，中间挖空（空心框整块可点会挡住下面的图元）。
+    # widget_element 继承了它 → 设计态点控件中间毫无反应，只能贴边点中。
+    hover_item = manager.createItem(widget_element)
+    hover_item.transfer_head_pos(QPointF(0.0, 0.0))
+    hover_item.transfer_end_pos(QPointF(160.0, 400.0))
+    hover_item.completed()
+    # completed() 之后仍在"移动中"，正常由 paint 里的 _reset_moving_flag 清掉
+    hover_item._reset_moving_flag()
+    hover_tf = hover_item.sceneTransform()
+
+    def hover_at(local: QPointF) -> bool:
+        hit = hover_item.check_hover(hover_tf.map(local))
+        hover_item.set_hover(False)
+        return bool(hit)
+
+    check("控件图元中心可命中", hover_at(QPointF(0.0, 0.0)))
+    check("控件图元靠近边可命中", hover_at(QPointF(70.0, 70.0)) and hover_at(QPointF(0.0, 190.0)))
+    check("控件图元外部不命中", not hover_at(QPointF(90.0, 0.0)))
+    check("控件图元纵向外部不命中", not hover_at(QPointF(0.0, 300.0)))
+    # 对照：父类规则下同一位置（中心）判不中，说明这层覆写是必需的
+    check(
+        "对照：rect_element 旧规则中心不命中",
+        not rect_element.check_hover(hover_item, hover_tf.map(QPointF(0.0, 0.0))),
+    )
+    # 选中链路：single_select_handle 只认 get_hover()，中心命中必须能落到选中
+    hover_item.check_hover(hover_tf.map(QPointF(0.0, 0.0)))
+    check(
+        "点中间能被单选选中",
+        scene.single_select_handle() and hover_item.get_selected(),
+    )
+    hover_item.set_selected(False)
+    hover_item.Delete()
 
     # --- 1. 设计模式：也加载承载层，但只读展示（鼠标穿透） ----------
     scene.set_scene_mode(SceneMode.Design)

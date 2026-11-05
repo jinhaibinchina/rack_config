@@ -79,6 +79,10 @@ class _ResourceManager:
     def get_img_path(self, img_name: str) -> str:
         """获取图标路径"""
         return self.get_path(f"myDesigner/img/{img_name}")
+
+    def get_img_dir(self) -> str:
+        """图片资源目录（``res/myDesigner/img``），用于导入新图片"""
+        return self.get_path("myDesigner/img")
     
     def get_json_path(self, json_name: str) -> str:
         """获取图标路径"""

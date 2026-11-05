@@ -1,14 +1,19 @@
-"""页面卡片堆叠：点左侧页签，与右侧「当前页」互换。
+"""页面卡片堆叠：点左侧页签，与右侧「当前页」互换；双击背景收起左侧。
 
 设计原型见 ``Designer/Core/data.json/datas/design/pages/page_9.json``：
 左侧几张卡以左下角为支点扇形展开，右侧一张是「当前页」槽位。
 
-本模块只负责三件事，不关心窗口/工具栏：
+本模块只负责四件事，不关心窗口/工具栏：
 
 1. **读位姿**：每张卡的场景中心点 + 旋转角 + Z 值；
 2. **命中测试**：按 Z 从高到低找最上面那张，局部矩形判断（旋转卡片不能
    直接拿包围盒判，扇形叠在一起时包围盒会互相咬住）；
-3. **交换动画**：两张卡同时沿弧线平移并旋转，结束时互换 Z 值。
+3. **交换动画**：两张卡同时沿弧线平移并旋转，结束时互换 Z 值；
+4. **收拢 / 展开**：左侧扇形叠成一摞（最前面那张原地不动），再散开回扇形。
+
+交换和收拢共用一套动画内核（:meth:`PageDeck._start_motion`）：都是"把若干
+张卡从当前位姿插值到目标位姿"，区别只在参与卡数、要不要走弧线、收尾时
+做什么（交换要换 Z；收拢只要落位）。
 
 坐标约定：插值全部在**视图（屏幕）坐标系**里做，再转回场景坐标。场景用的是
 AGV 的 90° 轴映射（``sceneToView`` 交换 x/y），直接在场景坐标里插值，弧线的
@@ -87,6 +92,15 @@ class CardPose:
         return f"({self.center.x():.1f}, {self.center.y():.1f}) @ {self.angle:.1f}°"
 
 
+@dataclass(frozen=True)
+class _Motion:
+    """一次动画里单张卡的起止位姿。"""
+
+    card: object
+    start: CardPose
+    end: CardPose
+
+
 class PageDeck(QObject):
     """卡片堆叠的交互与动画。
 
@@ -100,8 +114,12 @@ class PageDeck(QObject):
     swap_started = Signal(str, str)
     swap_finished = Signal(str, str)
     busy_changed = Signal(bool)
+    # True = 已收拢（左侧叠成一摞）
+    fold_changed = Signal(bool)
 
     DEFAULT_DURATION_MS = 520
+    # 收拢比交换略快：动作简单（只有旋转归零 + 平移），拖太久显得拖沓
+    FOLD_DURATION_MS = 420
     # 弧线高度 = 屏幕位移 × ARC_RATIO，并限制上限，避免大跨度时甩得太夸张
     ARC_RATIO = 0.22
     MAX_ARC_PX = 140.0
@@ -136,11 +154,19 @@ class PageDeck(QObject):
 
         self._slot = self._detect_slot()
         self._pair: Optional[tuple] = None
-        self._from: tuple = ()
-        self._to: tuple = ()
         self._swap_z: tuple = ()
         self._arc_len = 0.0
         self._anim: Optional[QVariantAnimation] = None
+
+        # 通用动画内核的状态（交换 / 收拢 / 展开共用）
+        self._motion: List[_Motion] = []
+        self._motion_kind = ""
+
+        # 收拢状态：_folded 是当前状态，_fold_saved 是展开时要还原的位姿。
+        # 存"收拢前那一刻"的位姿而不是设计初始位姿——交换过之后谁在哪儿已经
+        # 变了，用初始值展开会把卡片弹到别人的位置上。
+        self._folded = False
+        self._fold_saved: Dict[object, CardPose] = {}
 
     # ------------------------------------------------------------------
     # 查询
@@ -209,6 +235,10 @@ class PageDeck(QObject):
         """把 ``card`` 与槽位上的卡互换。忙 / 点的是槽位卡时返回 ``False``。"""
         if self._anim is not None:
             return False
+        # 收拢状态下左侧卡片已经被收进左边缘，位置不再对应任何"页签"，
+        # 这时允许交换会把卡片从屏幕外抽出来，画面很突兀。
+        if self._folded:
+            return False
         if card is None or card is self._slot or card not in self._cards:
             return False
 
@@ -218,8 +248,6 @@ class PageDeck(QObject):
         start_leaving = self.pose_of(leaving)
 
         self._pair = (entering, leaving)
-        self._from = (start_entering, start_leaving)
-        self._to = (start_leaving, start_entering)
         # 互换前的 Z：进场卡拿走槽位的 Z，退场卡接过堆叠里那张的 Z
         self._swap_z = (entering.zValue(), leaving.zValue())
 
@@ -227,32 +255,26 @@ class PageDeck(QObject):
         # 抽出来的那张会被同层卡片盖住，看起来像"卡在下面穿过去了"。
         self._lift_top(leaving, entering)
 
+        self.swap_started.emit(entering.get_name(), leaving.get_name())
         # 动画期间所有卡片改用位图缓存渲染控件。只给要动的两张开是不够的：
         # 父窗口一脏，该区域下所有承载视图都会被重画，没开缓存的静止卡每帧
-        # 仍要把真实控件从头渲染一遍——放大后这正是卡顿的主因。
-        # 第二件事是跳过被真实控件 100% 盖住的占位框，见 _set_fast_render。
-        self._set_fast_render(True)
-
-        self._arc_len = self._view_distance(start_entering.center, start_leaving.center)
-
-        anim = QVariantAnimation(self)
-        anim.setStartValue(0.0)
-        anim.setEndValue(1.0)
-        anim.setDuration(self._duration_ms)
-        # InOutCubic：起步和收尾都软，中段快，像被人抽走又放下
-        anim.setEasingCurve(QEasingCurve.InOutCubic)
-        anim.valueChanged.connect(self._on_progress)
-        anim.finished.connect(self._on_finished)
-        self._anim = anim
-
-        self.swap_started.emit(entering.get_name(), leaving.get_name())
-        self.busy_changed.emit(True)
-        anim.start()
-        return True
+        # 仍要把真实控件从头渲染一遍——放大后这正是卡顿的主因。见 _set_fast_render。
+        return self._start_motion(
+            (
+                _Motion(entering, start_entering, start_leaving),
+                _Motion(leaving, start_leaving, start_entering),
+            ),
+            kind="swap",
+            duration_ms=self._duration_ms,
+            arc_len=self._view_distance(start_entering.center, start_leaving.center),
+        )
 
     def reset(self) -> None:
         """回到设计文件的初始布局（位姿 + Z 值）。"""
         self._cancel_animation()
+        was_folded = self._folded
+        self._folded = False
+        self._fold_saved = {}
         for card in self._cards:
             pose = self._initial_poses[card]
             self._apply_pose(card, pose.center, pose.angle)
@@ -260,58 +282,160 @@ class PageDeck(QObject):
         self._slot = self._detect_slot()
         self._restack()
         self._scene.update()
+        if was_folded:
+            self.fold_changed.emit(False)
 
     def stop(self) -> None:
         """中断进行中的动画但不还原布局（窗口关闭时用）。"""
         self._cancel_animation()
 
     # ------------------------------------------------------------------
+    # 收拢 / 展开
+    # ------------------------------------------------------------------
+    def is_folded(self) -> bool:
+        return self._folded
+
+    def fold(self, duration_ms: Optional[int] = None) -> bool:
+        """把左侧堆叠收拢成一摞。忙 / 已收拢时返回 ``False``。
+
+        收拢形态：**最前面那张（Z 最高）原地不动**，其余卡旋转角与中心点都对齐
+        到它，叠成整齐一摞。最前那张是这摞的"封面"，也是展开时唯一的把手——
+        它要是一起滑走，用户就看不到自己刚收起来的那一摞了。
+        """
+        if self._anim is not None or self._folded:
+            return False
+        stack = self.stack_cards()
+        if len(stack) < 2:
+            return False
+
+        anchor = self.pose_of(stack[0])
+        movers = stack[1:]
+        # 只记要动的这几张：展开时最前那张本来就没挪，不需要"还原"
+        self._fold_saved = {card: self.pose_of(card) for card in movers}
+        self._folded = True
+        return self._start_motion(
+            [_Motion(card, self._fold_saved[card], anchor) for card in movers],
+            kind="fold",
+            duration_ms=int(duration_ms or self.FOLD_DURATION_MS),
+        )
+
+    def unfold(
+        self, duration_ms: Optional[int] = None, *, immediate: bool = False
+    ) -> bool:
+        """展开回收拢前的扇形。``immediate=True`` 时不做动画直接落位。"""
+        if self._anim is not None or not self._folded:
+            return False
+        saved = dict(self._fold_saved)
+        self._folded = False
+
+        if immediate or not saved:
+            for card, pose in saved.items():
+                self._apply_pose(card, pose.center, pose.angle)
+            self._fold_saved = {}
+            self._restack()
+            self._scene.update()
+            self.fold_changed.emit(False)
+            return True
+
+        return self._start_motion(
+            [_Motion(card, self.pose_of(card), pose) for card, pose in saved.items()],
+            kind="unfold",
+            duration_ms=int(duration_ms or self.FOLD_DURATION_MS),
+        )
+
+    def toggle_fold(self) -> bool:
+        return self.unfold() if self._folded else self.fold()
+
+    # ------------------------------------------------------------------
+    # 动画内核
+    # ------------------------------------------------------------------
+    def _start_motion(
+        self,
+        motions: Sequence[_Motion],
+        *,
+        kind: str,
+        duration_ms: int,
+        arc_len: float = 0.0,
+    ) -> bool:
+        """跑一次"若干张卡从 A 位姿到 B 位姿"的动画。
+
+        交换（2 张、带弧线、收尾换 Z）和收拢/展开（N 张、直线、收尾只落位）
+        只是在参数与收尾动作上不同，插值、快速渲染开关、busy 信号全部共用。
+        """
+        motions = list(motions)
+        if not motions or self._anim is not None:
+            return False
+
+        self._motion = motions
+        self._motion_kind = kind
+        self._arc_len = float(arc_len)
+        # 动画期间全量卡片改用位图快照 + 占位框只描边（放大后不卡的关键）
+        self._set_fast_render(True)
+
+        anim = QVariantAnimation(self)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setDuration(int(duration_ms))
+        # InOutCubic：起步和收尾都软，中段快，像被人抽走又放下
+        anim.setEasingCurve(QEasingCurve.InOutCubic)
+        anim.valueChanged.connect(self._on_progress)
+        anim.finished.connect(self._on_finished)
+        self._anim = anim
+
+        self.busy_changed.emit(True)
+        anim.start()
+        return True
+
+    # ------------------------------------------------------------------
     # 动画回调
     # ------------------------------------------------------------------
     def _on_progress(self, value) -> None:
-        if self._pair is None:
+        if not self._motion:
             return
         t = float(value)
-        entering, leaving = self._pair
-        from_entering, from_leaving = self._from
-        to_entering, to_leaving = self._to
-
-        self._apply_pose(
-            entering,
-            self._interpolate(from_entering.center, to_entering.center, t),
-            self._lerp_angle(from_entering.angle, to_entering.angle, t),
-        )
-        self._apply_pose(
-            leaving,
-            self._interpolate(from_leaving.center, to_leaving.center, t),
-            self._lerp_angle(from_leaving.angle, to_leaving.angle, t),
-        )
-        # 整窗重绘：试过按两张卡的并集做局部 update()，实测帧数没有提升
-        # （真正的开销在两张真实控件旋转时的重绘），就不引入这层复杂度了。
+        for item in self._motion:
+            self._apply_pose(
+                item.card,
+                self._interpolate(item.start.center, item.end.center, t),
+                self._lerp_angle(item.start.angle, item.end.angle, t),
+            )
+        # 整窗重绘：试过按动到的卡片的并集做局部 update()，实测帧数没有提升
+        # （真正的开销在真实控件旋转时的重绘），就不引入这层复杂度了。
         self._scene.update()
 
     def _on_finished(self) -> None:
-        if self._pair is None:
+        if not self._motion:
             return
-        entering, leaving = self._pair
         # 收尾对齐到目标位姿：插值在 t=1 时理论值就是目标，但浮点误差会让
-        # 卡片停在差几分之一度的位置，与设计值对不上（再次交换会越差越多）。
-        self._apply_pose(leaving, self._from[0].center, self._from[0].angle)
-        self._apply_pose(entering, self._from[1].center, self._from[1].angle)
+        # 卡片停在差几分之一度的位置，与记录值对不上（再次交换会越差越多）。
+        for item in self._motion:
+            self._apply_pose(item.card, item.end.center, item.end.angle)
 
-        z_entering, z_leaving = self._swap_z
-        leaving.set_zValue(z_entering)
-        entering.set_zValue(z_leaving)
+        kind = self._motion_kind
+        self._motion = []
+        self._motion_kind = ""
+        swapped: Optional[tuple] = None
 
-        self._slot = entering
-        self._pair = None
-        # 先换回矢量渲染再重排：收尾这一帧要把两张卡按最终角度重画成清晰的
+        if kind == "swap" and self._pair is not None:
+            entering, leaving = self._pair
+            z_entering, z_leaving = self._swap_z
+            leaving.set_zValue(z_entering)
+            entering.set_zValue(z_leaving)
+            self._slot = entering
+            self._pair = None
+            swapped = (entering.get_name(), leaving.get_name())
+
+        # 先换回矢量渲染再重排：收尾这一帧要把卡片按最终角度重画成清晰的
         self._set_fast_render(False)
         self._restack()
         self._scene.update()
         self._dispose_animation()
         self.busy_changed.emit(False)
-        self.swap_finished.emit(entering.get_name(), leaving.get_name())
+
+        if swapped is not None:
+            self.swap_finished.emit(*swapped)
+        elif kind in ("fold", "unfold"):
+            self.fold_changed.emit(self._folded)
 
     # ------------------------------------------------------------------
     # 位姿落地
@@ -449,11 +573,23 @@ class PageDeck(QObject):
             return
         # 中断时同样要把位图缓存关掉，否则画面会一直停在"发虚"的那一版
         self._set_fast_render(False)
-        was_busy = True
+        kind = self._motion_kind
+
+        if kind in ("fold", "unfold"):
+            # 收拢/展开被打断在半路，卡片会停在"既没收进去也没散开"的位置，
+            # 状态和画面就对不上。直接落到目标位姿（Z 和层级本来就没变）。
+            for item in self._motion:
+                self._apply_pose(item.card, item.end.center, item.end.angle)
+            self._restack()
+            self._scene.update()
+
+        self._motion = []
+        self._motion_kind = ""
         self._pair = None
         self._dispose_animation()
-        if was_busy:
-            self.busy_changed.emit(False)
+        self.busy_changed.emit(False)
+        if kind in ("fold", "unfold"):
+            self.fold_changed.emit(self._folded)
 
     def _dispose_animation(self) -> None:
         anim = self._anim

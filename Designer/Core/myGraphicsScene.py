@@ -832,7 +832,9 @@ class FrameSelect(QObject):
     def receive_end_pos(self,pos: QPointF) -> None:
         if self.__processing:
             self.end_pos= pos
-            self.select_rect_scene = QRectF(self.end_pos,self.start_pos)
+            # QRectF(p1, p2) 不做归一化：从右下往左上拖时宽高是负数，
+            # 后续 contains()/绘制全都会落空（四个方向里只有右下方向能用）。
+            self.select_rect_scene = QRectF(self.end_pos,self.start_pos).normalized()
             self.select_rect     =self.parent.rect_sceneToView(self.select_rect_scene)
             self.parent.update()
             
@@ -843,14 +845,30 @@ class FrameSelect(QObject):
             self.__done =False
             return
         if self.__processing:
-            if self.parent.items_in_area:
-                items=self.parent.items_in_area(self.select_rect_scene)
-                for item in items:
-                    if self.select_rect_scene.contains(item.sceneBoundingRect()):
+            area = (
+                self.select_rect_scene.normalized()
+                if self.select_rect_scene is not None
+                else None
+            )
+            if self.parent.items_in_area and area is not None:
+                for item in self.parent.items_in_area(area):
+                    if not isinstance(item, base_element):
+                        continue
+                    # 组内成员不参与框选：点选同样选不到它们（进组靠 Tab 切换），
+                    # 混进来会让"删除所选 / 成组 / 对齐"作用到成员身上，也会让
+                    # 属性面板拿到一个组内图元而不是整组。
+                    if item.is_has_parent():
+                        continue
+                    if area.contains(item.sceneBoundingRect()):
                         item.set_selected(True)
-           
-            # self.select_rect     =self.parent.rect_sceneToView(QRectF(self.end_pos,self.start_pos))
-        
+
+            # 框选只改各图元的 selected 标志，不走 single_select_handle，
+            # 没人会替它通知选中变化。属性面板、状态栏、删除/排列动作的
+            # 可用性全挂在这个信号上，漏发就等于框选"只在画布上留了个蓝框"。
+            notify = getattr(self.parent, "frame_selection_finished", None)
+            if callable(notify):
+                notify()
+
             QTimer.singleShot(100,lambda:self.parent.update())
             self.__processing = False
             self.start_pos=None
@@ -1906,6 +1924,31 @@ class myGraphicsScene(grid_map_window):
             self.current_selected = item_selected
             self.selectionChanged.emit()
 
+    def selected_top_level_items(self) -> list:
+        """当前被选中的顶层图元（不含组内成员），按 Z 从低到高。
+
+        框选、点选、Ctrl+点选改的都是图元的 ``selected`` 标志，选中集合是
+        "真相"；``current_selected`` 只是最近一次点到的单个对象。属性面板
+        要按集合来判断是"显示某个图元"还是"显示多选概要"。
+        """
+        items = [
+            item
+            for item in self.findChildren(base_element)
+            if item.get_selected() and not item.is_has_parent()
+        ]
+        items.sort(key=lambda item: item.zValue())
+        return items
+
+    def frame_selection_finished(self) -> None:
+        """框选结束后的统一通知。
+
+        ``current_selected`` 故意保持不变：框选的起点判定要求它仍是场景
+        （见 ``mousePressEvent`` 里 Ctrl + 按下时的 ``current_selected is self``），
+        改了会让下一次 Ctrl+拖 直接失效，用户得先点一下空白才能再框。
+        面板改成读 :meth:`selected_top_level_items`，不依赖这个字段。
+        """
+        self.selectionChanged.emit()
+
     def single_select_handle(self)->bool:
         """                """
         for item in self.findChildren(base_element):
@@ -2135,6 +2178,9 @@ class myGraphicsScene(grid_map_window):
         for child in self.findChildren(QObject):
             if isinstance(child, base_element):
                 child.set_selected(False)
+        # 取消选中也是选中变化：属性面板/删除按钮要跟着回到"页面背景"状态，
+        # 否则按 Esc 之后面板还停在刚才那个图元上。
+        self.selectionChanged.emit()
         self.update()
         
     def deleteSelectedItems(self) -> None:

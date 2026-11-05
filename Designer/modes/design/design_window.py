@@ -655,10 +655,19 @@ class DesignWindow(QMainWindow):
             self.status_bar.showMessage("没有打开的页面")
             return
         page = self.current_page
-        zoom = int(round(page.scene.scale_factor * 100))
-        self.status_bar.showMessage(
-            f"当前页面：{page.meta.name}　|　图元：{page.item_count}　|　缩放：{zoom}%"
-        )
+        scene = page.scene
+        zoom = int(round(scene.scale_factor * 100))
+        parts = [
+            f"当前页面：{page.meta.name}",
+            f"图元：{page.item_count}",
+            f"缩放：{zoom}%",
+        ]
+        # 框选/多选没有"当前对象"这个单一概念，光看画布上的蓝框不够，
+        # 状态栏给出数量，才一眼确认框到了几个。
+        selected = scene.selected_top_level_items()
+        if selected:
+            parts.append(f"已选 {len(selected)} 个")
+        self.status_bar.showMessage("　|　".join(parts))
 
     # ------------------------------------------------------------------
     # Page commands
@@ -797,10 +806,7 @@ class DesignWindow(QMainWindow):
             self._build_property_dock()
             return
         scene = self.current_page.scene
-        if selected is None:
-            selected = scene.current_selected
-        if selected is not scene and not isinstance(selected, base_element):
-            selected = scene
+        selected = self._panel_target(scene, selected)
 
         self.property_panel.scene = scene
         try:
@@ -809,6 +815,38 @@ class DesignWindow(QMainWindow):
             # A property editor must never take the whole design window down.
             # The most common cause is a stale selection after a deletion.
             print(f"刷新属性面板失败: {exc}")
+
+    def _panel_target(self, scene, selected=None):
+        """决定属性面板该显示什么。
+
+        以前直接用 ``scene.current_selected``，而框选、Ctrl+点选只改图元的
+        ``selected`` 标志，不动这个字段，于是框选之后面板还停在框选前那个
+        对象上。现在按"选中集合"判断：
+
+        * 恰好一个顶层图元 → 显示它（和点选一致，字段可编辑）；
+        * 多个 → 传列表，面板显示多选概要页；
+        * 没有顶层图元 → 退回 ``current_selected``（组内成员会走这条，
+          因为成员被选中时 ``selected_top_level_items`` 是空的）或场景。
+        """
+        items = scene.selected_top_level_items()
+        if len(items) > 1:
+            return items
+        if len(items) == 1:
+            return items[0]
+        if selected is None:
+            selected = scene.current_selected
+        if isinstance(selected, base_element):
+            # current_selected 是"最近一次点到的对象"，取消选中（Esc、清空选择）
+            # 之后它不会自动回到场景；这时还照它显示，面板就会停在一个已经
+            # 不存在的选中状态上。被删掉的图元会抛 RuntimeError，一并兜回场景。
+            try:
+                if not selected.get_selected():
+                    selected = scene
+            except RuntimeError:
+                selected = scene
+        if selected is not scene and not isinstance(selected, base_element):
+            selected = scene
+        return selected
 
     def _on_scene_selection_changed(self) -> None:
         scene = self.sender()
@@ -839,11 +877,7 @@ class DesignWindow(QMainWindow):
         scene = self.current_page.scene if self.current_page else None
         if scene is None:
             return []
-        return [
-            item
-            for item in scene.findChildren(base_element)
-            if item.get_selected() and not item.is_has_parent()
-        ]
+        return scene.selected_top_level_items()
 
     def _selected_group(self):
         scene = self.current_page.scene if self.current_page else None
@@ -855,10 +889,11 @@ class DesignWindow(QMainWindow):
         self.save_template_action.setEnabled(group is not None)
         self.toolbox_dock.set_capture_enabled(group is not None)
         self.delete_selected_action.setEnabled(bool(items))
-        # The arrangement actions stay enabled on purpose: rubber-band
-        # selection does not emit selectionChanged(), so toggling them from
-        # here would leave them disabled after a box-select.  They validate
-        # the selection themselves in apply_arrangement().
+        # 排列要求至少两个图元。框选现在会正常发 selectionChanged（见
+        # QuadTreeScene.frame_selection_finished），这里可以放心跟着开关；
+        # 早期为了让框选后按钮不被禁用，曾把这几个动作常开。
+        for action in self.arrange_actions:
+            action.setEnabled(len(items) >= 2)
 
     # ------------------------------------------------------------------
     # Group templates

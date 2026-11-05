@@ -287,6 +287,10 @@ class EmbeddedWidgetLayer(QObject):
                 if self._interactive
                 else Qt.FocusPolicy.NoFocus
             )
+            if not self._interactive:
+                # 退回只读时把键盘焦点交出去：否则光标还停在页面里某个输入框
+                # 上，鼠标已经穿透了、键盘却还在往里打字。
+                widget.clearFocus()
 
     def raise_view(self) -> None:
         view = self.view
@@ -391,7 +395,17 @@ class EmbeddedWidgetLayer(QObject):
                 | QPainter.SmoothPixmapTransform
             )
             painter.scale(ratio, ratio)
-            widget.render(painter, QPoint(0, 0), QRegion(), QWidget.DrawChildren)
+            # DrawWindowBackground 不能省：卡片根控件是 QMainWindow / QWidget
+            # 这类"背景由窗口背景填充"的容器时，它自己的底是**不透明但不在
+            # 子控件里**的——只传 DrawChildren 烘出来是一张透明底，快照期间
+            # 整张卡会露出场景底色（实测占画面 24% 的差异）。QWidget::grab()
+            # 内部用的就是 DrawWindowBackground | DrawChildren 这一组。
+            widget.render(
+                painter,
+                QPoint(0, 0),
+                QRegion(),
+                QWidget.DrawWindowBackground | QWidget.DrawChildren,
+            )
         finally:
             painter.end()
 

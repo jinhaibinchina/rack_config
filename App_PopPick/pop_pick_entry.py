@@ -5,6 +5,16 @@
 设为鼠标穿透，点击事件落到场景上，再由 :class:`PageDeck` 做命中测试与交换
 动画。
 
+例外是「最大窗口」视图与「左侧已收起」这两种状态：那时画面上只剩两页正对着
+看（右侧当前页 + 左侧堆叠最上层），它们会放开交互，页内按钮可以正常操作；
+同时左侧最上层不再响应点击切换——见 :meth:`_sync_card_readonly` 与
+:meth:`_unswappable_card`。
+
+「最大窗口」的取景是按当时的窗口尺寸反算出来的，所以窗口尺寸一变就要重算
+（``resizeEvent`` → 合并 ``MAXIMIZE_REFIT_MS`` → :meth:`_refit_maximized`），
+否则两页会缩在中间或溢出边界。重算只改缩放，不改状态：普通视图不动、已经
+收起的左侧页面也不会被摊开。
+
 运行方式::
 
     python pop_pick_main.py                 # 经统一入口（--app PopPick）
@@ -38,7 +48,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
 
@@ -48,9 +58,14 @@ from Designer.Core.my_common import SceneMode
 # （``python App_PopPick/pop_pick_entry.py``），那时没有包上下文。
 from App_PopPick.page_deck import PageDeck, find_page_cards
 
+from  .rack_global_parameters_model import Page0_Model ,Page1_Model,Page3_Model
+
 APP_TITLE = "PopPick 拣选工作站"
 DEFAULT_PAGE = "page_9"
 DEFAULT_PLC_IP = "192.168.1.88"
+# 窗口尺寸变化后重算最大视图取景的合并窗口（毫秒）：拖动过程中不重算，
+# 松手后一次算完
+MAXIMIZE_REFIT_MS = 80
 
 
 def _page_file_candidates(page: str) -> list[str]:
@@ -102,8 +117,10 @@ class PopPickWindow(QMainWindow):
         self._dragged = False
         # 「最大窗口」视图下锁定左侧最上层那一页，防止看着看着把正对着
         # 的那页点跑了。任何重新取景的动作（适应窗口/重置/滚轮缩放）都会
-        # 解除锁定，见 _maximize_view / _fit_view / eventFilter。
+        # 解除锁定，见 _set_maximized 的调用点。
         self._maximized = False
+        # 窗口尺寸变化后重算最大视图取景用的合并定时器（见 resizeEvent）
+        self._maximize_refit_timer: Optional[QTimer] = None
 
         self.setObjectName("popPickWindow")
         self.setWindowTitle(APP_TITLE)
@@ -115,8 +132,13 @@ class PopPickWindow(QMainWindow):
         self._install_deck()
         self._build_actions()
 
+        Page0_Model(self.scene_manager, parent=self)
+        Page1_Model(self.scene_manager, parent=self)
+        Page3_Model(self.scene_manager, parent=self)
+
         self.statusBar().showMessage(
-            "点击左侧任意页面，与右侧当前页互换（拖动可平移画布）"
+            "点击左侧任意页面与右侧当前页互换 ｜ 拖动可平移画布 ｜ "
+            "双击空白背景收起/展开左侧页面"
         )
 
     # ------------------------------------------------------------------
@@ -163,11 +185,88 @@ class PopPickWindow(QMainWindow):
 
         self.deck = PageDeck(self.scene, cards, parent=self)
         self.deck.swap_finished.connect(self._on_swap_finished)
+        # 收起/展开会改变"画面上正对着看的是哪两页"，可交互集合要跟着走。
+        # 接信号而不是只在 _toggle_fold 里同步：reset()、滚轮缩放前的展开
+        # 等路径都会改变折叠状态，逐个补调用一定会漏。
+        self.deck.fold_changed.connect(self._on_fold_changed)
         # 卡片布局依赖窗口尺寸（视图坐标），布局收敛后再对一次视图
         self.scene.refresh_embedded_widgets()
 
     def _on_swap_finished(self, entered: str, left: str) -> None:
         self.statusBar().showMessage(f"已切换到「{entered}」，「{left}」已放回左侧", 4000)
+        # 交换后 Z 值互换过，「堆叠最上层」可能换人 → 最大视图下放开交互的
+        # 那张卡得跟着走，否则用户点着的是新最上层却还是只读。
+        self._sync_card_readonly()
+
+    # ------------------------------------------------------------------
+    # 卡片只读 / 可交互
+    # ------------------------------------------------------------------
+    def _on_fold_changed(self, folded: bool) -> None:
+        """收拢状态变化后重算"哪些卡可交互"。"""
+        self._sync_card_readonly()
+
+    def _set_maximized(self, maximized: bool) -> None:
+        """切换「最大视图」状态，并同步各卡片的只读标志。"""
+        self._maximized = bool(maximized)
+        self._sync_card_readonly()
+
+    def _sync_card_readonly(self) -> None:
+        """按当前视图状态刷新每张卡的只读标志。
+
+        常规视图：全部只读。承载视图与控件都设 ``WA_TransparentForMouseEvents``，
+        鼠标穿透到场景，一次点击就是一次页面交换；控件自己要吃事件的话
+        （``QTextEdit`` 一按下就抢走）交换就永远点不动了。
+
+        最大视图 / 左侧已收起：**画面上正对着看的那两页恢复可交互**（右侧
+        当前页 + 左侧堆叠最上层）。这时它们已经不会再被一次点击点走，此时
+        还让它们鼠标穿透，等于页内按钮也点不动——同一块像素上"点击=交换"
+        和"按钮可点"互斥，这两种状态正好把冲突解掉。其余卡片保持只读，
+        点击照旧落到场景。
+        """
+        if self.deck is None:
+            return
+        interactive = self._interactive_cards()
+        for card in self.deck.cards():
+            # 用身份比较而不是 in：图元是 Qt 对象，命中的必须是同一个实例
+            readonly = not any(card is other for other in interactive)
+            # 状态没变就别碰：set_widget_readonly(True) 会顺带跑一次
+            # _auto_fit_size，无谓地走一遍尺寸贴合逻辑。
+            if card.widget_readonly() != readonly:
+                card.set_widget_readonly(readonly)
+
+    def _interactive_cards(self) -> tuple:
+        """放开交互的卡片——画面上正对着看、撑得最开的那两页。
+
+        返回 ``(右侧当前页, 左侧堆叠最上层)``；常规视图返回空元组（全只读）。
+        两侧都放开：一边是"当前页"，一边是"正在看的那页"，只放开一半会让
+        用户点右边那页时毫无反应。
+        """
+        if self.deck is None:
+            return ()
+        if not (self._maximized or self.deck.is_folded()):
+            return ()
+        front = []
+        slot = self.deck.slot_card()
+        if slot is not None:
+            front.append(slot)
+        stack = self.deck.stack_cards()
+        if stack:
+            front.append(stack[0])
+        return tuple(front)
+
+    def _unswappable_card(self):
+        """不允许再被点走的那一张：左侧堆叠最上层。
+
+        最大视图与收起状态都算——这两种状态里它就是"用户正看着的封面"，
+        一点就跑掉等于把画面换了个样子。锁定只针对它：右侧是槽位，点了
+        本来也不交换。每次现算，不缓存引用：交换之后最上层会换人。
+        """
+        if self.deck is None:
+            return None
+        if not (self._maximized or self.deck.is_folded()):
+            return None
+        stack = self.deck.stack_cards()
+        return stack[0] if stack else None
 
     # ------------------------------------------------------------------
     # 工具栏
@@ -205,10 +304,13 @@ class PopPickWindow(QMainWindow):
         if self.deck is None:
             return
         self.deck.reset()
-        self._maximized = False
+        self._set_maximized(False)
         self.statusBar().showMessage("已恢复初始布局", 2500)
 
     def _fit_view(self) -> None:
+        # 收拢时左侧卡片在视口左侧之外，把它们算进包围盒会把缩放拉爆；
+        # 「重新取景」本来就意味着回到全貌，先展开再取景。
+        self._unfold_if_folded()
         rect = QRectF()
         for item in self.scene_manager.m_sorted_items:
             if not item.get_visibility():
@@ -217,9 +319,9 @@ class PopPickWindow(QMainWindow):
             rect = bound if rect.isNull() else rect.united(bound)
         # 留一圈边距，卡片边框和旋转后的尖角不贴边
         if self._show_scene_rect(rect, 0.04):
-            self._maximized = False
+            self._set_maximized(False)
 
-    def _maximize_view(self) -> None:
+    def _maximize_view(self, *, announce: bool = True, unfold: bool = True) -> None:
         """把当前正在展示的两页放大到撑满窗口。
 
         「最前面的两页」不是 Z 前两名——扇形里 Z 最高的两张是相邻的，
@@ -229,9 +331,19 @@ class PopPickWindow(QMainWindow):
 
         排除掉左侧其余被压住的卡之后，包围盒比「适应窗口」紧凑，因此
         缩放比更大，正好用来凑近看这两页。
+
+        ``announce=False`` 用于窗口尺寸变化后的重算：取景要跟手，但不必
+        每次都往状态栏里再播报一遍「已放大到最前面两页」。
+
+        ``unfold=False`` 同理——最大视图与「左侧已收起」可以同时成立，
+        窗口变化时重算取景不该顺手把那摞卡摊开（那是用户的取景选择之外
+        的另一件事）。工具栏按钮走默认的 ``True``：重新取景本来就意味着
+        回到全貌。
         """
         if self.deck is None:
             return
+        if unfold:
+            self._unfold_if_folded()
         front = []
         slot = self.deck.slot_card()
         if slot is not None:
@@ -252,11 +364,15 @@ class PopPickWindow(QMainWindow):
         if not self._show_scene_rect(rect, 0.015):
             return
         # 锁定：最大视图是"专注看这两页"的状态，左侧最上层那张占满左半屏，
-        # 最容易顺手点掉。这里把它锁住，退出该状态才恢复交换。
-        self._maximized = True
+        # 最容易顺手点掉。这里把它锁住，退出该状态才恢复交换——同时把它的
+        # 交互打开（_set_maximized → _sync_card_readonly），页内按钮照常能点。
+        self._set_maximized(True)
+        if not announce:
+            return
         names = "、".join(f"「{card.get_name()}」" for card in front)
         self.statusBar().showMessage(
-            f"已放大到最前面两页：{names} ｜ 左侧最上层已锁定，点「适应窗口」恢复交换",
+            f"已放大到最前面两页：{names} ｜ "
+            "两页均可直接操作，左侧最上层不再响应点击切换",
             4000,
         )
 
@@ -281,6 +397,68 @@ class PopPickWindow(QMainWindow):
         return True
 
     # ------------------------------------------------------------------
+    # 收起 / 展开左侧页面（双击空白处）
+    # ------------------------------------------------------------------
+    def _unfold_if_folded(self) -> None:
+        """重新取景前把收拢的左侧页面展开（无动画，取景本身才是主角）。"""
+        if self.deck is not None and self.deck.is_folded():
+            self.deck.unfold(immediate=True)
+
+    def _toggle_fold(self) -> None:
+        """双击空白背景触发的收起 / 展开。"""
+        if self.deck is None or self.deck.is_busy():
+            return
+        if self.deck.is_folded():
+            if self.deck.unfold():
+                self.statusBar().showMessage("左侧页面已展开", 2500)
+            return
+        if self.deck.fold():
+            # 最大视图**不解除**：收起/展开只是把左边那一摞挪一挪，取景没变。
+            # 展开回来后仍然是"专注看这两页"的状态——左侧最上层照旧不可交换、
+            # 页内控件照旧可操作。要退出这个状态得点「适应窗口」或滚轮缩放。
+            if self._maximized:
+                self.statusBar().showMessage(
+                    "左侧页面已收起，仍在最大视图：最前页不可交换，双击空白背景展开",
+                    3000,
+                )
+            else:
+                self.statusBar().showMessage(
+                    "左侧页面已收起：两页均可直接操作，双击空白背景展开", 3000
+                )
+
+    # ------------------------------------------------------------------
+    # 窗口尺寸变化：最大视图的取景跟着重算
+    # ------------------------------------------------------------------
+    def resizeEvent(self, event):  # noqa: N802 - Qt 命名
+        super().resizeEvent(event)
+        # 最大视图的缩放/平移是按"当时的窗口尺寸"反算出来的，窗口一变，那两页
+        # 就缩在中间或溢出边界。这里只重算、不改状态：普通视图（扇形全貌）
+        # 一律不动，拖一下窗口不会被拽进最大视图。
+        # if self._maximized:
+        self._schedule_maximize_refit()
+
+    def _schedule_maximize_refit(self) -> None:
+        """合并连续 resize 事件，等拖动停下再重算一次取景。
+
+        逐次重算会跟着每个像素的 resize 走一遍全场景几何同步，拖大窗口时
+        明显掉帧；而且每次都会引发一轮承载视图重排，视觉上是抖的。
+        """
+        timer = self._maximize_refit_timer
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(MAXIMIZE_REFIT_MS)
+            timer.timeout.connect(self._refit_maximized)
+            self._maximize_refit_timer = timer
+        timer.start()
+
+    def _refit_maximized(self) -> None:
+        """按新窗口尺寸重算最大视图取景（不播报、不展开收起中的页面）。"""
+        # if not self._maximized or self.deck is None:
+        #     return
+        self._maximize_view(announce=False, unfold=False)
+
+    # ------------------------------------------------------------------
     # 鼠标：把"点一下卡片"翻译成一次交换
     # ------------------------------------------------------------------
     def eventFilter(self, obj, event):  # noqa: N802 - Qt 命名
@@ -288,7 +466,18 @@ class PopPickWindow(QMainWindow):
             return super().eventFilter(obj, event)
 
         kind = event.type()
-        if kind == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+        if kind == QEvent.MouseButtonDblClick and event.button() == Qt.LeftButton:
+            # 双击**空白背景**才是收起/展开的开关。双击卡片不算：收起状态下
+            # 那两页已经放开交互，双击落在页内控件上（文本框选词、按钮连点），
+            # 顺手把整摞展开等于在用户操作页面时抢走他的画面。
+            if self.deck is not None and not self.deck.is_busy():
+                on_card = (
+                    self.deck.card_at(self._window_to_scene(QPointF(event.position())))
+                    is not None
+                )
+                if not on_card:
+                    self._toggle_fold()
+        elif kind == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
             self._press_pos = QPointF(event.position())
             self._dragged = False
         elif kind == QEvent.MouseMove and self._press_pos is not None:
@@ -305,7 +494,7 @@ class PopPickWindow(QMainWindow):
         elif kind == QEvent.Wheel:
             # 滚轮缩放等于重新取景，最大视图状态随之失效，锁定一并解除；
             # 否则用户缩回全貌后会发现最上面那页点不动。
-            self._maximized = False
+            self._set_maximized(False)
         return super().eventFilter(obj, event)
 
     def _handle_click(self, window_pos: QPointF) -> None:
@@ -314,26 +503,32 @@ class PopPickWindow(QMainWindow):
         card = self.deck.card_at(self._window_to_scene(window_pos))
         if card is None:
             return
+        if self.deck.is_folded():
+            # 收起状态下左侧只剩"封面"那一张，交换没有意义；而且它已经放开
+            # 交互（点击落在页内控件里），正常情况下走不到这儿，留作兜底。
+            self.statusBar().showMessage(
+                "左侧页面已收起，双击空白背景展开后再切换页面", 3000
+            )
+            return
         if card is self.deck.slot_card():
             self.statusBar().showMessage("这是当前页，点左侧任意页面进行互换", 2500)
             return
-        if self._maximized and self._is_locked_card(card):
+        if self._is_locked_card(card):
             self.statusBar().showMessage(
-                "最大视图下已锁定这一页，点「适应窗口」后可继续交换", 3000
+                "这一页已锁定（页内按钮可正常操作），"
+                "点「适应窗口」退出最大视图后可继续交换",
+                3000,
             )
             return
         self.deck.swap_with_slot(card)
 
     def _is_locked_card(self, card) -> bool:
-        """最大视图下被锁定的那张：左侧堆叠里最上面的一页。
+        """``card`` 是否是不允许再被点走的那一张。
 
-        每次现算，不缓存引用——交换之后最上层会换人，缓存下来的引用会
-        锁到一张已经跑到右边槽位的卡上。
+        注意和 :meth:`_interactive_cards` 的区别：那个返回"放开交互的两页"
+        （含右侧槽位），这里只判左侧最上层——右边点了本来也不交换，不需要拦。
         """
-        if self.deck is None:
-            return False
-        stack = self.deck.stack_cards()
-        return bool(stack) and card is stack[0]
+        return card is not None and card is self._unswappable_card()
 
     def _window_to_scene(self, window_pos: QPointF) -> QPointF:
         """窗口像素 → 场景坐标。
@@ -348,6 +543,8 @@ class PopPickWindow(QMainWindow):
 
     # ------------------------------------------------------------------
     def closeEvent(self, event):  # noqa: N802 - Qt 命名
+        if self._maximize_refit_timer is not None:
+            self._maximize_refit_timer.stop()
         if self.deck is not None:
             self.deck.stop()
         super().closeEvent(event)

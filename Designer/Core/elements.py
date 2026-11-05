@@ -1708,6 +1708,38 @@ class widget_element(rect_element):
         return self._widget_readonly
 
     # ------------------------------------------------------------------
+    # 命中测试：整块矩形都算
+    # ------------------------------------------------------------------
+    def check_hover(self, mouse_pos: QPointF) -> None:
+        """整块矩形都可命中，不能只认边框。
+
+        ``rect_element.check_hover`` 对**无填充**矩形只认"边框往里 10px /
+        往外 10~20px"那一条带，中间是挖空的：空心框要是整块都能点，就会
+        挡住压在它下面的图元。控件图元不是空心框——它是一块占满整格的面板
+        （真实控件就铺在上面），只认边框的表现就是"点中间完全没反应、只能
+        贴着边点"。
+
+        坐标系与父类一致：``_head_pos`` / ``_end_pos`` 是局部坐标下的一对
+        对角点（已按中心归一化），旋转由 ``mapFromScene`` 逆变换消掉，因此
+        这里直接按轴对齐矩形判。
+        """
+        if self.is_moving() or not self.get_selectable():
+            self.set_hover(False)
+            return False
+        if self._head_pos is None or self._end_pos is None:
+            self.set_hover(False)
+            return False
+
+        local = self.mapFromScene(mouse_pos)
+        rect = QRectF(self._head_pos, self._end_pos).normalized()
+        hit = rect.contains(local)
+        self.set_hover(hit)
+        # 成组时的悬停联动（父类在这里比对上一帧状态并发信号），放在改完
+        # hover 之后调用，本帧就能通知出去，不用等下一次鼠标移动。
+        base_element.check_hover(self, mouse_pos)
+        return hit
+
+    # ------------------------------------------------------------------
     # 几何变化钩子：拖动 / 移动后同步子窗口
     # ------------------------------------------------------------------
     def setPos(self, *args: float | QPointF) -> None:
@@ -3324,11 +3356,15 @@ class image_element(base_element):
         _log_destroy("image", self)
 
     def image_path(self) -> str:
+            # 只保存文件名（如 "bg.png"），文件统一放在 res/myDesigner/img 下
             return self.img_file
     
-    def set_image_path(self,path: str) -> None:
-        self.img_file = path
-        self.img_path = res_mng.get_img_path(path)
+    def set_image_path(self,file_name: str) -> None:
+        # 旧数据里可能存了相对路径（如 "..\\..\\res\\myDesigner\\img\\x.png"），
+        # 统一收敛成资源目录下的文件名，保证 image_path() 反读到的就是文件名
+        file_name = os.path.basename(str(file_name or "").replace("\\", "/"))
+        self.img_file = file_name
+        self.img_path = res_mng.get_img_path(file_name)
     
     # def image_path(self):
     #     # return self.img_path

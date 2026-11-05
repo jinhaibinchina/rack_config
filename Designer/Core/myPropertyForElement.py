@@ -14,9 +14,11 @@
 
 from __future__ import annotations
 
+import filecmp
 import json
 import math
 import os
+import shutil
 from typing import Any, Callable, Protocol
 
 from PySide6.QtCore import Property, QObject, QPointF, QSizeF, Qt
@@ -64,6 +66,7 @@ from .property_widgets import (
     make_textarea,
     make_value_label,
 )
+from res.designer_resource_manager import resource_manager as res_mng
 
 
 TYPE_LABELS = {
@@ -1146,18 +1149,28 @@ class GroupPropertyItem(PropertyItem):
 class ImagePropertyItem(PropertyItem):
     """图片：源文件 + 填充色 + 尺寸。"""
 
+    # 显示当前图片文件名的只读输入框，选图后回填
+    _source_edit: QLineEdit | None
+
     def __init__(
         self,
         parent: QObject | None = None,
         item: image_element | None = None,
     ) -> None:
         super().__init__(parent=parent, item=item)
+        self._source_edit = None
 
     def create_appearance_page(self) -> PropertyPage:
         page = PropertyPage()
 
         source = SectionCard("图片来源")
-        path_edit = make_line(self.item.image_path(), read_only=True, tooltip="相对程序目录的路径，随页面一起保存")
+        path_edit = make_line(
+            self.item.image_path(),
+            read_only=True,
+            tooltip="资源目录 res/myDesigner/img 下的文件名，随页面一起保存",
+        )
+        # 选图后要同步回填，见 select_image()
+        self._source_edit = path_edit
         browse = QPushButton("浏览…")
         browse.setObjectName("propBrowseButton")
         browse.setFixedHeight(FIELD_HEIGHT)
@@ -1170,27 +1183,71 @@ class ImagePropertyItem(PropertyItem):
         row_layout.addWidget(path_edit, 1)
         row_layout.addWidget(browse)
         source.add_widget(row)
-        source.add_hint("支持 PNG；路径按相对目录保存，换机器打开时请连同资源目录一起拷贝。")
+        source.add_hint("支持 PNG / JPG；选中的图片会复制到 res/myDesigner/img，页面里只记录文件名。")
         page.add_card(source)
         page.add_card(self._appearance_card())
         return page
 
-    def select_image(self) -> None:
-        import sys
+    def select_image(self) -> str:
+        """选择图片，写回图元并返回保存的文件名（如 ``"bg.png"``）。
 
+        页面只记录文件名，实际文件统一放在 ``res/myDesigner/img`` 下：从别处
+        选中的图片会先复制进来，避免换机器时相对路径失效。取消选择返回空串。
+        """
         parent = self.navi if self.navi else None
-        file_path, _ = QFileDialog.getOpenFileName(parent, "选择图片", "", "图片文件 (*.png)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            parent,
+            "选择图片",
+            "",
+            "图片文件 (*.png *.jpg *.jpeg);;PNG 图片 (*.png);;JPEG 图片 (*.jpg *.jpeg)",
+        )
         if not file_path:
-            return
-        if getattr(sys, "frozen", False):
-            # 打包后的可执行文件路径（如 PyInstaller）
-            base_dir = os.path.dirname(sys.executable)
-        else:
-            # 脚本文件所在路径
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-        rel_path = os.path.relpath(file_path, base_dir)
-        self.item.set_image_path(rel_path)
+            return ""
+
+        file_name = self._import_image(file_path)
+        self.item.set_image_path(file_name)
         self.item.prepareDirtyChange()
+        if self._source_edit is not None:
+            self._source_edit.setText(file_name)
+        return file_name
+
+    def _import_image(self, source_path: str) -> str:
+        """把选中的图片放进资源目录，返回最终使用的文件名。
+
+        已在资源目录里的文件直接沿用文件名；遇到同名但内容不同的图片不覆盖，
+        改用 ``bg_1.png`` 这类新名字，免得改掉其它图元共用的图。
+        """
+        source_path = os.path.abspath(source_path)
+        file_name = os.path.basename(source_path)
+        img_dir = res_mng.get_img_dir()
+        try:
+            os.makedirs(img_dir, exist_ok=True)
+        except OSError:
+            return file_name
+
+        target = os.path.join(img_dir, file_name)
+        if os.path.normcase(os.path.abspath(target)) == os.path.normcase(source_path):
+            return file_name
+
+        if os.path.exists(target):
+            if filecmp.cmp(source_path, target, shallow=False):
+                return file_name
+            stem, ext = os.path.splitext(file_name)
+            index = 1
+            while True:
+                candidate = f"{stem}_{index}{ext}"
+                candidate_path = os.path.join(img_dir, candidate)
+                if not os.path.exists(candidate_path):
+                    file_name, target = candidate, candidate_path
+                    break
+                index += 1
+
+        try:
+            shutil.copyfile(source_path, target)
+        except OSError:
+            # 复制失败就退回原名，图片若已在资源目录里仍能正常显示
+            return os.path.basename(source_path)
+        return file_name
 
 
 class CheckboxPropertyItem(RectPropertyItem):

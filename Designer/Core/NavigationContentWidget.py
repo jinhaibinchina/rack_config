@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import QColor
 
 from .elements import (
@@ -254,13 +254,17 @@ class NavigationContentWidget(QWidget):
         self._refresh_header(selected_obj)
 
     def _namespace_for(self, selected_obj: object | None) -> str:
+        if isinstance(selected_obj, (list, tuple)):
+            return "multi"
         if isinstance(selected_obj, myGraphicsScene):
             return "scene"
         return "element"
 
     def _populate_pages(self, selected_obj: object | None) -> None:
         if self.scene is not None and self.scene.mode() == SceneMode.Design:
-            if isinstance(selected_obj, myGraphicsScene):
+            if isinstance(selected_obj, (list, tuple)):
+                self._show_multi_selection_pages(selected_obj)
+            elif isinstance(selected_obj, myGraphicsScene):
                 self._show_scene_pages()
             elif isinstance(selected_obj, text_element):
                 TextPropertyItem(item=selected_obj).add_navigation_items(self)
@@ -307,6 +311,80 @@ class NavigationContentWidget(QWidget):
         self.item = self.scene
         self.add_navigation_items()
 
+    # ------------------------------------------------------------------
+    # 多选
+    # ------------------------------------------------------------------
+    def _show_multi_selection_pages(self, items) -> None:
+        """多选时没有"当前图元"，面板改为概要 + 清单。
+
+        逐个图元的分页构造器都绑定在单个对象上（字段读写只作用于它），
+        多选硬套会让人以为改动会同时应用到所有对象；这里只展示汇总，
+        编辑入口留给"单独点选一个"。
+        """
+        items = [item for item in items if isinstance(item, base_element)]
+        self.item = self.scene
+        tree = self.navigation_tree
+        for title, key in (("选择概要", "multi"), ("图元清单", "multi_list")):
+            node = QTreeWidgetItem([title])
+            node.setData(0, Qt.UserRole, key)
+            tree.addTopLevelItem(node)
+
+        self.add_page("multi", "选择概要", self.create_multi_summary_page(items))
+        self.add_page("multi_list", "图元清单", self.create_multi_list_page(items))
+        if not self._building_navigation:
+            self.select_preferred_page()
+
+    def create_multi_summary_page(self, items) -> PropertyPage:
+        page = PropertyPage()
+        card = SectionCard("选择概要")
+
+        counts: dict[str, int] = {}
+        bounds = QRectF()
+        for item in items:
+            type_key = str(getattr(item, "type", "") or "")
+            label = TYPE_LABELS.get(type_key, type_key or "图元")
+            counts[label] = counts.get(label, 0) + 1
+            rect = item.sceneBoundingRect()
+            bounds = rect if bounds.isNull() else bounds.united(rect)
+
+        breakdown = "、".join(f"{label} {count}" for label, count in counts.items())
+        card.add_row(("数量", make_value_label(f"{len(items)} 个图元")))
+        card.add_row(("类型", make_value_label(breakdown)))
+        card.add_row(
+            ("包围盒", make_value_label(f"{bounds.width():.0f} x {bounds.height():.0f}"))
+        )
+        card.add_row(("Z 范围", make_value_label(self._z_range_text(items))))
+        card.add_hint(
+            "多选状态下这里只做汇总：逐个图元的字段编辑请单独点选它"
+            "（组内成员按 Tab 切换）；批量移动/对齐用工具栏右侧的排列按钮。"
+        )
+        page.add_card(card)
+        return page
+
+    def create_multi_list_page(self, items) -> PropertyPage:
+        page = PropertyPage()
+        card = SectionCard("图元清单")
+        card.set_badge(str(len(items)))
+        limit = 40
+        for item in items[:limit]:
+            type_key = str(getattr(item, "type", "") or "")
+            label = TYPE_LABELS.get(type_key, type_key or "图元")
+            name = item.get_name() or "未命名"
+            card.add_row(
+                (label, make_value_label(f"{item.id()} · {name}"))
+            )
+        if len(items) > limit:
+            card.add_hint(f"仅列出前 {limit} 个，共 {len(items)} 个。")
+        page.add_card(card)
+        return page
+
+    @staticmethod
+    def _z_range_text(items) -> str:
+        values = [item.zValue() for item in items]
+        if not values:
+            return "—"
+        return f"{min(values)} ~ {max(values)}"
+
     def _show_empty_state(self, title: str, hint: str) -> None:
         page = EmptyState(title, hint, self)
         scroll = QScrollArea()
@@ -317,6 +395,20 @@ class NavigationContentWidget(QWidget):
         self.content_stack.addWidget(scroll)
 
     def _refresh_header(self, selected_obj: object | None) -> None:
+        if isinstance(selected_obj, (list, tuple)):
+            items = [item for item in selected_obj if isinstance(item, base_element)]
+            counts: dict[str, int] = {}
+            for item in items:
+                type_key = str(getattr(item, "type", "") or "")
+                label = TYPE_LABELS.get(type_key, type_key or "图元")
+                counts[label] = counts.get(label, 0) + 1
+            breakdown = "、".join(f"{label} {count}" for label, count in counts.items())
+            self.header.set_object(
+                "多",
+                f"{len(items)} 个图元",
+                f"{breakdown} · 多选（字段编辑请单选）",
+            )
+            return
         if isinstance(selected_obj, myGraphicsScene):
             scene = selected_obj
             manager = getattr(scene, "scene_manager", None)
@@ -425,7 +517,12 @@ class NavigationContentWidget(QWidget):
         scene = self.scene
         if scene is None:
             return
+        # 一并选中：面板的目标按"选中集合"判断（见设计窗口的 _panel_target），
+        # 只改 current_selected 的话，这个"点进来看看"的组没有选中标志，
+        # 面板会判定成"没有选中任何顶层图元"而退回页面背景。
+        item.set_selected(True)
         scene.set_current_select_item(item)
+        scene.selectionChanged.emit()
 
     def create_canvas_page(self) -> PropertyPage:
         page = PropertyPage()
