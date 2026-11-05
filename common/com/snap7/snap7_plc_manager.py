@@ -116,6 +116,9 @@ class PLCManager:
         # 重连相关
         self._reconnecting = False
         self._stop_reconnect = False
+        # 可唤醒的停止信号：shutdown() set 之后，正在退避等待的线程立刻醒来
+        # 退出，而不是把 15 秒的退避睡完再走（否则关窗后日志还会继续刷）。
+        self._stop_event = threading.Event()
         self._connect_attempts = 0
         self._state_listeners = []
         self.hmi_seq = 0
@@ -142,19 +145,32 @@ class PLCManager:
     # 底层连接
     # ------------------------------------------------------------------
     def _close_client(self) -> None:
-        """销毁底层 client，释放 socket。调用方保证不持有 self.lock。"""
-        client = self.client
-        self.client = None
-        if client is None:
-            return
-        try:
-            client.disconnect()
-        except Exception:
-            pass
-        try:
-            client.destroy()
-        except Exception:
-            pass
+        """销毁底层 client，释放 socket。调用方保证不持有 self.lock。
+
+        **必须**持 ``_io_lock``：snap7 的 client 是一层薄薄的 C 指针包装，
+        另一线程正在 ``db_read`` 时把底层对象 ``destroy()`` 掉，等于让它往
+        已释放的内存里读——Windows 上直接 access violation（整个进程段错误），
+        界面上表现为"窗口还在，但点什么都没反应"。
+
+        典型触发场景：PLC 不可达，重连线程周期性地 ``_close_client()`` +
+        ``_open_client()``，同时轮询线程正拿着同一个 client 读 DB21。
+        """
+        with self._io_lock:
+            client = self.client
+            self.client = None
+            # destroy 之后必须同步把 connected 置 False：否则轮询线程
+            # isConnected() 仍为真，会继续尝试拿 client 去读。
+            self.connected = False
+            if client is None:
+                return
+            try:
+                client.disconnect()
+            except Exception:
+                pass
+            try:
+                client.destroy()
+            except Exception:
+                pass
 
     def _open_client(self) -> bool:
         """建立连接。调用方保证不持有 self.lock（会阻塞数秒）。"""
@@ -215,6 +231,7 @@ class PLCManager:
             return
         self.heartbeat_active = True
         self._stop_reconnect = False
+        self._stop_event.clear()
         self.thread = threading.Thread(
             target=self._heartbeat_loop,
             args=(interval,),
@@ -227,12 +244,30 @@ class PLCManager:
         """停止心跳线程并断开连接"""
         self.heartbeat_active = False
         self._stop_reconnect = True
+        self._stop_event.set()
         self.disconnect()
         thread = self.thread
         self.thread = None
         if thread is not None and thread.is_alive():
             thread.join(timeout=3)
         print('断开连接')
+
+    def shutdown(self) -> None:
+        """请求停止后台线程（**不阻塞调用方**，可在 UI 线程直接调）。
+
+        与 :meth:`stop_thread` 的区别：
+
+        * 不 ``join``。重连线程可能正阻塞在 ``client.connect()`` 里，join 会把
+          UI 线程拖住数秒；关窗卡顿正是这么来的。
+        * 不在这里 ``disconnect``。重连线程可能正持有 client 做 connect，
+          另一线程并发 ``destroy()`` 会让 snap7 直接崩。socket 交给线程自己
+          在退出那一轮收尾（见 ``_heartbeat_loop`` / ``_reconnect_loop``）。
+
+        两个线程都是 daemon，最坏情况下进程退出也不会被它们拖住。
+        """
+        self.heartbeat_active = False
+        self._stop_reconnect = True
+        self._stop_event.set()
 
     def _heartbeat_loop(self, interval: float):
         """心跳循环（独立线程）。
@@ -261,7 +296,12 @@ class PLCManager:
             if not self.connected:
                 self._request_reconnect()
 
-            threading.Event().wait(interval)
+            self._stop_event.wait(interval)
+
+        # 被 shutdown() 停掉时由本线程自己收尾：此时本线程不再碰 client，
+        # 关 socket 不会和重连线程的 connect 撞车（shutdown 特意不做这件事）。
+        if self._stop_reconnect:
+            self.disconnect()
 
     # ------------------------------------------------------------------
     # 重连
@@ -295,8 +335,9 @@ class PLCManager:
                 self._close_client()
                 if self._open_client():
                     return
-                # 指数退避，避免 PLC 未上电时每 5 秒刷屏
-                threading.Event().wait(delay)
+                # 指数退避，避免 PLC 未上电时每 5 秒刷屏；
+                # 用可唤醒的 Event 等待，shutdown 时能立刻醒来退出。
+                self._stop_event.wait(delay)
                 delay = min(delay * RECONNECT_BACKOFF, RECONNECT_MAX_DELAY)
         finally:
             with self.lock:

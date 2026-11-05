@@ -13,7 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtCore import Qt, QEvent, QCoreApplication
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QApplication
 
@@ -82,6 +82,21 @@ def main() -> int:
     check("活动窗口引用已清空", launcher._active is None)
     check("关闭后窗口对象已销毁", not _alive(win))
 
+    # ---- 3.5 完全不触发 Close，直接销毁窗口：destroyed 兜底也要回选择页 ----
+    # 真实故障：某些路径下窗口不是被 close() 关掉而是被销毁（deleteLater /
+    # C++ 侧删除 / closeEvent 里提前删），eventFilter 收不到 QEvent.Close，
+    # 选择页就永远不回来了。
+    click_card(safety_card, app)
+    doomed = launcher._active
+    check("兜底用例：工具窗口已打开", doomed is not None)
+    if doomed is not None:
+        doomed.deleteLater()
+        app.processEvents()
+        QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+        app.processEvents()
+        check("窗口被直接销毁后也回到选择页", launcher.isVisible())
+        check("销毁兜底后活动引用已清空", launcher._active is None)
+
     # ---- 4. 同样的流程换成料架工具 ----
     rack_card = next(c for c in cards if c.tool.key == "rack")
     click_card(rack_card, app)
@@ -94,6 +109,41 @@ def main() -> int:
         app.processEvents()
         check("料架关窗后回到选择页", launcher.isVisible())
         check("料架活动引用已清空", launcher._active is None)
+
+    # ---- 4.5 回落补救：三种"窗口存在但看不见" ----
+    # 这里最容易写错的地方：**最小化的窗口 isVisible() 依然是 True**，
+    # 早期版本用 `if self.isVisible(): raise_(); return` 快退，于是
+    # showNormal()/强制前台全成了走不到的死代码。
+    launcher.show()
+    launcher.showMinimized()
+    app.processEvents()
+    check("前置：选择页已最小化", launcher.isMinimized())
+    launcher.hide()
+    app.processEvents()
+    launcher._back_to_launcher()
+    app.processEvents()
+    check(
+        "最小化状态下回落能从最小化恢复",
+        launcher.isVisible() and not launcher.isMinimized(),
+        f"visible={launcher.isVisible()} minimized={launcher.isMinimized()}",
+    )
+    check(
+        "最小化状态下回落窗口状态已清零",
+        not (launcher.windowState() & entry.Qt.WindowMinimized),
+        str(launcher.windowState()),
+    )
+
+    launcher.move(40000, 40000)
+    app.processEvents()
+    check("前置：窗口已在所有屏幕之外", not launcher._is_on_screen())
+    launcher.hide()
+    launcher._back_to_launcher()
+    app.processEvents()
+    check(
+        "屏外窗口回落后回到屏幕内",
+        launcher._is_on_screen(),
+        f"geom={launcher.frameGeometry().getRect()}",
+    )
 
     launcher.close()
     app.processEvents()

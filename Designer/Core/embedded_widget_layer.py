@@ -211,13 +211,14 @@ class EmbeddedWidgetLayer(QObject):
         # 先摘掉动画快照，否则 removeItem(proxy) 之后内层场景里还留着它的位图。
         self._remove_snapshot(show_proxy=False)
         proxy = self.proxy
+        widget = self.widget
         self.proxy = None
+        self.widget = None
         if proxy is None:
-            self.widget = None
             return
         try:
-            # setWidget(None) 让 proxy 放弃对控件的所有权（内部走 deleteLater），
-            # 之后 removeItem 归还 proxy 的所有权给 Python 侧，可安全回收。
+            # setWidget(None) 让 proxy 放弃对控件的所有权，之后 removeItem
+            # 归还 proxy 的所有权给 Python 侧，可安全回收。
             proxy.setWidget(None)
         except RuntimeError:
             pass
@@ -225,7 +226,17 @@ class EmbeddedWidgetLayer(QObject):
             self.inner_scene.removeItem(proxy)
         except RuntimeError:
             pass
-        self.widget = None
+        # 关键：QGraphicsProxyWidget 摘控件时只做 setParent(None)，**不会 hide、
+        # 也不会删除**。不补这一步，控件就成了 parent=None 的顶层窗口，还带着
+        # 原来的 visible 状态留在屏幕上——宿主窗口关闭时表现为"关掉页面后
+        # 屏幕上多出几个空白控件窗口，盖住了身后的界面"（实测 PopPick 关窗后
+        # 残留 3 个 750×1000 的 QTextEdit）。
+        if widget is not None:
+            try:
+                widget.hide()
+                widget.deleteLater()
+            except RuntimeError:
+                pass
 
     # ------------------------------------------------------------------
     # 布局

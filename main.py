@@ -23,12 +23,18 @@
 from __future__ import annotations
 
 import argparse
+import faulthandler
+import os
 import sys
+import tempfile
+import threading
+import time
 import traceback
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
 from PySide6.QtCore import Qt, QEvent, QTimer, Signal
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -44,6 +50,124 @@ from PySide6.QtWidgets import (
 APP_ORG = "AppsManagers"
 APP_NAME = "AppsManagers"
 LAUNCHER_TITLE = "工具平台"
+
+# 排查「关掉工具后选择页没回来」用：默认把打开 / 关闭 / 回落的关键节点
+# 追加写到 %TEMP%/apps_launcher_trace.log（同时打 stderr）。
+# APPS_LAUNCHER_TRACE=0 可以关掉。
+_TRACE = os.environ.get("APPS_LAUNCHER_TRACE") != "0"
+_TRACE_FILE = os.path.join(tempfile.gettempdir(), "apps_launcher_trace.log")
+
+# 进程直接崩掉（段错误）时，Python 层一行日志都来不及打，"界面卡死"和
+# "崩溃"在屏幕上看起来是一样的。faulthandler 能在信号处理里落一份带 C 帧
+# 的栈，落到单独的文件里，用来区分这两种情况。
+_FAULT_FILE = None
+try:
+    _FAULT_FILE = open(  # noqa: SIM115 - 进程生命周期内一直开着
+        os.path.join(tempfile.gettempdir(), "apps_launcher_fault.log"),
+        "a",
+        buffering=1,
+        encoding="utf-8",
+    )
+    faulthandler.enable(file=_FAULT_FILE, all_threads=True)
+except Exception:  # noqa: BLE001
+    _FAULT_FILE = None
+
+
+def _trace(message: str) -> None:
+    line = f"[{time.strftime('%H:%M:%S')}] {message}"
+    try:
+        # 这个文件是常年追加的，超过 256KB 就重开，避免无限涨。
+        if os.path.getsize(_TRACE_FILE) > 256 * 1024:
+            os.remove(_TRACE_FILE)
+    except OSError:
+        pass
+    try:
+        with open(_TRACE_FILE, "a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+    except OSError:
+        pass
+    if _TRACE:
+        print(f"[工具平台] {message}", file=sys.stderr, flush=True)
+
+
+def _thread_stacks(reason: str) -> None:
+    """把所有线程的调用栈追加到 trace 文件。
+
+    只在主线程心跳停转时调用：这时界面上只能看到"卡死"，分不清是卡在
+    Python 代码里、卡在等 GIL、还是卡在 Qt 的窗口调用里。抓一次栈就能落到
+    具体函数，比继续猜快得多。
+    """
+    try:
+        with open(_TRACE_FILE, "a", encoding="utf-8") as handle:
+            handle.write(f"[{time.strftime('%H:%M:%S')}] !!! 主线程停转：{reason}\n")
+            try:
+                # faulthandler 连 C/C++ 层的帧一起 dump，能看出是不是卡在
+                # show()/raise() 这类 Qt 调用里（纯 Python traceback 看不到）。
+                faulthandler.dump_traceback(file=handle, all_threads=True)
+            except Exception:  # noqa: BLE001
+                pass
+            main_frame = sys._current_frames().get(threading.main_thread().ident)
+            if main_frame is not None:
+                handle.write("--- 主线程 Python 栈（带源码行）---\n")
+                handle.write("".join(traceback.format_stack(main_frame)))
+            handle.flush()
+    except OSError:
+        pass
+
+
+class _MainThreadWatchdog(threading.Thread):
+    """主线程心跳监控：停转超过 stall_seconds 就抓一次栈。
+
+    心跳由主线程上的 QTimer 递增；本线程只读计数，不碰 Qt。主线程如果卡在
+    C++ 调用里（GIL 已释放）或死等 GIL，本线程都还能跑，因此观测有效。
+    """
+
+    def __init__(self, beat: Callable[[], int], stall_seconds: float = 3.0) -> None:
+        super().__init__(name="launcher-watchdog", daemon=True)
+        self._beat = beat
+        self._stall_seconds = stall_seconds
+        self._stop = threading.Event()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def run(self) -> None:  # noqa: D102 - Thread 接口
+        last = self._beat()
+        changed_at = time.monotonic()
+        while not self._stop.wait(0.25):
+            current = self._beat()
+            if current != last:
+                last = current
+                changed_at = time.monotonic()
+                continue
+            stalled = time.monotonic() - changed_at
+            if stalled >= self._stall_seconds:
+                _thread_stacks(f"心跳 {stalled:.1f}s 未推进")
+                return
+
+
+def _force_foreground(widget: QWidget) -> None:
+    """Windows：把窗口从最小化恢复并提到最前，绕开前台窗口限制。
+
+    Qt 的 ``raise_()`` / ``activateWindow()`` 最终会落到 ``SetForegroundWindow``，
+    但系统只允许"当前拥有前台的进程"或"刚失去前台的进程"调用它。工具窗口
+    刚关闭时前台归属常被系统判给别的进程，此时 ``activateWindow()`` 静默失败，
+    表现就是"选择页已经 show 了，但还压在别的窗口后面 / 只在任务栏闪"。
+    ``ShowWindow(SW_RESTORE) + BringWindowToTop`` 是同一进程内的窗口操作，
+    不受这条限制。
+    """
+    try:
+        import ctypes
+
+        hwnd = int(widget.winId())
+        user32 = ctypes.windll.user32
+        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        user32.BringWindowToTop(hwnd)
+        user32.SetForegroundWindow(hwnd)
+    except Exception:  # noqa: BLE001 - 提权失败不影响主流程
+        pass
+
+
 
 # 各工具的默认 PLC 地址。料架取自 App_RackConfig.rack_config_main.DEFAULT_PLC_IP，
 # 安全车沿用原 safety_car_main.main() 里写死的地址。
@@ -248,13 +372,26 @@ class ToolLauncher(QWidget):
         self.enable_plc = enable_plc
         self.plc_ip = plc_ip
         self._active: Optional[QMainWindow] = None
+        # 与 _active 配对的认领令牌（见 _on_window_destroyed）
+        self._active_token: Optional[object] = None
         self._quitting = False
+        # 关闭工具后的状态采样器：关窗后每 500ms 记一行窗口状态，共 12 行。
+        # 排查"关掉工具后选择页不出现"时，这 12 行能直接看出到底卡在哪一步
+        # （没 show / show 了但最小化 / 在屏幕外 / show 了但被别的窗口盖住）。
+        self._diag_timer: Optional[QTimer] = None
+        self._diag_left = 0
+        # 主线程心跳 + 看门狗：界面卡死时自动把调用栈写进 trace 文件，
+        # 不用再靠"卡了几秒"猜是哪一步（见 _MainThreadWatchdog）。
+        self._beat = 0
+        self._beat_timer: Optional[QTimer] = None
+        self._watchdog: Optional[_MainThreadWatchdog] = None
 
         self.setObjectName("launcherRoot")
         self.setWindowTitle(LAUNCHER_TITLE)
         self.setStyleSheet(LAUNCHER_QSS)
         self.setMinimumSize(760, 400)
         self._build()
+        self._start_watchdog()
 
     # ------------------------------------------------------------------
     # UI
@@ -320,25 +457,204 @@ class ToolLauncher(QWidget):
         # 因此关闭即销毁，不缓存实例复用。
         window.setAttribute(Qt.WA_DeleteOnClose, True)
         window.installEventFilter(self)
+        # Close 之外的第二条兜底路径：窗口被销毁（deleteLater / C++ 侧直接
+        # 删除 / 没走 closeEvent）时不保证有 QEvent.Close 经过 eventFilter，
+        # 但 destroyed 一定会发。用 token 认领，避免上一个窗口迟到的
+        # destroyed 把新开的窗口误判成已关闭。
+        token = object()
+        self._active_token = token
+        window.destroyed.connect(lambda *_: self._on_window_destroyed(token))
         self._active = window
+        _trace(f"打开 {tool.key}: {type(window).__name__}")
 
         window.show()
         window.raise_()
         window.activateWindow()
         self.hide()
+        _trace(f"选择页已隐藏，等待 {tool.key} 关闭")
 
     def eventFilter(self, obj, event):  # noqa: N802 - Qt 命名
         if event.type() == QEvent.Close and obj is self._active:
+            _trace("收到活动窗口 Close")
             self._active = None
+            self._active_token = None
             if not self._quitting:
-                # Close 事件里还不能显示自己，等窗口真正关掉再回来
-                QTimer.singleShot(0, self._back_to_launcher)
+                try:
+                    self._start_launcher_diag()
+                except Exception as exc:  # noqa: BLE001
+                    _trace(f"启动采样失败: {exc!r}")
+                # **立刻**回落，不再等工具窗口的 closeEvent 跑完。
+                # closeEvent 里要做停 PLC 线程、回收承载控件这些清理，实测
+                # 会花 100~500ms；万一哪一步卡住，排在事件循环里的
+                # singleShot(0) 就永远不会执行，屏幕上一直空着——现象就是
+                # "工具页没恢复"。先 show 出来，后面清理卡多久都不影响可见性。
+                try:
+                    self._back_to_launcher()
+                except Exception as exc:  # noqa: BLE001
+                    # 这里一旦把异常抛出去，Close 事件就没派发下去，
+                    # 工具窗口的 closeEvent 也不会跑，窗口会留在屏幕上。
+                    _trace(f"回落失败: {exc!r}")
         return super().eventFilter(obj, event)
 
+    def _on_window_destroyed(self, token: object) -> None:
+        """窗口被销毁时的兜底：没收到 Close 也要回到选择页。
+
+        只认领"当前这个"窗口的销毁通知：destroyed 走 DeferredDelete，可能
+        晚一轮才到，那时用户也许已经启动了另一个工具，不能把选择页抢到前面。
+        """
+        if self._quitting or getattr(self, "_active_token", None) is not token:
+            return
+        _trace("窗口 destroyed（未收到 Close）")
+        self._active = None
+        self._active_token = None
+        QTimer.singleShot(0, self._back_to_launcher)
+
+    def _start_watchdog(self) -> None:
+        timer = QTimer(self)
+        timer.setInterval(200)
+        timer.timeout.connect(self._on_beat)
+        timer.start()
+        self._beat_timer = timer
+        watchdog = _MainThreadWatchdog(lambda: self._beat)
+        watchdog.start()
+        self._watchdog = watchdog
+
+    def _on_beat(self) -> None:
+        self._beat += 1
+
+    def _start_launcher_diag(self) -> None:
+        """关闭工具后采样 6 秒窗口状态（12 行），写进 trace 文件。
+
+        只看一个时间点的状态分不清"没 show"、"show 了但被最小化"、
+        "show 了但在屏幕外"、"show 了但被别的顶层窗口盖住"这几种情况，
+        连续采样才能看出回落是没发生、还是发生了又被打回去。
+        """
+        timer = self._diag_timer
+        if timer is None:
+            timer = QTimer(self)
+            timer.setInterval(500)
+            timer.timeout.connect(self._sample_launcher)
+            self._diag_timer = timer
+        self._diag_left = 12
+        timer.start()
+
+    def _sample_launcher(self) -> None:
+        if self._diag_left <= 0:
+            if self._diag_timer is not None:
+                self._diag_timer.stop()
+            return
+        self._diag_left -= 1
+        geom = self.frameGeometry()
+        screen = self.screen()
+        tops = [
+            w for w in QApplication.topLevelWidgets()
+            if w.isVisible() and w.parent() is None
+        ]
+        _trace(
+            f"diag#{12 - self._diag_left:02d} visible={self.isVisible()} "
+            f"minimized={self.isMinimized()} state={self.windowState().value} "
+            f"geom=({geom.x()},{geom.y()},{geom.width()},{geom.height()}) "
+            f"active={type(self._active).__name__ if self._active else None} "
+            f"screen={screen.name() if screen else None} tops={len(tops)}"
+            + ("" if not tops else " " + ",".join(type(w).__name__ for w in tops))
+        )
+
     def _back_to_launcher(self) -> None:
-        self.show()
-        self.raise_()
-        self.activateWindow()
+        if self._quitting:
+            return
+        # 兜底路径可能在用户已经又启动了别的工具之后才到（destroyed 走
+        # DeferredDelete，晚一轮），这时不能把选择页又拽到前面去。
+        if self._active is not None:
+            return
+
+        # 先判"是否真的正常可见"。注意 **最小化的窗口 isVisible() 依然是 True**：
+        # 早期版本这里是 `if self.isVisible(): raise_(); return` 的快退，结果
+        # "窗口被最小化"——也就是最符合现象的那条（任务栏有图标、屏幕上没窗口）
+        # ——永远走不到下面的纠正代码，showNormal / 强制前台全成了死代码。
+        minimized = self.isMinimized() or bool(self.windowState() & Qt.WindowMinimized)
+        offscreen = not self._is_on_screen()
+        if self.isVisible() and not minimized and not offscreen:
+            # Close 与 destroyed 两条路都会调到这里，已经正常可见就只抬一下。
+            # 同样不能在本栈里抢前台（见本函数末尾的说明），排到下一轮。
+            _trace("选择页本就可见，仅抬升")
+            QTimer.singleShot(0, self._raise_launcher)
+            return
+
+        _trace(
+            f"回到选择页（visible={self.isVisible()} minimized={minimized} "
+            f"offscreen={offscreen} state={self.windowState().value} "
+            f"geom={self.frameGeometry().getRect()}）"
+        )
+        # 下面三步都是为了"进程还在、窗口却看不见"这几种情况：
+        # 1) 位置落在所有屏幕之外（拔过副屏 / 改过分辨率）；
+        # 2) 之前被最小化过，show() 出来仍然是 minimized；
+        # 3) Windows 把前台交给刚关闭的窗口后，拒绝再给选择页。
+        # 每一步单独打点：这三步都是同步的窗口系统调用，卡死的话日志会停在
+        # 某个"前/后"之间，下次就不用再猜。
+        try:
+            _trace("屏外纠正 前")
+            self._restore_on_screen()
+            _trace("屏外纠正 后")
+        except Exception as exc:  # noqa: BLE001
+            _trace(f"屏外纠正失败: {exc!r}")
+        try:
+            if minimized:
+                self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
+            _trace("showNormal 前")
+            self.showNormal()
+            _trace("showNormal 后")
+        except Exception as exc:  # noqa: BLE001
+            _trace(f"显示选择页失败: {exc!r}")
+        # raise_ / activateWindow / SetForegroundWindow **不能**放在这里。
+        # 本函数是从工具栏窗口的 Close 事件里同步调过来的：那一刻 Windows
+        # 正在处理 WM_CLOSE，如果在这条栈里把前台抢给同一进程的另一个顶层
+        # 窗口，系统会同步和"正在关闭的那个窗口"握手，两边互等 —— 表现就是
+        # 选择页出来了，但整个界面卡死、点什么都没反应。
+        # 只做"让它可见"，抢前台留给下一轮事件循环。
+        QTimer.singleShot(0, self._raise_launcher)
+
+    def _is_on_screen(self) -> bool:
+        """窗口是否与任意一块屏幕的可视区域相交。"""
+        screens = QGuiApplication.screens()
+        if not screens:
+            return True
+        frame = self.frameGeometry()
+        return any(screen.availableGeometry().intersects(frame) for screen in screens)
+
+    def _restore_on_screen(self) -> None:
+        """窗口若完全落在所有屏幕之外，挪回主屏中央。"""
+        screens = QGuiApplication.screens()
+        if not screens:
+            return
+        frame = self.frameGeometry()
+        for screen in screens:
+            if screen.availableGeometry().intersects(frame):
+                return
+        primary = QGuiApplication.primaryScreen() or screens[0]
+        available = primary.availableGeometry()
+        _trace(f"窗口在屏幕外 {frame.getRect()}，移回主屏")
+        self.move(
+            available.center().x() - frame.width() // 2,
+            available.center().y() - frame.height() // 2,
+        )
+
+    def _raise_launcher(self) -> None:
+        if self._quitting or not self.isVisible():
+            return
+        # 最小化的窗口 isVisible() 也是 True，这里必须先恢复再抬升
+        try:
+            _trace("抬升 前")
+            if self.isMinimized():
+                self.showNormal()
+            self.raise_()
+            _trace("raise 后")
+            self.activateWindow()
+            _trace("activateWindow 后")
+            if sys.platform == "win32":
+                _force_foreground(self)
+                _trace("强制前台 后")
+        except Exception as exc:  # noqa: BLE001
+            _trace(f"抬升选择页失败: {exc!r}")
 
     def _quit(self) -> None:
         self._quitting = True
@@ -378,6 +694,7 @@ def run(
     app.setOrganizationName(APP_ORG)
     if owns_app:
         app.setStyle("Fusion")
+    _trace(f"{'=' * 20} 启动 app={app_key or 'launcher'} plc={enable_plc}")
 
     if app_key and app_key != "launcher":
         # 与原来的独立入口一致：关掉窗口就退出进程

@@ -765,6 +765,41 @@ class QuadTreeScene(myGraphicsScene):
             widget_items.append(item)
         self._restack_embedded_widgets(widget_items)
 
+    def release_embedded_widgets(self, trace=None) -> None:
+        """释放所有 ``widget_element`` 的承载层（窗口关闭 / 场景销毁前调用）。
+
+        为什么必须有这一步：``QGraphicsProxyWidget`` 析构时只把被承载的控件
+        ``setParent(None)``，**既不 hide 也不 delete**。宿主窗口一关，承载视图
+        随宿主销毁 → proxy 析构 → 控件变成 ``parent=None`` 的顶层窗口，还带
+        着关闭前的 visible 状态留在屏幕上。实测 PopPick 关窗后残留 3 个
+        750×1000 的空白 QTextEdit 盖在工具选择页上，看起来就是"关掉 PopPick
+        后工具页没恢复"。
+
+        这里走图元自己的 ``_release_widget()``（内部 ``dispose()`` →
+        ``clear_widget()`` → ``proxy.setWidget(None)`` + ``deleteLater``），
+        在窗口销毁前把控件有序回收掉。
+        """
+        manager = getattr(self, "scene_manager", None)
+        if manager is None:
+            return
+        items = [
+            item for item in list(getattr(manager, "m_items", {}).values())
+            if isinstance(item, widget_element)
+        ]
+        if trace:
+            trace(f"待回收控件 {len(items)} 个")
+        for index, item in enumerate(items):
+            name = getattr(item, "context", "") or getattr(item, "name", "")
+            if trace:
+                trace(f"#{index} 回收前 {name!r}")
+            try:
+                item._release_widget()
+            except RuntimeError:
+                # 图元 / 承载视图已被 C++ 侧提前销毁，跳过即可
+                continue
+            if trace:
+                trace(f"#{index} 回收后 {name!r}")
+
     # ------------------------------------------------------------------
     # 窗口显隐 / 尺寸变化：重新对齐嵌入式控件
     # ------------------------------------------------------------------

@@ -72,6 +72,7 @@ from .myPropertyForElement import (
     WidgetPropertyItem,
 )
 from .run_property import CabinetPropertyItem
+from .station_pages import StationCatalog
 from .my_common import SceneMode
 
 
@@ -125,6 +126,7 @@ class NavigationContentWidget(QWidget):
         self,
         parent: QWidget | None = None,
         scene: QuadTreeScene | None = None,
+        station_catalog: StationCatalog | None = None,
     ) -> None:
         super().__init__(parent)
         self.property_items = {}
@@ -133,6 +135,9 @@ class NavigationContentWidget(QWidget):
         self._building_navigation = False
         self._current_property_item = None
         self._current_selected = None
+        # 运行态"分组说明页"的目录由调用方注入（见 run_property 模块文档）；
+        # 不传就是空目录，选中分组时显示"无可用配置"，不会报错。
+        self.station_catalog = station_catalog
         self.setObjectName("designPropertyPanel")
 
         self.item = scene
@@ -295,7 +300,10 @@ class NavigationContentWidget(QWidget):
                 )
         else:
             if isinstance(selected_obj, group_element):
-                CabinetPropertyItem(item=selected_obj).add_navigation_items(self)
+                CabinetPropertyItem(
+                    item=selected_obj,
+                    catalog=self.station_catalog,
+                ).add_navigation_items(self)
                 if self.content_stack.count() == 0:
                     self._show_empty_state(
                         "无可用配置",

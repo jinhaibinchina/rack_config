@@ -1061,9 +1061,45 @@ def run() -> int:
     # ---- 10. 状态栏 / 关闭 ----
     message = win.statusBar().currentMessage()
     check("状态栏有操作反馈", ("互换" in message) or ("已切换到" in message), message)
+
+    # 原生 WM_CLOSE（点标题栏 × 的真实路径）必须被拦截、改成延后 close()。
+    # 直接让 Qt 处理这条原生消息，本机会在进入 closeEvent 之前就段错误
+    # （exit 139）：窗口留在屏幕上、点什么都没反应，看起来就是"界面卡死"。
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        msg = wintypes.MSG()
+        msg.message = 0x0010  # WM_CLOSE
+        handled, _result = win.nativeEvent(
+            b"windows_generic_MSG", ctypes.addressof(msg)
+        )
+        check("原生 WM_CLOSE 被拦截（改为延后 close）", bool(handled))
+        _wait(120)
+        check("拦截后窗口确实关掉了", not win.isVisible())
+
     win.close()
     _wait(50)
     check("窗口关闭后动画已停止", not deck.is_busy())
+
+    # 关窗后页内控件不能变成无父的可见顶层窗口：
+    # QGraphicsProxyWidget 析构只把控件 setParent(None)，不 hide 也不删。
+    # 少了 PopPickWindow.closeEvent 里的 release_embedded_widgets()，这些
+    # 750×1000 的空白控件会浮在屏幕上盖住工具选择页。
+    ghosts = [
+        w
+        for w in QApplication.instance().topLevelWidgets()
+        if w.isVisible()
+        and w.parent() is None
+        and type(w).__name__
+        in ("QTextEdit", "QLineEdit", "QPushButton", "QComboBox", "QLabel",
+            "QSpinBox", "QCheckBox")
+    ]
+    check(
+        "关闭后没有残留的可见幽灵控件",
+        not ghosts,
+        str([(type(w).__name__, w.geometry().getRect()) for w in ghosts]),
+    )
 
     return _report()
 

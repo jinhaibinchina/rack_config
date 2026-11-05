@@ -63,6 +63,7 @@ from PySide6.QtWidgets import (
 
 import App_SafetyCar.global_variables as gv
 from Designer.Core.NavigationContentWidget import NavigationContentWidget
+from Designer.Core.station_pages import StationCatalog
 from App_SafetyCar.ip_setup import ip_setup_window
 
 from Designer.modes.design.project_store import ProjectStore
@@ -489,7 +490,15 @@ class SafetyCarWindow(QMainWindow):
         )
         self.property_dock.setAllowedAreas(Qt.BottomDockWidgetArea)
 
-        self.property_container = NavigationContentWidget(scene=self.scene)
+        # 工作站说明页的文案属于业务数据，放在 cfg/station_pages.json；
+        # 框架层只按组名匹配 + 渲染，不含任何产线名词。
+        station_catalog = StationCatalog.load(
+            res_manager.get_config_path("station_pages.json")
+        )
+        self.property_container = NavigationContentWidget(
+            scene=self.scene,
+            station_catalog=station_catalog,
+        )
         self.property_container.setObjectName("property_container")
 
         content = QWidget()

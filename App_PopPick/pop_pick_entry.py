@@ -43,6 +43,11 @@ import sys
 import traceback
 from typing import Optional, Sequence
 
+if sys.platform == "win32":
+    # 只用来在 nativeEvent 里读 MSG 结构（见 _is_native_window_close）
+    import ctypes
+    from ctypes import wintypes
+
 # 项目根加进 sys.path：单独跑本文件时 Designer 包才 import 得到
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
@@ -66,6 +71,68 @@ DEFAULT_PLC_IP = "192.168.1.88"
 # 窗口尺寸变化后重算最大视图取景的合并窗口（毫秒）：拖动过程中不重算，
 # 松手后一次算完
 MAXIMIZE_REFIT_MS = 80
+
+# 关窗排查：写进和 main.py 同一个 trace 文件，用来定位"关掉 PopPick 后
+# 工具页不出现"到底卡在 closeEvent 的哪一步（现象是日志停在 Close 之后
+# 一行都没有，说明主线程就卡在这个函数里）。
+_CLOSE_TRACE_FILE = os.path.join(
+    os.environ.get("TEMP") or os.environ.get("TMP") or ".", "apps_launcher_trace.log"
+)
+
+
+def _close_trace(message: str) -> None:
+    import time
+
+    line = f"[{time.strftime('%H:%M:%S')}] [pp-close] {message}"
+    try:
+        with open(_CLOSE_TRACE_FILE, "a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+    except OSError:
+        pass
+    print(line, file=sys.stderr, flush=True)
+
+
+_WM_CLOSE = 0x0010
+
+
+def _is_native_window_close(event_type, message) -> bool:
+    """原生消息是不是 WM_CLOSE（非 Windows 一律 False）。"""
+    if sys.platform != "win32":
+        return False
+    try:
+        if bytes(event_type) not in (
+            b"windows_generic_MSG",
+            b"windows_dispatcher_MSG",
+        ):
+            return False
+        msg = ctypes.cast(int(message), ctypes.POINTER(wintypes.MSG)).contents
+    except Exception:  # noqa: BLE001
+        return False
+    return msg.message == _WM_CLOSE
+
+
+class _DeferredNativeClose:
+    """把原生 WM_CLOSE 推迟到下一轮事件循环，再走正常的 ``close()``。
+
+    实测（Windows + 本窗口）：点标题栏的 × 时进程直接段错误（exit 139），
+    trace 停在 ``收到活动窗口 Close`` 之后、``[pp-close] closeEvent 进入``
+    之前——也就是说 Qt 在处理原生 WM_CLOSE 的过程中就崩了，Python 的
+    ``closeEvent`` 一次都没进来。同一次关闭改用程序内 ``window.close()``
+    则完全正常（exit 0，closeEvent 全程走完）。
+
+    差别在于原生消息是在窗口过程里**同步**派发的，而本窗口上挂着 6 个
+    ``QGraphicsProxyWidget`` 承载视图和若干 PLC 后台线程。拦截之后只排一个
+    ``singleShot(0)``，让关闭动作回到事件循环里执行，行为与 ``close()`` 一致。
+
+    注意：拦截后必须自己调 ``close()``，否则点 × 关不掉窗口。
+    """
+
+    def nativeEvent(self, event_type, message):  # noqa: N802 - Qt 命名
+        if _is_native_window_close(event_type, message):
+            _close_trace("拦截原生 WM_CLOSE，延后一轮再关")
+            QTimer.singleShot(0, self.close)
+            return True, 0
+        return super().nativeEvent(event_type, message)
 
 
 def _page_file_candidates(page: str) -> list[str]:
@@ -95,7 +162,7 @@ def resolve_page_file(page: str) -> str:
     raise FileNotFoundError(f"找不到页面文件「{page}」，已尝试：\n{tried}")
 
 
-class PopPickWindow(QMainWindow):
+class PopPickWindow(_DeferredNativeClose, QMainWindow):
     """运行态主窗口：一张场景 + 一个页面堆叠交互。"""
 
     def __init__(
@@ -121,6 +188,10 @@ class PopPickWindow(QMainWindow):
         self._maximized = False
         # 窗口尺寸变化后重算最大视图取景用的合并定时器（见 resizeEvent）
         self._maximize_refit_timer: Optional[QTimer] = None
+        # 页内控件背后的 PLC 后台模型：**必须自己持引用**。它们是 QObject
+        # 子对象，只靠 parent 存活时拿不到 Python 侧句柄，closeEvent 里也就
+        # 没法停它们的轮询/重连线程。
+        self._page_models: list = []
 
         self.setObjectName("popPickWindow")
         self.setWindowTitle(APP_TITLE)
@@ -132,9 +203,11 @@ class PopPickWindow(QMainWindow):
         self._install_deck()
         self._build_actions()
 
-        Page0_Model(self.scene_manager, parent=self)
-        Page1_Model(self.scene_manager, parent=self)
-        Page3_Model(self.scene_manager, parent=self)
+        self._page_models = [
+            Page0_Model(self.scene_manager, parent=self),
+            Page1_Model(self.scene_manager, parent=self),
+            Page3_Model(self.scene_manager, parent=self),
+        ]
 
         self.statusBar().showMessage(
             "点击左侧任意页面与右侧当前页互换 ｜ 拖动可平移画布 ｜ "
@@ -434,8 +507,8 @@ class PopPickWindow(QMainWindow):
         # 最大视图的缩放/平移是按"当时的窗口尺寸"反算出来的，窗口一变，那两页
         # 就缩在中间或溢出边界。这里只重算、不改状态：普通视图（扇形全貌）
         # 一律不动，拖一下窗口不会被拽进最大视图。
-        # if self._maximized:
-        self._schedule_maximize_refit()
+        if self._maximized or True:
+            self._schedule_maximize_refit()
 
     def _schedule_maximize_refit(self) -> None:
         """合并连续 resize 事件，等拖动停下再重算一次取景。
@@ -456,6 +529,8 @@ class PopPickWindow(QMainWindow):
         """按新窗口尺寸重算最大视图取景（不播报、不展开收起中的页面）。"""
         # if not self._maximized or self.deck is None:
         #     return
+        if  self.deck is None:
+            return
         self._maximize_view(announce=False, unfold=False)
 
     # ------------------------------------------------------------------
@@ -543,11 +618,40 @@ class PopPickWindow(QMainWindow):
 
     # ------------------------------------------------------------------
     def closeEvent(self, event):  # noqa: N802 - Qt 命名
+        _close_trace("closeEvent 进入")
+        # 先让窗口消失：后面的清理（停线程、回收 6 个承载控件）实测要
+        # 100~500ms，卡多久屏幕就空白多久。
+        self.hide()
+        _close_trace("窗口已 hide")
         if self._maximize_refit_timer is not None:
             self._maximize_refit_timer.stop()
+        _close_trace("refit 定时器已停")
         if self.deck is not None:
             self.deck.stop()
+        _close_trace("deck 已停")
+        # 页内控件背后的 PLC 后台线程（心跳 / 重连 / 数据轮询）必须显式停止。
+        # 不停的话：PLC 未上线时重连线程会一直刷"尝试重连"，而且 DataBroker
+        # 的 QThread 随对象回收时仍在运行，Qt 会直接终止进程。
+        # shutdown() 只置停止标志、不 join，所以不会把关窗拖慢。
+        for index, model in enumerate(getattr(self, "_page_models", ())):
+            _close_trace(f"model{index} shutdown 前")
+            try:
+                model.shutdown()
+            except Exception as exc:  # noqa: BLE001
+                _close_trace(f"model{index} shutdown 异常: {exc!r}")
+            _close_trace(f"model{index} shutdown 后")
+        self._page_models = []
+        _close_trace("models 全部停止")
+        # 必须在 super().closeEvent 之前：窗口一关，承载视图随宿主销毁，
+        # QGraphicsProxyWidget 析构只把控件 setParent(None)，不 hide 也不删，
+        # 页内控件就变成无父的顶层窗口留在屏幕上（盖住工具选择页）。
+        try:
+            self.scene.release_embedded_widgets(trace=_close_trace)
+        except RuntimeError:
+            pass
+        _close_trace("承载控件已回收")
         super().closeEvent(event)
+        _close_trace("closeEvent 结束")
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
