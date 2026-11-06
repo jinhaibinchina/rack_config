@@ -26,12 +26,19 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, QSizeF, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QTextEdit
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from Designer.Core.elements import rect_element, widget_element
+from Designer.Core.embedded_widget_layer import EmbeddedWidgetLayer
 from Designer.Core.my_common import SceneMode
 from tools.bench_scene import DEFAULT_PAGE, build_scene
 
@@ -210,12 +217,14 @@ def main() -> int:
     scene.setFocus()
     app.processEvents()
 
-    # --- 2c. 在控件上拖动 = 平移画布 ---------------------------------
-    # 场景的平移是 offset += 鼠标位移，但控件矩形上的事件被 overlay 视图接走，
-    # 所以承载层要把"拖动"识别出来交回场景。这里直接构造鼠标事件序列，
-    # 验证位移量与视图跟随（真实点击路径由 2b 覆盖）。
-    def send_mouse(etype, global_pos, button, buttons):
-        local = viewport.mapFromGlobal(global_pos)
+    # --- 2c. 拖动：非交互区域 = 平移画布，按住语义控件 = 直通 ----------
+    # 承载层对左键做"延迟派发"：按下先扣住，超过阈值判为拖动画布，没超阈值
+    # 判为点击。但按在按钮 / 输入框 / 表格 / 文本区这类控件上必须**立刻直通**
+    # ——否则按住期间控件收不到 press，点动按钮会在松手那一刻才补发
+    # press+release，业务上看到的就是"按下即抬起"。
+    def send_mouse(etype, global_pos, button, buttons, target=None):
+        widget = target if target is not None else viewport
+        local = widget.mapFromGlobal(global_pos)
         ev = QMouseEvent(
             etype,
             QPointF(local),
@@ -224,15 +233,19 @@ def main() -> int:
             buttons,
             Qt.KeyboardModifier.NoModifier,
         )
-        QApplication.sendEvent(viewport, ev)
+        QApplication.sendEvent(widget, ev)
 
     center = QPoint(viewport.width() // 2, viewport.height() // 2)
-    offset_before = QPointF(scene.offset)
-    geo_before = QPointF(layer.view.geometry().topLeft())
-    start_global = viewport.mapToGlobal(center)
 
+    # (a) 文本区上按住：必须立刻直通，控件自己吃掉整个手势
+    offset_before = QPointF(scene.offset)
+    start_global = viewport.mapToGlobal(center)
     send_mouse(QEvent.Type.MouseButtonPress, start_global,
                Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton)
+    app.processEvents()
+    check("文本区按住立刻直通（press 不被扣住）",
+          layer._press_pending is False,
+          f"_press_pending={layer._press_pending}")
     for step in range(1, 5):
         send_mouse(
             QEvent.Type.MouseMove,
@@ -247,10 +260,50 @@ def main() -> int:
         Qt.MouseButton.NoButton,
     )
     app.processEvents()
+    check("文本区上拖动不平移画布", scene.offset == offset_before,
+          f"offset={scene.offset.x():.0f},{scene.offset.y():.0f}")
+
+    # (b) 另建一个承载「容器 + 标签」的层：按在卡片空白处仍能拖画布
+    canvas_layer = EmbeddedWidgetLayer(scene)
+    canvas_holder = QWidget()
+    canvas_holder.setMinimumSize(1, 1)
+    canvas_lay = QVBoxLayout(canvas_holder)
+    canvas_lay.setContentsMargins(0, 0, 0, 0)
+    canvas_lay.addWidget(QLabel("空白区域"))
+    canvas_layer.set_widget(canvas_holder)
+    canvas_layer.apply(QPointF(140.0, 120.0), QSizeF(160.0, 120.0), 1.0, 0.0)
+    canvas_layer.set_visible(True)
+    app.processEvents()
+
+    canvas_viewport = canvas_layer._viewport
+    canvas_center = QPoint(canvas_viewport.width() // 2, canvas_viewport.height() // 2)
+    offset_before = QPointF(scene.offset)
+    geo_before = QPointF(layer.view.geometry().topLeft())
+    start_global = canvas_viewport.mapToGlobal(canvas_center)
+
+    send_mouse(QEvent.Type.MouseButtonPress, start_global,
+               Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+               canvas_viewport)
+    for step in range(1, 5):
+        send_mouse(
+            QEvent.Type.MouseMove,
+            QPoint(start_global.x() + step * 10, start_global.y() + step * 5),
+            Qt.MouseButton.NoButton,
+            Qt.MouseButton.LeftButton,
+            canvas_viewport,
+        )
+    send_mouse(
+        QEvent.Type.MouseButtonRelease,
+        QPoint(start_global.x() + 40, start_global.y() + 20),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.NoButton,
+        canvas_viewport,
+    )
+    app.processEvents()
 
     drag_delta = scene.offset - offset_before
     geo_delta = QPointF(layer.view.geometry().topLeft()) - geo_before
-    check("控件上左键拖动可平移画布",
+    check("非交互区域上拖动可平移画布",
           abs(drag_delta.x() - 40.0) <= 1.5 and abs(drag_delta.y() - 20.0) <= 1.5,
           f"offset 位移 {drag_delta.x():.0f},{drag_delta.y():.0f}（期望 40,20）")
     check("平移时承载视图跟着移动",
@@ -258,19 +311,24 @@ def main() -> int:
           and abs(geo_delta.y() - drag_delta.y()) <= 1.5,
           f"view 位移 {geo_delta.x():.0f},{geo_delta.y():.0f}")
 
-    # 微动（小于拖动阈值）不能触发平移，仍按点击处理
+    # 微动（小于拖动阈值）不能触发平移
     offset_after_drag = QPointF(scene.offset)
-    tap_global = viewport.mapToGlobal(center)
+    tap_global = canvas_viewport.mapToGlobal(canvas_center)
     send_mouse(QEvent.Type.MouseButtonPress, tap_global,
-               Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton)
+               Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+               canvas_viewport)
     send_mouse(QEvent.Type.MouseMove, QPoint(tap_global.x() + 2, tap_global.y() + 1),
-               Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton)
+               Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton,
+               canvas_viewport)
     send_mouse(QEvent.Type.MouseButtonRelease, QPoint(tap_global.x() + 2, tap_global.y() + 1),
-               Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton)
+               Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton,
+               canvas_viewport)
     app.processEvents()
     check("微动不超过阈值时不平移", scene.offset == offset_after_drag,
           f"offset={scene.offset.x():.0f},{scene.offset.y():.0f}")
-    check("微动按点击处理（控件获焦）", layer.widget.hasFocus())
+
+    canvas_layer.dispose()
+    app.processEvents()
 
     # 还原平移，避免影响后面的几何断言
     scene.offset = offset_before
@@ -340,6 +398,44 @@ def main() -> int:
     check("重建后几何仍正确", close_rect(geo_re, exp_re, 3.5),
           f"{geo_re.x():.0f},{geo_re.y():.0f} {geo_re.width():.0f}x{geo_re.height():.0f} "
           f"vs 预期 {exp_re.x():.0f},{exp_re.y():.0f} {exp_re.width():.0f}x{exp_re.height():.0f}")
+
+    # --- 4c. fit_widget_size：按控件像素尺寸反推图元尺寸 ---------------
+    #
+    # 回归点：``fit_widget_size(w, h)`` 走 ``change_size`` 改图元尺寸，换算口径
+    # 必须和 ``_view_design_size`` 互逆 —— 改完以后控件自己的像素尺寸就应该
+    # 正好等于传进来的 (w, h)，既不拉伸也不裁切；同时旋转中心（当前 30°）不能
+    # 被顶跑。
+    center_before_fit = item.get_scene_center_pos()
+    pivot_before_fit = item.get_scene_transformOriginPoint()
+    fitted = item.fit_widget_size(420, 260)
+    scene._sync_embedded_widgets_geometry()
+    check("fit_widget_size 返回换算后的场景尺寸",
+          abs(fitted.width() - 260.0 * scene.scene_units_per_grid_x / scene.grid_size) <= 0.5
+          and abs(fitted.height() - 420.0 * scene.scene_units_per_grid_y / scene.grid_size) <= 0.5,
+          f"{fitted.width():.1f}x{fitted.height():.1f}")
+    check("fit_widget_size 后控件自身像素尺寸 = 传入尺寸",
+          abs(layer.widget.width() - 420) <= 1 and abs(layer.widget.height() - 260) <= 1,
+          f"{layer.widget.width()}x{layer.widget.height()} (期望 420x260)")
+    check("fit_widget_size 与 widget_pixel_size 互逆",
+          abs(item.widget_pixel_size().width() - 420.0) <= 0.5
+          and abs(item.widget_pixel_size().height() - 260.0) <= 0.5,
+          f"{item.widget_pixel_size().width():.1f}x{item.widget_pixel_size().height():.1f}")
+    check("fit_widget_size 后几何与旋转包围盒一致",
+          close_rect(QRectF(layer.view.geometry()),
+                     expected_geometry(item, scene, 1.0, item.sceneTransform().get_rotation_angle()),
+                     3.5),
+          f"{layer.view.geometry().width()}x{layer.view.geometry().height()}")
+    check("fit_widget_size 不移动控件中心",
+          abs(item.get_scene_center_pos().x() - center_before_fit.x()) <= 0.5
+          and abs(item.get_scene_center_pos().y() - center_before_fit.y()) <= 0.5,
+          f"({center_before_fit.x():.1f},{center_before_fit.y():.1f}) -> "
+          f"({item.get_scene_center_pos().x():.1f},{item.get_scene_center_pos().y():.1f})")
+    check("fit_widget_size 不动旋转中心",
+          abs(item.get_scene_transformOriginPoint().x() - pivot_before_fit.x()) <= 0.5
+          and abs(item.get_scene_transformOriginPoint().y() - pivot_before_fit.y()) <= 0.5,
+          f"({pivot_before_fit.x():.1f},{pivot_before_fit.y():.1f}) -> "
+          f"({item.get_scene_transformOriginPoint().x():.1f},"
+          f"{item.get_scene_transformOriginPoint().y():.1f})")
 
     if args.shot:
         out_dir = args.shot

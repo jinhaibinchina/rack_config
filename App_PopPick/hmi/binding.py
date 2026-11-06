@@ -16,6 +16,9 @@
   ``front_page_changed`` 驱动。值仍全量缓存（切页可立刻重灌），但控件重绘
   与初始订阅只覆盖这两页；后台页不滚动、不追加日志。放大后掉帧的主因是
   363 个点 × 7 个控件树的重复重绘，不是网络推送。
+* **卡片尺寸跟着页面走**：挂载后统一用 ``widget_element.fit_widget_size``
+  把卡片校正到「正好容纳 ``page_size`` 像素的页面控件」，不再依赖场景 JSON
+  里写死的宽高（见 :data:`PAGE_PIXEL_SIZE`）。
 
 接入 ``PopPickWindow``（不改现有文件，在 ``__init__`` 末尾加三行）::
 
@@ -32,13 +35,41 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, QSize, QSizeF, QTimer, Signal
 from PySide6.QtWidgets import QWidget
 
 from common.com.opcua import OpcConfig, OpcUaManager, keep_alive_until_stopped
 
 from .pages import HmiPage, make_page_specs
 from .tag_catalog import TagCatalog, clean_text, format_value
+
+#: 页面控件在屏幕上的设计尺寸（像素，``scale=1.0``）。
+#:
+#: 7 张卡片统一按这一个口径落到场景里：挂载完页面后调用
+#: ``widget_element.fit_widget_size`` 把卡片的场景尺寸校正成「正好容纳这么大
+#: 的控件」。页面内部是按 :data:`App_PopPick.hmi.widgets.PAGE_SIZE` 排的
+#: **750×1000 竖版**，控件必须正好这么大，``ScrollBody`` 才会 1:1 呈现
+#: （给 1000×750 会算成缩放 0.79，整页发虚）。
+#:
+#: 卡片中心 / 角度 / Z 值都不动（见 :meth:`HmiPagesHost._fit_card`），所以
+#: 扇形位姿、槽位判定和 ``PageDeck`` 的动画全不受影响。AGV 90° 映射下
+#: 750×1000 的控件对应 **1000×750** 的场景矩形（宽高互换）。
+PAGE_PIXEL_SIZE = QSize(750, 1000)
+
+
+def _as_pixel_size(value: Any) -> QSize | None:
+    """归一化「页面像素尺寸」参数：``None`` / QSize / ``(w, h)`` / 有宽高的对象。"""
+    if value is None:
+        return None
+    if isinstance(value, QSize):
+        return QSize(value)
+    if isinstance(value, (tuple, list)):
+        if len(value) != 2:
+            raise ValueError("页面尺寸需要 (width, height)")
+        return QSize(int(value[0]), int(value[1]))
+    if hasattr(value, "width") and hasattr(value, "height"):
+        return QSize(int(value.width()), int(value.height()))
+    raise TypeError("页面尺寸需要 QSize / (width, height) / None")
 
 
 class HmiClient(QObject):
@@ -122,6 +153,7 @@ class HmiPagesHost(QObject):
                  user: str = "", password: str = "", demo: bool = False,
                  active_only: bool = True, flush_ms: int = 100,
                  static_background: bool = True,
+                 page_size: Any = PAGE_PIXEL_SIZE,
                  parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.catalog = catalog or TagCatalog()
@@ -141,6 +173,8 @@ class HmiPagesHost(QObject):
         self._active_page_ids: set[str] = set()
         #: 后台页改用位图快照渲染（见 :meth:`apply_static_pages`）
         self.static_background = bool(static_background)
+        #: 页面控件的目标像素尺寸；``None`` 表示不校正卡片（沿用场景 JSON）
+        self.page_pixel_size = _as_pixel_size(page_size)
         self._card_to_page: dict[str, str] = {
             self.card_of(spec.page_id): spec.page_id for spec in self._specs
         }
@@ -300,6 +334,56 @@ class HmiPagesHost(QObject):
                 continue
             # 必须在场景切到 Run 之后设置；承载层若已存在会立即重建控件
             card.set_widget_factory(self._make_factory(spec))
+            # 控件建好后按页面像素尺寸校正卡片：场景 JSON 里写的是 3000×4000
+            # （旧的 6 卡快照是 4000×3000），靠这一步统一到同一观感。
+            self._fit_card(card)
+
+    def _fit_card(self, card) -> None:
+        """把卡片场景尺寸校正成「正好容纳 :attr:`page_pixel_size` 的控件」。
+
+        用 ``widget_element.fit_widget_size`` 做换算（AGV 90° 映射下控件宽对应
+        场景高），只改尺寸，**不动位姿**：``change_size`` 是绕旋转中心缩放的，
+        卡片的 ``m_origin`` 可能是扇形支点而不是包围盒中心，缩放后中心会漂；
+        这里记下缩放前的场景中心，再把中心推回去，``PageDeck`` 读到的
+        center/angle/Z 与设计文件一致，扇形和槽位判定都不受影响。
+        """
+        size = self.page_pixel_size
+        if size is None or size.isEmpty():
+            return
+        fitter = getattr(card, "fit_widget_size", None)
+        if not callable(fitter):
+            return                      # 普通矩形卡片（不是 widget 图元）不碰
+        try:
+            before = QSizeF(card.getSize())
+            center = card.get_scene_center_pos()
+            fitter(size)
+            after = QSizeF(card.getSize())
+            shift = center - card.get_scene_center_pos()
+            if abs(shift.x()) > 0.5 or abs(shift.y()) > 0.5:
+                # setPos 对 widget_element 会顺带同步承载控件的几何
+                card.setPos(card.pos() + shift)
+            name = card.get_name()
+        except RuntimeError:
+            # 卡片 / 承载视图在关窗流程里被 C++ 侧提前销毁
+            return
+        if (abs(before.width() - after.width()) < 1.0
+                and abs(before.height() - after.height()) < 1.0):
+            return
+        self._on_message(
+            f"卡片 {name} 尺寸 {before.width():.0f}×{before.height():.0f}"
+            f" → {after.width():.0f}×{after.height():.0f}"
+            f"（适配 {size.width()}×{size.height()} 像素控件）", "info")
+
+    def refit_cards(self) -> None:
+        """按 :attr:`page_pixel_size` 重新校正所有卡片尺寸。
+
+        ``_install()`` 已经调过一次；场景被重新反序列化（卡片按 JSON 重建、
+        尺寸回到写死值）或运行时改了 ``page_pixel_size`` 之后需要再调一次。
+        """
+        for spec in self._specs:
+            card = self._scene.findItemByName(self.card_of(spec.page_id))
+            if card is not None:
+                self._fit_card(card)
 
     # ------------------------------------------------------------------
     # 运行
@@ -422,12 +506,16 @@ class HmiPagesHost(QObject):
     # 诊断
     # ------------------------------------------------------------------
     def report(self) -> str:
+        size = self.page_pixel_size
+        size_line = ("页面尺寸: 未校正（沿用场景 JSON）" if size is None
+                     else f"页面尺寸: {size.width()}×{size.height()} 像素（卡片按此校正）")
         lines = [
             f"端点: {self.endpoint}",
             f"页面: {len(self._specs)} 个，全表订阅点: {len(self.subscribe_keys)} 个",
             f"已挂载卡片: {len(self._specs) - len(self._missing)}/{len(self._specs)}",
             f"刷新范围: {'最前面两页 ' + ', '.join(sorted(self._active_page_ids)) if self._active_page_ids else '全部页面（尚未设置活跃页）'}"
             f"｜当前订阅 {len(self.active_keys()) if self.active_only else len(self.subscribe_keys)} 点",
+            size_line,
         ]
         if self._missing:
             lines.append("未挂载: " + "、".join(
@@ -448,12 +536,19 @@ def attach_hmi_pages(scene_manager, *, parent: QObject | None = None,
                      user: str = "", password: str = "", demo: bool = False,
                      active_only: bool = True, flush_ms: int = 100,
                      static_background: bool = True,
+                     page_size: Any = PAGE_PIXEL_SIZE,
                      auto_start: bool = True) -> HmiPagesHost:
     """把 7 个页面挂到场景卡片上，返回宿主对象（窗口要自己持有引用）。
 
     只刷新前两页时建议 ``auto_start=False``：先
     ``host.set_active_cards(window.front_pages())`` 再 ``host.start()``，
     初始订阅就只覆盖这两页。
+
+    ``page_size`` 是页面控件在屏幕上的目标像素尺寸（默认
+    :data:`PAGE_PIXEL_SIZE` = 750×1000，与页面设计尺寸一致）。挂载时用
+    ``widget_element.fit_widget_size`` 把卡片场景尺寸校正成正好容纳这个尺寸，
+    所以场景 JSON 里写多少（当前快照是 3000×4000）都会被拉回同一套观感；
+    传 ``None`` 则不校正、完全沿用场景文件。
 
     ``flush_ms`` 是数值刷新的合流间隔：PLC 推送先攒起来，每 ``flush_ms``
     毫秒统一灌进控件一次（默认 100ms = 10Hz）。页面控件在
@@ -468,7 +563,7 @@ def attach_hmi_pages(scene_manager, *, parent: QObject | None = None,
         scene_manager, parent=parent, mapping=mapping, catalog=catalog,
         endpoint=endpoint, user=user, password=password, demo=demo,
         active_only=active_only, flush_ms=flush_ms,
-        static_background=static_background,
+        static_background=static_background, page_size=page_size,
     )
     if auto_start:
         host.start()

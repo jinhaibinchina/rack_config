@@ -231,6 +231,12 @@ def _make_designer(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
 
     return DesignWindow()
 
+def _make_motion_editer(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
+
+    from App_PopPick_Motion_Editer.robot_teach_pendant import MainWindow
+
+    return MainWindow()
+
 TOOLS: tuple[Tool, ...] = (
     Tool(
         key="rack",
@@ -253,6 +259,13 @@ TOOLS: tuple[Tool, ...] = (
         badge="POPPICK",
         factory=_make_pop_pick,
     ),
+     Tool(
+            key="PopPickMotionEditer",
+            title="PopPick 运动编排器",
+            subtitle="高密度货架拣选工作站：运动编排",
+            badge="POPPICKMOTION",
+            factory=_make_motion_editer,
+        ),
     Tool(
         key="logplot",
         title="RCD 日志解析工具",

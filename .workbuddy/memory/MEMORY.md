@@ -31,6 +31,7 @@
 - `set_widget_factory` 要的是可调用对象 `factory(host) -> QWidget`，不是控件实例；传实例会在重建时报 `TypeError: 'xxx' object is not callable`。延迟创建用闭包/lambda
 - `set_scene_mode(Run)` 在 `load_element_info_run_mode()` **之前**调用时（`RackStoresWindow` 就是这样），切换那一刻场景还是空的，加载完必须补一次 `_sync_embedded_widgets(True)`，否则承载层永远不创建，运行态连占位框都不画 → 看起来"控件没加载出来"。已在 `load_element_info_run_mode` 末尾补
 - **控件上的左键语义**：承载视图把鼠标事件全接走了，场景原本"左键拖动平移"在控件上就失效。`EmbeddedWidgetLayer` 用延迟派发解决：press 先扣住 → 移动超过 `startDragDistance` 判为拖动画布（改 `scene.offset` + `update_coordinate` + `_sync_embedded_widgets_geometry`）→ 没超阈值则在 release 时补发 press/release 给 viewport（照常点击/取焦）。两次快速点击还会补一个 `MouseButtonDblClick`，否则双击在控件里失效。滚轮不拦（冒泡给场景缩放）
+  - **例外：有「按住」语义的控件必须立刻直通**（`PRESS_THROUGH_TYPES` = 按钮/输入框/表格/滑块/下拉/文本区，外加带 `_clickable` 的自绘灯）。否则按住期间控件收不到 press，点动按钮会在松手那一帧才连发 `pressed`+`released`，业务侧表现为「按下即抬起」。命中页面根/卡片空白仍走延迟派发，画布照常能拖。嵌套承载（页面自己就是一个 `QGraphicsView`，如 PopPick 的 `ScrollBody`）靠把 `QGraphicsView` 放进 `PRESS_THROUGH_TYPES` 放行；**宿主 `is_pan_enabled()` 为 False 时整个延迟派发直接跳过**（平移禁用后它只剩副作用）。回归 `tools/verify_press_through.py` + `tools/verify_hmi_press.py`
 - 控件必须先 `setMinimumSize(1,1)`（给 0,0 无效），否则 `proxy.resize` 被 minimumSizeHint 卡住（QPushButton 宽 80），包围盒偏大、控件被裁。**只对被承载的顶层 widget 这么做**（`EmbeddedWidgetLayer.set_widget` 自己也会再设一遍）；给内部每个子控件都设会让 QGridLayout 认为一行可压到 1px，密集页面文字直接叠成一条线。子控件要显式给合理的最小高度（按钮 28 / 数值行 22 / 写入行 30）
 - 尺寸用 `proxy.resize(w,h)` 驱动，不要 `widget.setFixedSize`（fix 之后 proxy 的 boundingRect 不跟手）
 - 几何：中心 = `pos_viewToWindow(sceneToView(get_scene_center_pos()))`，尺寸 = `scene_size.height/width × grid/units`（AGV 下 w/h 是交换的），view 的 geometry = 旋转后包围盒 × scale
@@ -47,3 +48,38 @@
 - 「主」「副」按钮通过 `global_config.set_axis_visible()` → `axis_visibility_change` 信号广播，别只改 bool（不会有界面反应）
 - 回归固定跑 `.venv/Scripts/python.exe tools/verify_log_plot_pyside6.py`（离屏 19 项）。离屏下 `menuBar().actions()` 的 QAction wrapper 要和 QMenu 一起持有引用，否则 Python GC 会把 C++ QMenu 删掉，读 `actions()` 报 `RuntimeError: already deleted`
 
+
+# 图元几何约定
+- `change_size` 的缩放锚点：无父图元 = 旋转中心（`m_origin`，不再被覆盖成新中心，保证基点在场景中的位置不变）；有父图元 = 左上角（组内子图元旧语义）。辅助函数 `_resize_anchor_local` / `_axis_scale` / `_scale_about` 在 `elements.py` 顶部
+- 回归：`tools/verify_resize_anchor.py`（23 项，离屏）覆盖 rect/circle/text/triangle + 组内外语义
+- 图元尺寸 ↔ 控件像素：`widget_element.fit_widget_size(w,h)`（也收 QWidget/QSize/QSizeF/(w,h)）走 `_scene_size_from_view` + `change_size`，改完 `widget.size()` 正好等于传入尺寸；反向自检用 `widget_pixel_size()`。AGV 90° 下控件宽对应场景高（750×1000 控件 = 1000×750 场景）
+- PopPick 页面卡片尺寸由页面控件反推：`App_PopPick/hmi/binding.py` 的 `PAGE_PIXEL_SIZE=1000×750` + `HmiPagesHost._fit_card()`（挂载后 `fit_widget_size`）；`page_size=None` 关闭。**卡片 m_origin 是扇形支点，改尺寸后必须把场景中心推回去**，否则 PageDeck 扇形错位
+
+# App_PopPick HMI 7 页（OPC UA 页面控件）
+- 画布固定 **750×1000、1:1 不缩放**：`widgets.PAGE_SIZE` / `HEADER_HEIGHT=52` / `BODY_SIZE=750×948`；容器是 `ScrollBody(design=BODY_SIZE)`（QGraphicsView + ProxyWidget），`_refit()` 把 `fitInView` 得到的 scale 钉回 1.0。**装不下就改布局，不许缩放/滚动**，用 `body.overflow()` 量（负数=装得下）
+- `binding.PAGE_PIXEL_SIZE` 必须是 `QSize(750, 1000)`（页面设计尺寸）。给 1000×750 会被 fitInView 缩到 0.79 整页发虚。AGV 90° 下 750×1000 控件 = 场景 1000×750 矩形（场景 4:1 单位）
+- **`QSizePolicy.Ignored` + `setMinimumWidth` 会让同行控件重叠**：Ignored 让布局项 `sizeHint()` 恒为 0 → 按 0 宽排位 → `setGeometry` 被最小宽度 clamp → 尺寸变大位置没变。要"文字不撑宽"就覆写 `minimumSizeHint()=minimumWidth()`，sizePolicy 用 `Preferred`
+- 卡片挂在 `QGraphicsProxyWidget` 里，`page.findChildren(Card)` 找不到（父子链到代理项就断），要用 `self.body.content.findChildren(...)`
+- `QGridLayout.setRowStretch(行数之外的行, 1)` 在 Qt6 里**无效**，卡片底部留白要真的塞 `QSpacerItem(0,0,Minimum,Expanding)`
+- `HmiPage`：`card(title, weight)` 竖直权重按"每段需要的高度"分配；`row(*w, weight)` 并排；`strip(widgets)` 单排；`block(widgets, columns)` 多行固定列数（灯阵 6/5 列对齐）
+- 字号一律 `_pixel_font(w, px)`，**不能靠 QSS**：页面根 `QWidget { font-size }` 是类型选择器，会盖掉子控件的 `setStyleSheet("font-size")`
+- `DataTable` 行高 `Stretch` 铺满；行高不合适调卡片权重，`setMaximumSectionSize` 只在 Interactive/Fixed 下生效
+- 回归：`.venv/Scripts/python.exe tools/verify_hmi_layout.py --shot build/hmi_layout`（7 页 1:1、无重叠、无滚动条）；场景挂载 `tools/preview_hmi_pages.py --attach`
+- 改 `pages.py`（CRLF）禁用 `read_text().replace("\n","\r\n")` 写法，会写坏成 `\r\r\n`；用 `open(..., newline="")`
+
+# 打包（工具集.spec / PyInstaller 6）
+- **必须用本项目 .venv 打包**：`.venv/Scripts/python.exe -m PyInstaller 工具集.spec --noconfirm`。PyInstaller 收集模块用的是**它自己所在解释器**的 site-packages，spec 里的 `pathex` 管不着；用 `D:/rack/rack_config/.venv` 的 pyinstaller 打包过，那边没装 asyncua，`hiddenimports` 静默失败只在 warn 里留一行，产物照出、打开才报错
+- spec 里已加**前置自检**（find_spec 检查 PySide6/asyncua/aiosqlite/sortedcontainers/pytz/dateutil/cryptography/snap7/matplotlib/PIL），缺包直接 SystemExit 并打印解释器路径，别再删掉
+- `asyncua` 要 `collect_submodules`（112 个子模块），只写顶层包名会漏 `asyncua.client.*` / `asyncua.ua`
+- 数据文件三套：`res` → `res`；`App_LogPlot/app/plot_moudle/{cfg,data,ui,ico,templates}` → **根目录**（resource_manager 把 `_MEIPASS` 当根）；`App_PopPick/hmi/data` → **保持原相对路径**（tag_catalog 用 `Path(__file__).parent/"data"`）
+- COLLECT 会 rmtree 旧 `dist/工具集`；被安全策略拦下时先 `mv` 走再跑，Analysis 有缓存，二次跑只要 1 分钟
+- 冒烟：`cd dist/工具集 && QT_QPA_PLATFORM=offscreen timeout 25 ./工具集.exe --app PopPick --no-plc`，exit=124 表示窗口活着没崩
+
+# packTool.py（生成 spec 的 GUI 工具）
+- **`工具集.spec` 是 packTool 生成的**：点「保存 Spec 文件」会覆盖人工修改，修 spec 必须同步修工具。配置在 `~/.python_packager_spec_config.json`
+- 打包命令必须 `[UI 里指定的 python.exe, '-m', 'PyInstaller', ...]`，**别再用 `shutil.which('pyinstaller')` 优先**；PATH 指到别的 venv 会静默缺库
+- 打包返回码 0 不代表成功：要扫 `build/<spec名>/warn-*.txt` 的 `missing module named`，声明过的隐藏导入缺失必须判失败
+- 隐藏导入要生成 `collect_submodules`（UI 开关默认开）；依赖自检要在**打包用的解释器**里跑 `find_spec`，GUI 自己的解释器不算
+- 资源必须有「包内目标目录」：`resource_manager` 同级目录（plot_moudle 的 ui/cfg/ico/data）要**摊平**，`Path(__file__).parent/'data'` 类（App_PopPick/hmi/data）要**保持层级**；扫描器检测到同级 `resource_manager.py` 会自动建议摊平
+- 回归：`.venv/Scripts/python.exe tools/verify_pack_tool.py`（离屏 19 项）
+- **冒烟别跑 `--app Designer`**：DesignWindow 关窗会重写 `Designer/Core/data.json/datas/design/pages/page_*.json` 和 `project.json`（含离线 offscreen 冒烟），跑完必须 `git checkout` 还原

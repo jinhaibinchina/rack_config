@@ -16,6 +16,40 @@ def _log_destroy(kind: str, item: Any) -> None:
         print(f"销毁{kind} id:{item.id()} name：{item.get_name()}")
 
 
+# ---------------------------------------------------------------------------
+# 改尺寸锚点（change_size 用）
+#
+# 属性面板改宽高时，图元需要一个“不动的点”作为缩放基准。以前一律以左上角
+# （_head_pos / _topLeft）为基准，图元转过去之后改尺寸就会沿着旋转方向滑动。
+# 现在的规则：
+#   * 没有父图元 —— 锚点取旋转中心（变换原点 m_origin），图元绕着它长大/缩小，
+#     旋转中心在场景中的位置不变，之后再用 setRotation / 设置基点都不会跑偏；
+#   * 有父图元（组内子图元）—— 仍是左上角锚点，由父图元的等比缩放逻辑驱动，
+#     避免和父图元的局部坐标系打架。
+# ---------------------------------------------------------------------------
+
+def _axis_scale(new_value: float, old_value: float) -> float:
+    """单轴缩放系数；旧尺寸为 0（几何还没建起来）时按 1.0 处理。"""
+    if old_value <= 0.0:
+        return 1.0
+    return new_value / old_value
+
+
+def _resize_anchor_local(item: base_element) -> QPointF | None:
+    """改尺寸的缩放锚点（图元局部坐标）；None 表示沿用左上角锚点。"""
+    if item.is_has_parent():
+        return None
+    return QPointF(item.m_origin.x(), item.m_origin.y())
+
+
+def _scale_about(anchor: QPointF, point: QPointF, sx: float, sy: float) -> QPointF:
+    """局部点按 (sx, sy) 绕锚点缩放。"""
+    return QPointF(
+        anchor.x() + (point.x() - anchor.x()) * sx,
+        anchor.y() + (point.y() - anchor.y()) * sy,
+    )
+
+
 
 class line_element(base_element):
     
@@ -806,38 +840,57 @@ class rect_element(base_element):
             return
 
     def change_size(self,w: float,h: float) -> None:
-        self._scene_size_last =copy.copy(self.scene_size)
-        # self.scene_size.setWidth(w)
-        # self.scene_size.setHeight(h)
-        self.setSize(w,h)
-        self._bottomRight =self._end_pos  =   QPointF(w,h) + self._head_pos
-        self._center_pos = (self._head_pos + self._end_pos)/2.0
-        self._topRight   = QPointF(w,0) + self._head_pos
-        self._bottomLeft = QPointF(0,h) + self._head_pos
+        """"属性设置改变尺寸
 
-        # center_pos_scene = self.mapToScene(self._center_pos)
-        # self.m_pos_init = self.m_pos = center_pos_scene
-        self.setTransformOriginPoint(self._center_pos)
-        
+        没有父图元时绕旋转中心（变换原点）缩放：旋转中心在场景中的位置不变，
+        图元绕着它长大/缩小；有父图元（组内子图元）时仍以左上角为基准。
+        """
+        old_size = QSizeF(self.scene_size)
+        self._scene_size_last =copy.copy(self.scene_size)
+
+        anchor = _resize_anchor_local(self)
+        if anchor is None:
+            head = QPointF(self._head_pos)
+        else:
+            # 无父图元：左上角绕旋转中心等比移位，旋转中心的场景位置保持不变
+            head = _scale_about(anchor, self._head_pos,
+                                _axis_scale(w, old_size.width()),
+                                _axis_scale(h, old_size.height()))
+
+        self.setSize(w,h)
+        self._topLeft     = self._head_pos = head
+        self._bottomRight = self._end_pos  = QPointF(w,h) + head
+        self._center_pos  = (head + self._end_pos)/2.0
+        self._topRight    = QPointF(w,0) + head
+        self._bottomLeft  = QPointF(0,h) + head
+
+        if anchor is None:
+            # 有父图元：保持原语义，旋转中心跟着新包围盒中心走
+            self.setTransformOriginPoint(self._center_pos)
+        # 无父图元：保留（用户用右键设置过的）旋转中心，不再覆盖成新中心
+
         self.update_boundingRect()
 
         if self.is_has_child():
-            x_scale,y_scale = self.scene_size.width()/self._scene_size_last.width() , self.scene_size.height()/self._scene_size_last.height()
+            # 子图元等比缩放围绕同一个锚点，否则它们会和父图元的新坐标框错位
+            anchor_scene = self.mapToScene(anchor if anchor is not None else self._head_pos)
+            x_scale = _axis_scale(w, old_size.width())
+            y_scale = _axis_scale(h, old_size.height())
             for child in self.childItems():
-                p1 =    child.get_scene_topLeft()               - self.get_scene_head_pos()
+                p1 =    child.get_scene_topLeft()                - anchor_scene
                 dpos_head = QPointF(p1.x()*x_scale ,p1.y()*y_scale)   
-                p2 =    child.get_scene_bottomRight()                - self.get_scene_head_pos()
+                p2 =    child.get_scene_bottomRight()            - anchor_scene
                 dpos_end  = QPointF(p2.x()*x_scale ,p2.y()*y_scale)
-                p3 =    child.get_scene_topRight()               - self.get_scene_head_pos()
+                p3 =    child.get_scene_topRight()               - anchor_scene
                 dpos_topRight = QPointF(p3.x()*x_scale,p3.y()*y_scale) 
 
                 a = dpos_topRight - dpos_head
                 b = dpos_topRight - dpos_end
-                w = sqrt(a.x()*a.x() + a.y()*a.y())
-                h = sqrt(b.x()*b.x() + b.y()*b.y())
+                child_w = sqrt(a.x()*a.x() + a.y()*a.y())
+                child_h = sqrt(b.x()*b.x() + b.y()*b.y())
                
-                child.change_position(dpos_head+ self.get_scene_head_pos())
-                child.change_size(w,h)
+                child.change_position(dpos_head+ anchor_scene)
+                child.change_size(child_w,child_h)
         else:
             return
     
@@ -1634,6 +1687,80 @@ class widget_element(rect_element):
         scene_w = view_h * units_x / grid
         scene_h = view_w * units_y / grid
         return QSizeF(scene_w, scene_h)
+
+    def fit_widget_size(
+        self,
+        size: QSizeF | QSize | tuple[float, float] | float,
+        height: float | None = None,
+    ) -> QSizeF:
+        """按真实控件的像素尺寸设置图元尺寸，让边框正好容纳控件。
+
+        ``size`` 是控件在 ``scale=1.0`` 时的**像素**宽高（也就是控件自己的
+        ``width()`` / ``height()``），几种写法都支持：
+
+        - ``elem.fit_widget_size(widget)`` —— 直接传挂载的控件本身；
+        - ``elem.fit_widget_size(QSize(750, 1000))`` / ``QSizeF``；
+        - ``elem.fit_widget_size((750, 1000))``；
+        - ``elem.fit_widget_size(750, 1000)`` —— 两个标量。
+
+        换算口径与 ``_view_design_size`` 完全互逆（AGV 90° 映射下控件的宽对应
+        场景的高、控件的高对应场景的宽），所以改完尺寸后下一次
+        ``sync_widget_geometry`` 算出来的控件像素尺寸就是传进来的这个尺寸，
+        不会被拉伸或裁掉。
+
+        缩放锚点沿用 ``change_size``：没有父图元时绕旋转中心（默认即包围盒
+        中心，"从中心向四周长大"），组内子图元按左上角旧语义。
+
+        :return: 换算后的图元场景尺寸；尺寸非法或场景网格参数还没就绪时，
+                 不改动几何，返回当前尺寸。
+        """
+        if height is not None:
+            view_w, view_h = float(size), float(height)  # type: ignore[arg-type]
+        elif isinstance(size, (tuple, list)):
+            view_w, view_h = float(size[0]), float(size[1])
+        elif hasattr(size, "width") and hasattr(size, "height"):
+            # QWidget / QSize / QSizeF 都能走这条：取控件的像素宽高
+            view_w, view_h = float(size.width()), float(size.height())
+        else:
+            raise TypeError(
+                "fit_widget_size 需要 (width, height)、QSize/QSizeF 或 QWidget"
+            )
+
+        if not (view_w > 0.0 and view_h > 0.0):
+            return QSizeF(self.scene_size)
+
+        scene_size = self._scene_size_from_view(view_w, view_h)
+        if not (scene_size.width() > 0.0 and scene_size.height() > 0.0):
+            # 场景网格参数还没就绪 → 换算无从谈起，保持原几何
+            return QSizeF(self.scene_size)
+
+        self.change_size(scene_size.width(), scene_size.height())
+        # change_size 里走的是 setSize，已有承载层时已经同步过一次；这里再补
+        # 一次，保证"改完尺寸立刻看控件到位"，不用等下一次整场景同步。
+        self.sync_widget_geometry()
+        return QSizeF(self.scene_size)
+
+    def widget_pixel_size(self) -> QSizeF:
+        """当前图元尺寸对应的控件像素尺寸（``fit_widget_size`` 的逆运算）。
+
+        与 ``_view_design_size`` 同口径，可直接和控件自己的
+        ``width()`` / ``height()`` 比对，用来判断边框是否正好贴合控件。
+        """
+        return self._view_design_size()
+
+    def fit_widget_size_of_control(self) -> QSizeF:
+        """按当前挂载控件的实际尺寸自动贴合一次。
+
+        取控件的 ``sizeHint``（拿不到时退回 ``size()``），再交给
+        ``fit_widget_size`` 换算。没有挂载控件时返回 ``(0, 0)`` 且不改几何。
+        """
+        widget = self._leaf_widget()
+        if widget is None:
+            return QSizeF(0.0, 0.0)
+        hint = widget.sizeHint()
+        if hint.width() <= 0 or hint.height() <= 0:
+            hint = widget.size()
+        return self.fit_widget_size(hint)
 
     def _auto_fit_size(self, force: bool = False) -> None:
         """按控件的 ``sizeHint`` 更新图元边框（中心锚定）。
@@ -2470,37 +2597,56 @@ class circle_element(base_element):
             return
 
     def change_size(self,w: float,h: float) -> None:
+        """"属性设置改变尺寸
+
+        没有父图元时绕旋转中心（变换原点）缩放：旋转中心在场景中的位置不变；
+        有父图元（组内子图元）时仍以左上角为基准。
+        """
+        old_size = QSizeF(self.scene_size)
         self._scene_size_last =copy.copy(self.scene_size)
+
+        anchor = _resize_anchor_local(self)
+        if anchor is None:
+            top_left = QPointF(self._topLeft)
+        else:
+            top_left = _scale_about(anchor, self._topLeft,
+                                    _axis_scale(w, old_size.width()),
+                                    _axis_scale(h, old_size.height()))
+
         self.setSize(w,h)
         
-        self._bottomRight = self._end_pos  =   QPointF(w,h) + self._topLeft
-        self._center_pos = (self._topLeft + self._end_pos)/2.0
-        self._topRight   = QPointF(w,0) + self._topLeft
-        self._bottomLeft = QPointF(0,h) + self._topLeft
+        self._topLeft     = self._head_pos = top_left
+        self._bottomRight = self._end_pos  = QPointF(w,h) + top_left
+        self._center_pos  = (top_left + self._end_pos)/2.0
+        self._topRight    = QPointF(w,0) + top_left
+        self._bottomLeft  = QPointF(0,h) + top_left
 
+        if anchor is None:
+            # 有父图元：保持原语义，旋转中心跟着新包围盒中心走
+            self.setTransformOriginPoint(self._center_pos)
+        # 无父图元：保留（用户用右键设置过的）旋转中心
 
-
-        self.setTransformOriginPoint(self._center_pos)
-        
         self.update_boundingRect()
 
         if self.is_has_child():
-            x_scale,y_scale = self.scene_size.width()/self._scene_size_last.width() , self.scene_size.height()/self._scene_size_last.height()
+            anchor_scene = self.mapToScene(anchor if anchor is not None else self._topLeft)
+            x_scale = _axis_scale(w, old_size.width())
+            y_scale = _axis_scale(h, old_size.height())
             for child in self.childItems():
-                p1 =    child.get_scene_topLeft()               - self.get_scene_topLeft()
+                p1 =    child.get_scene_topLeft()                - anchor_scene
                 dpos_head = QPointF(p1.x()*x_scale ,p1.y()*y_scale)   
-                p2 =    child.get_scene_bottomRight()                - self.get_scene_topLeft()
+                p2 =    child.get_scene_bottomRight()            - anchor_scene
                 dpos_end  = QPointF(p2.x()*x_scale ,p2.y()*y_scale)
-                p3 =    child.get_scene_topRight()               - self.get_scene_topLeft()
+                p3 =    child.get_scene_topRight()               - anchor_scene
                 dpos_topRight = QPointF(p3.x()*x_scale,p3.y()*y_scale) 
 
                 a = dpos_topRight - dpos_head
                 b = dpos_topRight - dpos_end
-                w = sqrt(a.x()*a.x() + a.y()*a.y())
-                h = sqrt(b.x()*b.x() + b.y()*b.y())
+                child_w = sqrt(a.x()*a.x() + a.y()*a.y())
+                child_h = sqrt(b.x()*b.x() + b.y()*b.y())
                
-                child.change_position(dpos_head+ self.get_scene_topLeft())
-                child.change_size(w,h)
+                child.change_position(dpos_head+ anchor_scene)
+                child.change_size(child_w,child_h)
         else:
             return
     
@@ -3057,47 +3203,65 @@ class text_element(base_element):
             return
 
     def change_size(self,w: float,h: float) -> None:
+        """"属性设置改变尺寸
+
+        没有父图元时绕旋转中心（变换原点）缩放：旋转中心在场景中的位置不变；
+        有父图元（组内子图元）时仍以左上角为基准。
+        """
+        old_size = QSizeF(self._scene_size.width(), self._scene_size.height())
     
         self.setSize(w,h)
         self.width = w
         text_height_view =  self.width* self.m_scene.grid_size  / self.m_scene.scene_units_per_grid_x
         text_width_view  =  self.calc_font_size(text_height_view,self._context)
         self.height       =  text_width_view *self.m_scene.scene_units_per_grid_x/self.m_scene.grid_size 
-
-        self._end_pos  = self._head_pos + QPointF(self.width,self.height)
-    
-        self._center_pos = (self._head_pos + self._end_pos)/2.0
-        self._topRight   = QPointF(self.width,0) + self._head_pos
-        self._bottomLeft = QPointF(0,self.height) + self._head_pos
-        self._scene_size.setWidth(abs(self._end_pos.x()-self._head_pos.x()))
-        self._scene_size.setHeight(abs(self._end_pos.y()-self._head_pos.y()))
         self.width  =self.getSize().width()
 
+        # 高度由宽度换算出来，缩放系数要用换算后的实际尺寸
+        anchor = _resize_anchor_local(self)
+        head = QPointF(self._head_pos)
+        if anchor is not None:
+            head = _scale_about(anchor, head,
+                                _axis_scale(self.width, old_size.width()),
+                                _axis_scale(self.height, old_size.height()))
 
-        self._topLeft  = self._head_pos
+        self._topLeft = self._head_pos = head
+        self._end_pos  = head + QPointF(self.width,self.height)
+    
+        self._center_pos = (head + self._end_pos)/2.0
+        self._topRight   = QPointF(self.width,0) + head
+        self._bottomLeft = QPointF(0,self.height) + head
+        self._scene_size.setWidth(abs(self._end_pos.x()-head.x()))
+        self._scene_size.setHeight(abs(self._end_pos.y()-head.y()))
+
         self._bottomRight = self._end_pos
 
-        self.setTransformOriginPoint(self._center_pos)
-        
+        if anchor is None:
+            # 有父图元：保持原语义，旋转中心跟着新包围盒中心走
+            self.setTransformOriginPoint(self._center_pos)
+        # 无父图元：保留（用户用右键设置过的）旋转中心
+
         self.update_boundingRect()
 
         if self.is_has_child():
-            x_scale,y_scale = self.scene_size.width()/self._scene_size_last.width() , self.scene_size.height()/self._scene_size_last.height()
+            anchor_scene = self.mapToScene(anchor if anchor is not None else self._head_pos)
+            x_scale = _axis_scale(self.width, old_size.width())
+            y_scale = _axis_scale(self.height, old_size.height())
             for child in self.childItems():
-                p1 =    child.get_scene_topLeft()               - self.get_scene_topLeft()
+                p1 =    child.get_scene_topLeft()                - anchor_scene
                 dpos_head = QPointF(p1.x()*x_scale ,p1.y()*y_scale)   
-                p2 =    child.get_scene_bottomRight()                - self.get_scene_topLeft()
+                p2 =    child.get_scene_bottomRight()            - anchor_scene
                 dpos_end  = QPointF(p2.x()*x_scale ,p2.y()*y_scale)
-                p3 =    child.get_scene_topRight()               - self.get_scene_topLeft()
+                p3 =    child.get_scene_topRight()               - anchor_scene
                 dpos_topRight = QPointF(p3.x()*x_scale,p3.y()*y_scale) 
 
                 a = dpos_topRight - dpos_head
                 b = dpos_topRight - dpos_end
-                w = sqrt(a.x()*a.x() + a.y()*a.y())
-                h = sqrt(b.x()*b.x() + b.y()*b.y())
+                child_w = sqrt(a.x()*a.x() + a.y()*a.y())
+                child_h = sqrt(b.x()*b.x() + b.y()*b.y())
                
-                child.change_position(dpos_head+ self.get_scene_topLeft())
-                child.change_size(w,h)
+                child.change_position(dpos_head+ anchor_scene)
+                child.change_size(child_w,child_h)
         else:
             return
     
@@ -3526,34 +3690,55 @@ class image_element(base_element):
             return
 
     def change_size(self,w: float,h: float) -> None:
-        self._scene_size_last =copy.copy(self.scene_size)
-        self.setSize(w,h)
-        self._bottomRight =self._end_pos  =   QPointF(w,h) + self._head_pos
-        self._center_pos = (self._head_pos + self._end_pos)/2.0
-        self._topRight   = QPointF(w,0) + self._head_pos
-        self._bottomLeft = QPointF(0,h) + self._head_pos
+        """"属性设置改变尺寸
 
-        self.setTransformOriginPoint(self._center_pos)
-        
+        没有父图元时绕旋转中心（变换原点）缩放：旋转中心在场景中的位置不变；
+        有父图元（组内子图元）时仍以左上角为基准。
+        """
+        old_size = QSizeF(self.scene_size)
+        self._scene_size_last =copy.copy(self.scene_size)
+
+        anchor = _resize_anchor_local(self)
+        if anchor is None:
+            head = QPointF(self._head_pos)
+        else:
+            head = _scale_about(anchor, self._head_pos,
+                                _axis_scale(w, old_size.width()),
+                                _axis_scale(h, old_size.height()))
+
+        self.setSize(w,h)
+        self._topLeft     = self._head_pos = head
+        self._bottomRight = self._end_pos  = QPointF(w,h) + head
+        self._center_pos  = (head + self._end_pos)/2.0
+        self._topRight    = QPointF(w,0) + head
+        self._bottomLeft  = QPointF(0,h) + head
+
+        if anchor is None:
+            # 有父图元：保持原语义，旋转中心跟着新包围盒中心走
+            self.setTransformOriginPoint(self._center_pos)
+        # 无父图元：保留（用户用右键设置过的）旋转中心
+
         self.update_boundingRect()
 
         if self.is_has_child():
-            x_scale,y_scale = self.scene_size.width()/self._scene_size_last.width() , self.scene_size.height()/self._scene_size_last.height()
+            anchor_scene = self.mapToScene(anchor if anchor is not None else self._head_pos)
+            x_scale = _axis_scale(w, old_size.width())
+            y_scale = _axis_scale(h, old_size.height())
             for child in self.childItems():
-                p1 =    child.get_scene_topLeft()               - self.get_scene_head_pos()
+                p1 =    child.get_scene_topLeft()                - anchor_scene
                 dpos_head = QPointF(p1.x()*x_scale ,p1.y()*y_scale)   
-                p2 =    child.get_scene_bottomRight()                - self.get_scene_head_pos()
+                p2 =    child.get_scene_bottomRight()            - anchor_scene
                 dpos_end  = QPointF(p2.x()*x_scale ,p2.y()*y_scale)
-                p3 =    child.get_scene_topRight()               - self.get_scene_head_pos()
+                p3 =    child.get_scene_topRight()               - anchor_scene
                 dpos_topRight = QPointF(p3.x()*x_scale,p3.y()*y_scale) 
 
                 a = dpos_topRight - dpos_head
                 b = dpos_topRight - dpos_end
-                w = sqrt(a.x()*a.x() + a.y()*a.y())
-                h = sqrt(b.x()*b.x() + b.y()*b.y())
+                child_w = sqrt(a.x()*a.x() + a.y()*a.y())
+                child_h = sqrt(b.x()*b.x() + b.y()*b.y())
                
-                child.change_position(dpos_head+ self.get_scene_head_pos())
-                child.change_size(w,h)
+                child.change_position(dpos_head+ anchor_scene)
+                child.change_size(child_w,child_h)
         else:
             return
     
@@ -4015,11 +4200,12 @@ class triangle_element(rect_element):
     def change_size(self, width: float, height: float) -> None:
         """Scale the vertices so their bbox matches the requested size.
 
-        The scale is anchored at the local bounding-box top-left, matching
-        ``rect_element.change_size`` semantics: group resizing first moves a
-        child to its scaled top-left and then calls ``change_size``.  Scaling
-        around the local origin (the bbox centre) would move the top-left and
-        make triangles drift/look wrong inside a resized group.
+        The scale is anchored at the rotation origin for a top-level triangle,
+        so the rotation centre keeps its scene position (see
+        ``_resize_anchor_local``).  Children of a group fall back to the local
+        bounding-box top-left, matching ``rect_element`` group semantics:
+        group resizing first moves a child to its scaled top-left and then
+        calls ``change_size``.
         """
         rect = self._local_bounding_rect()
         if rect.width() <= 0.0 or rect.height() <= 0.0:
@@ -4031,7 +4217,9 @@ class triangle_element(rect_element):
 
         sx = width / rect.width()
         sy = height / rect.height()
-        anchor = rect.topLeft()
+        anchor = _resize_anchor_local(self)
+        if anchor is None:
+            anchor = rect.topLeft()
 
         def scale_point(point: QPointF) -> QPointF:
             return QPointF(

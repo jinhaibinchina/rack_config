@@ -38,7 +38,7 @@ if any(flag in sys.argv for flag in ("--shot", "--report", "--verify", "--attach
 from PySide6.QtGui import QFontDatabase  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget  # noqa: E402
 
-from App_PopPick.hmi.binding import HmiClient  # noqa: E402
+from App_PopPick.hmi.binding import PAGE_PIXEL_SIZE, HmiClient  # noqa: E402
 from App_PopPick.hmi.pages import make_page_specs  # noqa: E402
 from App_PopPick.hmi.tag_catalog import TagCatalog  # noqa: E402
 
@@ -223,7 +223,11 @@ def run_attach(args) -> int:
     deck = PageDeck(scene, cards, parent=window)
     print(f"PageDeck 槽位: {deck.slot_card().get_name()}｜堆叠 {len(deck.stack_cards())} 张")
 
-    host = attach_hmi_pages(manager, parent=window, demo=True)
+    page_size = PAGE_PIXEL_SIZE
+    if args.page_size:
+        width, _, height = args.page_size.lower().partition("x")
+        page_size = (int(width), int(height))
+    host = attach_hmi_pages(manager, parent=window, demo=True, page_size=page_size)
     # 和真实窗口一致：只把最前面两页设为活跃，report 才反映现场刷新范围
     host.set_active_cards((deck.slot_card().get_name(),
                            deck.stack_cards()[0].get_name()))
@@ -233,7 +237,24 @@ def run_attach(args) -> int:
     created = {pid: len(pl) for pid, pl in host._pages.items()}
     print("承载层实际创建的页面实例:", created)
     print(f"已挂载: {sum(1 for v in created.values() if v)}/{len(make_page_specs())} 页")
-    ok = not host._missing and all(created.values())
+
+    # 卡片尺寸自检：挂载后每张卡的"控件像素尺寸"都该等于目标尺寸，
+    # 说明 fit_widget_size 的换算和承载层几何是同一口径（AGV 90° 不含糊）。
+    target = host.page_pixel_size
+    size_bad = []
+    for card in cards:
+        px = card.widget_pixel_size()
+        scene_size = card.getSize()
+        print(f"  {card.get_name():<6} 场景 {scene_size.width():.0f}×{scene_size.height():.0f}"
+              f"  控件 {px.width():.0f}×{px.height():.0f}"
+              f"  中心 ({card.get_scene_center_pos().x():.0f},"
+              f"{card.get_scene_center_pos().y():.0f}) @ {card.get_angle():.1f}°")
+        if target is not None and (abs(px.width() - target.width()) > 1.0
+                                   or abs(px.height() - target.height()) > 1.0):
+            size_bad.append(card.get_name())
+    if size_bad:
+        print(f"卡片尺寸未对齐目标 {target.width()}×{target.height()}: {size_bad}")
+    ok = not host._missing and all(created.values()) and not size_bad
     host.shutdown()
     if not args.keep_open:
         return 0 if ok else 1
@@ -256,6 +277,8 @@ def main() -> int:
     ap.add_argument("--offscreen", action="store_true", help="强制 offscreen 平台")
     ap.add_argument("--attach", action="store_true", help="场景挂载自检")
     ap.add_argument("--scene", default="Designer/Core/data.json/datas/design/pages/page_10.json")
+    ap.add_argument("--page-size", default="",
+                    help="--attach 时卡片目标像素尺寸，如 1000x750（默认取 PAGE_PIXEL_SIZE）")
     ap.add_argument("--keep-open", action="store_true", help="--attach 时保持窗口")
     args = ap.parse_args()
 

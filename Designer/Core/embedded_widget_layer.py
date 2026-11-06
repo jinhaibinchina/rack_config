@@ -38,13 +38,21 @@ import time
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QSizeF, Qt
 from PySide6.QtGui import QMouseEvent, QPainter, QPixmap, QRegion, QTransform
 from PySide6.QtWidgets import (
+    QAbstractButton,
+    QAbstractItemView,
+    QAbstractSlider,
+    QAbstractSpinBox,
     QApplication,
+    QComboBox,
     QFrame,
     QGraphicsItem,
     QGraphicsPixmapItem,
     QGraphicsProxyWidget,
     QGraphicsScene,
     QGraphicsView,
+    QLineEdit,
+    QPlainTextEdit,
+    QTextEdit,
     QWidget,
 )
 
@@ -65,6 +73,11 @@ class EmbeddedWidgetLayer(QObject):
     - 松开时若没超过阈值 → 判定为点击，补发 press + release 给视图，控件
       照常获得焦点 / 响应点击。
 
+例外：按下点落在**有"按住"语义的控件**上（按钮 / 输入框 / 表格 / 滑块 /
+可点灯，见 :attr:`EmbeddedWidgetLayer.PRESS_THROUGH_TYPES`）时**立刻直通**，
+不延迟。否则按住期间控件收不到 press，点动按钮会在松手瞬间才发出
+``pressed`` + ``released``，表现为"按下即抬起"。
+
     滚轮不拦（让 QGraphicsView 自己 ignore 后冒泡给场景缩放）。
     """
 
@@ -82,6 +95,27 @@ class EmbeddedWidgetLayer(QObject):
     # 一张卡就占满整屏，动画本身也没人看得清细节）。
     MOTION_SNAPSHOT_MAX_RATIO = 4.0
     MOTION_SNAPSHOT_MAX_SIDE = 4096
+
+    #: 左键按在这些控件上时**立刻直通**，不走延迟派发。
+    #:
+    #: 延迟派发的代价是"按住期间控件收不到 press"。对按钮来说这等于按下
+    #: 态永远不出现——点动按钮（按住写 True / 松开写 False）会在松手那一
+    #: 刻才收到 press+release，业务上看到的就是"按下立刻又被抬起"。输入
+    #: 框拖选、表格拖动、滑块同理。所以这几类控件必须原生接事件。
+    #: 嵌套承载（页面自己又是一个 QGraphicsView，比如 PopPick 的
+    #: ``ScrollBody``）也整块放行：按钮在内层场景的 proxy 里，
+    #: ``childAt`` 的父子链走不到它们，只能按"按到了承载视图"判直通。
+    PRESS_THROUGH_TYPES = (
+        QGraphicsView,
+        QAbstractButton,
+        QAbstractItemView,
+        QAbstractSlider,
+        QAbstractSpinBox,
+        QComboBox,
+        QLineEdit,
+        QPlainTextEdit,
+        QTextEdit,
+    )
 
     _host: QWidget
     _center: QPointF
@@ -473,6 +507,13 @@ class EmbeddedWidgetLayer(QObject):
         # 只读态（设计模式展示）：不拦截任何事件，让场景照常处理选中/拖动。
         if not self._interactive:
             return False
+        # 画布平移被禁用时（运行态钉死视图的常见配置，PopPick 就是），
+        # 延迟派发失去了唯一用途——它存在的理由就是"在控件上拖动画布"。
+        # 此时继续扣住 press 只剩副作用：控件在整个按住期间收不到按下，
+        # 点动按钮（按住写 True / 松开写 False）会在松手那一刻才连发
+        # ``pressed`` + ``released``，业务侧看到的就是"按下即抬起"。
+        if not self._pan_enabled():
+            return False
         # 下面只关心鼠标事件（上面已按 QEvent.Type 过滤），这里收窄类型。
         if not isinstance(event, QMouseEvent):
             return False
@@ -483,6 +524,15 @@ class EmbeddedWidgetLayer(QObject):
             etype == QEvent.Type.MouseButtonPress
             and event.button() == Qt.MouseButton.LeftButton
         ):
+            target = self._press_through_target(event.position().toPoint())
+            if target is not None:
+                # 按在有"按住"语义的控件上：整个手势（press/move/release）
+                # 全部交还给视图，控件照常进入按下态、拖选、拖动滚动条。
+                # 代价是这类控件上不能拖动画布——本来就该如此。
+                self._press_pending = False
+                self._panning = False
+                self._press_pos = None
+                return False
             # 先扣住：此刻还不知道是"点控件"还是"拖画布"，等松开或超阈值再定。
             self._press_pos = event.position().toPoint()
             self._press_global = event.globalPosition().toPoint()
@@ -524,13 +574,48 @@ class EmbeddedWidgetLayer(QObject):
 
         return False
 
+    def _pan_enabled(self) -> bool:
+        """宿主是否允许鼠标拖动平移。宿主没实现这个方法就按"允许"处理。"""
+        checker = getattr(self._host, "is_pan_enabled", None)
+        return bool(checker()) if callable(checker) else True
+
+    def _press_through_target(self, pos: QPoint) -> QWidget | None:
+        """返回 ``pos`` 下"必须立刻拿到 press"的控件，没有则返回 None。
+
+        只认叶子级的可交互控件（按钮 / 输入框 / 表格 / 滑块 / 可点灯）：
+        页面根和 Card 这类容器**不算**，否则整页都是卡片，画布再也拖不动。
+        """
+        view = self.view
+        proxy = self.proxy
+        widget = self.widget
+        if view is None or proxy is None or widget is None:
+            return None
+        try:
+            if view.itemAt(pos) is not proxy:
+                return None
+            local = proxy.mapFromScene(view.mapToScene(pos)).toPoint()
+        except RuntimeError:
+            return None
+        child = widget.childAt(local)
+        if child is None and widget.rect().contains(local):
+            # 直接承载的就是一个控件本身（没有子控件垫在中间）。
+            child = widget
+        while child is not None:
+            if isinstance(child, self.PRESS_THROUGH_TYPES) or getattr(
+                child, "_clickable", False
+            ):
+                return child
+            if child is widget:
+                break
+            child = child.parentWidget()
+        return None
+
     def _start_pan(self, global_pos: QPoint) -> None:
         """进入拖动画布状态，复用场景自己的 ``panning`` / ``offset`` 约定。"""
         host = self._host
         # 宿主（场景）可能禁止手动平移（运行态钉死视图时常见）。禁用时保持
         # 未进入 pan 状态，按键仍按"点击控件"处理，release 时照常派发点击。
-        pan_checker = getattr(host, "is_pan_enabled", None)
-        if callable(pan_checker) and not pan_checker():
+        if not self._pan_enabled():
             return
         self._panning = True
         # 拖动过就不该再和上一次点击凑成双击。

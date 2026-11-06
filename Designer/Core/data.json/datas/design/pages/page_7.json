@@ -1,9 +1,9 @@
 {
     "sceneRect": {
-        "x": -1525.6102390245578,
-        "y": -6993.003286819493,
-        "width": 4852.985262924403,
-        "height": 9288.854437134645
+        "x": 498.05377216263196,
+        "y": -3782.367184740591,
+        "width": 3128.3983241187107,
+        "height": 5987.909519552839
     },
     "backgroundColor": "#bee1f59b",
     "items": [
@@ -48,14 +48,14 @@
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 1339.157,
-                "y": 358.51
+                "x": 1098.267,
+                "y": 261.184
             },
             "origin_pos": {
                 "x": 717.67,
                 "y": 541.413
             },
-            "width": 1024.0,
+            "width": 500.0,
             "height": 800.0,
             "rotate": 21.999999999999996,
             "style": {
@@ -121,7 +121,7 @@
                 "x": 1905.81,
                 "y": -2804.854
             },
-            "width": 768.0,
+            "width": 500.0,
             "height": 1024.0,
             "rotate": 0.0,
             "style": {
@@ -180,16 +180,16 @@
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 1331.026,
-                "y": 683.601
+                "x": 1203.314,
+                "y": 190.665
             },
             "origin_pos": {
-                "x": 696.554,
-                "y": 536.866
+                "x": 989.209,
+                "y": 347.426
             },
-            "width": 768.0,
+            "width": 500.0,
             "height": 1024.0,
-            "rotate": -39.00000000000007,
+            "rotate": -57.00000000000007,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 2,
@@ -201,6 +201,199 @@
             "zValue": 2,
             "widgetText": "",
             "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 7,
+            "name": "矩形_21",
+            "type": "rect",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 597.775,
+                "y": -1896.493
+            },
+            "origin_pos": {
+                "x": 366.846,
+                "y": -1761.996
+            },
+            "width": 500.0,
+            "height": 500.0,
+            "rotate": -8.999999999999927,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 7
+        },
+        {
+            "id": 8,
+            "name": "控件_21",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2231.484,
+                "y": -449.57
+            },
+            "origin_pos": {
+                "x": 2231.484,
+                "y": -449.57
+            },
+            "width": 600.0,
+            "height": 800.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 8,
+            "widgetText": "",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 9,
+            "name": "控件_22",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2735.13,
+                "y": -1116.415
+            },
+            "origin_pos": {
+                "x": 2735.13,
+                "y": -1116.415
+            },
+            "width": 160.0,
+            "height": 80.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 9,
+            "widgetText": "",
+            "widgetType": "pushbutton",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 10,
+            "name": "控件_23",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2513.897,
+                "y": -1918.406
+            },
+            "origin_pos": {
+                "x": 2513.897,
+                "y": -1918.406
+            },
+            "width": 240.0,
+            "height": 60.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 10,
+            "widgetText": "",
+            "widgetType": "combobox",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 11,
+            "name": "控件_24",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2453.165,
+                "y": -1060.07
+            },
+            "origin_pos": {
+                "x": 2453.165,
+                "y": -1060.07
+            },
+            "width": 160.0,
+            "height": 60.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 11,
+            "widgetText": "",
+            "widgetType": "checkbox",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 12,
+            "name": "控件_25",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2113.147,
+                "y": -1481.311
+            },
+            "origin_pos": {
+                "x": 2113.147,
+                "y": -1481.311
+            },
+            "width": 160.0,
+            "height": 80.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 12,
+            "widgetText": "",
+            "widgetType": "pushbutton",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
             "widgetBackground": "#ffffff"
