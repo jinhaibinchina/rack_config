@@ -1,0 +1,30 @@
+{
+	"rcu": {
+		"rcu_vehical": {
+			"run_mode": [
+				{
+					"key": 0,
+					"level": "normal",
+					"str": "正常模式"
+				},
+				{
+					"key": 1,
+					"level": "alarm",
+					"str": "升级模式"
+				}
+			],
+            "b_credible": [
+				{
+					"key": 0,
+					"level": "alarm",
+					"str": "角度偏差值不可信"
+				},
+				{
+					"key": 1,
+					"level": "normal",
+					"str": "角度偏差值可信"
+				}
+			]
+        }
+    }
+}

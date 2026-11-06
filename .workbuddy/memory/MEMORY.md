@@ -31,11 +31,19 @@
 - `set_widget_factory` 要的是可调用对象 `factory(host) -> QWidget`，不是控件实例；传实例会在重建时报 `TypeError: 'xxx' object is not callable`。延迟创建用闭包/lambda
 - `set_scene_mode(Run)` 在 `load_element_info_run_mode()` **之前**调用时（`RackStoresWindow` 就是这样），切换那一刻场景还是空的，加载完必须补一次 `_sync_embedded_widgets(True)`，否则承载层永远不创建，运行态连占位框都不画 → 看起来"控件没加载出来"。已在 `load_element_info_run_mode` 末尾补
 - **控件上的左键语义**：承载视图把鼠标事件全接走了，场景原本"左键拖动平移"在控件上就失效。`EmbeddedWidgetLayer` 用延迟派发解决：press 先扣住 → 移动超过 `startDragDistance` 判为拖动画布（改 `scene.offset` + `update_coordinate` + `_sync_embedded_widgets_geometry`）→ 没超阈值则在 release 时补发 press/release 给 viewport（照常点击/取焦）。两次快速点击还会补一个 `MouseButtonDblClick`，否则双击在控件里失效。滚轮不拦（冒泡给场景缩放）
-- 控件必须先 `setMinimumSize(1,1)`（给 0,0 无效），否则 `proxy.resize` 被 minimumSizeHint 卡住（QPushButton 宽 80），包围盒偏大、控件被裁
+- 控件必须先 `setMinimumSize(1,1)`（给 0,0 无效），否则 `proxy.resize` 被 minimumSizeHint 卡住（QPushButton 宽 80），包围盒偏大、控件被裁。**只对被承载的顶层 widget 这么做**（`EmbeddedWidgetLayer.set_widget` 自己也会再设一遍）；给内部每个子控件都设会让 QGridLayout 认为一行可压到 1px，密集页面文字直接叠成一条线。子控件要显式给合理的最小高度（按钮 28 / 数值行 22 / 写入行 30）
 - 尺寸用 `proxy.resize(w,h)` 驱动，不要 `widget.setFixedSize`（fix 之后 proxy 的 boundingRect 不跟手）
 - 几何：中心 = `pos_viewToWindow(sceneToView(get_scene_center_pos()))`，尺寸 = `scene_size.height/width × grid/units`（AGV 下 w/h 是交换的），view 的 geometry = 旋转后包围盒 × scale
 - 承载层惰性创建：设计模式不建（只画占位框），切 Run 时 `_sync_embedded_widgets(True)` 建并显示；`Delete()` 里显式 `_release_widget()`
 - 视图之间按 zValue 用 `raise_()` 排序（`_restack_embedded_widgets`）；场景自绘内容永远在这些视图下面
+- **性能铁律**：代理控件里改一个标签 = 重画整页，且父窗口一脏同区域所有承载视图一起重画。所以（1）别让每个页面各挂 1s 定时器（7 页 = 7 次整页重绘/秒，事件循环直接降到 2 轮/秒）；（2）PLC 点要合流后统一灌控件，别逐点直刷；（3）非活跃卡用 `set_motion_cache(True)` 烘焙位图，切前台再关掉——换完快照必须补 `scene._sync_embedded_widgets_geometry()`，否则交换后视图停原地、画面还是旧页。测量脚本 `tools/profile_hmi.py`
 - 回归脚本：`tools/verify_embedded_widget.py`（21 项，含旋转/缩放/自定义工厂/删除回收）、`tools/overlay_widget_probe.py`（独立验证台）
 - 注意：用 `DesignWindow` 写冒烟脚本会在关闭时把 page_*.json 全部重写（多出测试图元），跑完必须 `git checkout` 还原
+
+# App_LogPlot / log_plot_main.py（PySide6 日志绘图工具）
+- 统一入口 `main.py`：工具在 `TOOLS` 注册 `factory(enable_plc, plc_ip) -> QMainWindow`，**点击时才 import**（绘图模块会拉 matplotlib 的 Qt 后端，必须等 QApplication 建好）；`QT_API=pyside6` 在任何 Qt/matplotlib 导入前用 `os.environ.setdefault` 钉死。选择页卡片布局是两列 `QGridLayout`，加工具不要改回单行 `QHBoxLayout`
+- `log_plot_main.py` 里 `App_LogPlot.app.*` 的导入只能在 `MainWidget.__init__`（模块顶层导入会让 matplotlib 抢先造 QApplication 单例）
+- 主副轴合并图：`PlotMatrixWithVice`（继承 `PlotMatrix`）建 `MplPlotWidget(ax_vice_en=True)`；曲线归属靠 `MplPlotWidget.lines_on_vice`（与 `lines` 等长，`plot`/`del_line`/`clear` 必须同步维护），`_auto_scale_to_fit_all_curves` 按同轴分组，副轴窗口的图例要显式传 `self.lines` 当 handles，否则 `ax.legend()` 看不到 twinx 曲线
+- 「主」「副」按钮通过 `global_config.set_axis_visible()` → `axis_visibility_change` 信号广播，别只改 bool（不会有界面反应）
+- 回归固定跑 `.venv/Scripts/python.exe tools/verify_log_plot_pyside6.py`（离屏 19 项）。离屏下 `menuBar().actions()` 的 QAction wrapper 要和 QMenu 一起持有引用，否则 Python GC 会把 C++ QMenu 删掉，读 `actions()` 报 `RuntimeError: already deleted`
 

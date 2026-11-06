@@ -32,7 +32,7 @@ from PySide6.QtWidgets import QApplication
 
 from Designer.Core.NavigationContentWidget import NavigationContentWidget
 from Designer.Core.elements import base_element, group_element
-from Designer.modes.design.design_window import DesignWindow
+from Designer.modes.design.design_window_entry import DesignWindow
 from Designer.modes.design.design_scene import DesignScene
 from tools.bench_scene import DEFAULT_PAGE, build_scene
 

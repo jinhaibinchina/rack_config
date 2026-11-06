@@ -258,63 +258,63 @@ class RackConfigWindow(LoadMainWindow):
         top_window.exec()
 
 
-# class App(QApplication):
-#     def notify(self, source: QObject, event: QEvent):
-#         """
-#         本次重写notify是为了截获应用的所有事件
-#         :param source: 事件接收对象
-#         :param event: 具体事件
-#         :return: True表示事件已经处理，False表示没有处理，需要继续往下传递
-#         """
-#         # if event.type() == QEvent.Wheel and event.modifiers() == Qt.ControlModifier:
-#         #     # print(f"App {source}")
-#         #     pass
-#             # return True
-#         # print(source, event)
-#         return super().notify(source, event)
+class App(QApplication):
+    def notify(self, source: QObject, event: QEvent):
+        """
+        本次重写notify是为了截获应用的所有事件
+        :param source: 事件接收对象
+        :param event: 具体事件
+        :return: True表示事件已经处理，False表示没有处理，需要继续往下传递
+        """
+        # if event.type() == QEvent.Wheel and event.modifiers() == Qt.ControlModifier:
+        #     # print(f"App {source}")
+        #     pass
+            # return True
+        # print(source, event)
+        return super().notify(source, event)
 
 
 
-# def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     
 
-#     app = QApplication.instance()
-#     owns_app = app is None
-#     if app is None:
-#         app = QApplication(sys.argv[:1])
-#     app.setApplicationName("料架PLC配置工具")
-#     app.setOrganizationName("RackConfig")
-#     app.setApplicationDisplayName(APP_TITLE)
-#     app.setStyle('Fusion')
-#     # icon_path = res_manager.get_icon_path("app_icon.ico")
-#     # if os.path.isfile(icon_path):
-#     #     app.setWindowIcon(QIcon(icon_path))
+    app = QApplication.instance()
+    owns_app = app is None
+    if app is None:
+        app = QApplication(sys.argv[:1])
+    app.setApplicationName("料架PLC配置工具")
+    app.setOrganizationName("RackConfig")
+    app.setApplicationDisplayName(APP_TITLE)
+    app.setStyle('Fusion')
+    # icon_path = res_manager.get_icon_path("app_icon.ico")
+    # if os.path.isfile(icon_path):
+    #     app.setWindowIcon(QIcon(icon_path))
 
-#     try:
+    try:
         
-#         window = RackConfigWindow(
+        window = RackConfigWindow(
             
-#             plc_ip=DEFAULT_PLC_IP,
-#             enable_plc=True,
-#         )
-#     except Exception as exc:  # noqa: BLE001 - 启动失败要给出可读提示
-#         traceback.print_exc()
-#         print(f"[运行态] 启动失败: {type(exc).__name__}: {exc}", file=sys.stderr)
-#         if owns_app:
-#             QMessageBox.critical(
-#                 None,
-#                 "运行态启动失败",
-#                 f"{type(exc).__name__}: {exc}\n\n请检查 --scene / --page 参数。",
-#             )
-#         return 2
+            plc_ip=DEFAULT_PLC_IP,
+            enable_plc=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - 启动失败要给出可读提示
+        traceback.print_exc()
+        print(f"[运行态] 启动失败: {type(exc).__name__}: {exc}", file=sys.stderr)
+        if owns_app:
+            QMessageBox.critical(
+                None,
+                "运行态启动失败",
+                f"{type(exc).__name__}: {exc}\n\n请检查 --scene / --page 参数。",
+            )
+        return 2
 
-#     window.show()
+    window.show()
    
     
 
-#     if owns_app:
-#         return app.exec()
-#     return 0
+    if owns_app:
+        return app.exec()
+    return 0
 
 
 

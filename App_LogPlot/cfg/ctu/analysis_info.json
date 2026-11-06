@@ -1,0 +1,31 @@
+{
+    "rcd":{
+        "轮组":[
+            {
+                "tip":"可控状态",
+                "type":"key_map",
+                "rcd_title":"wheel_head_b_under_ctrl",
+                "state_map_path":"$.rcu.wheel.b_under_ctrl"
+            },
+            {
+                "tip":"轮组个数",
+                "type":"tip_tr",
+                "rcd_title":"wheel_head_b_group_cnt"
+            },
+            {
+                "tip":"状态机",
+                "type":"key_map",
+                "rcd_title":"wheel_head_state",
+                "state_map_path":"$.rcu.wheel.state"
+            },
+            {
+                "type":"key_map",
+                "tip":"第{0[0]}轮组电机{0[1]}点状态",
+                "rcd_title":"wheel_{0[0]}_motor[{0[1]}].node_state",
+                "state_map_path":"$.rcu.motor.node_state",
+                "level1":["0","1","2","3"],
+                "level2":["0","1"]
+            }
+        ]
+    }
+}

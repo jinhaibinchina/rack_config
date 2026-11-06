@@ -1,0 +1,17 @@
+
+jsonpath==0.82.2
+
+Markdown==3.10
+matplotlib==3.10.8
+numpy==2.4.0
+packaging==25.0
+pandas==2.3.3
+pillow==12.0.0
+pyarrow==22.0.0
+pyparsing==3.3.1
+ 
+# GUI 框架：PySide6（已从 PyQt5 迁移）
+PySide6==6.10.2
+# matplotlib 画布走 backend_qtagg，会自动使用 PySide6，不需要额外的 webengine 包
+python-dateutil==2.9.0.post0
+

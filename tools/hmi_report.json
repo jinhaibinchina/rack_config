@@ -1,0 +1,105 @@
+{
+  "catalog": {
+    "endpoint": "opc.tcp://192.168.1.88:4840",
+    "verified_nodes": 391,
+    "candidate_nodes": 57,
+    "variables": 202,
+    "resolved_variables": 145,
+    "unresolved_variables": 57
+  },
+  "pages": [
+    {
+      "page_id": "main",
+      "title": "主监控页面",
+      "display_points": 61,
+      "subscribed_keys": 56,
+      "pending": [
+        "GVL.WCS_Connected｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.WCS_Connected",
+        "GVL.AnyAlarm｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.AnyAlarm",
+        "GVL.CurrentAlarm｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.CurrentAlarm",
+        "GVL.AlarmCounts｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.AlarmCounts",
+        "GVL.CurrentText｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.CurrentText"
+      ]
+    },
+    {
+      "page_id": "axis",
+      "title": "轴监控页面",
+      "display_points": 150,
+      "subscribed_keys": 148,
+      "pending": [
+        "GVL.aAllowMoveAxisManual｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.aAllowMoveAxisManual",
+        "GVL.ArmMotorSpeeds｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.ArmMotorSpeeds"
+      ]
+    },
+    {
+      "page_id": "io",
+      "title": "IO 监控",
+      "display_points": 42,
+      "subscribed_keys": 42,
+      "pending": []
+    },
+    {
+      "page_id": "parameters",
+      "title": "参数设置",
+      "display_points": 50,
+      "subscribed_keys": 41,
+      "pending": [
+        "GVL.storageType｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.storageType",
+        "GVL.MAX_STORAGE_ROW｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.MAX_STORAGE_ROW",
+        "GVL.MAX_STORAGE_COL｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.MAX_STORAGE_COL",
+        "GVL.MAX_WORKSTATION｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.MAX_WORKSTATION",
+        "GVL.RCD_CONTEXT_LEN｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.RCD_CONTEXT_LEN",
+        "GVL.HASH_TABLE_SIZE｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.HASH_TABLE_SIZE",
+        "GVL.WorkStationConveyVelocity｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.WorkStationConveyVelocity",
+        "GVL.sucker_ret_pos｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.sucker_ret_pos",
+        "GVL.MAX_ALARM_ID｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.MAX_ALARM_ID"
+      ]
+    },
+    {
+      "page_id": "alarm",
+      "title": "报警",
+      "display_points": 58,
+      "subscribed_keys": 54,
+      "pending": [
+        "GVL.AnyAlarm｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.AnyAlarm",
+        "GVL.CurrentAlarm｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.CurrentAlarm",
+        "GVL.AlarmCounts｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.AlarmCounts",
+        "GVL.CurrentText｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.CurrentText"
+      ]
+    },
+    {
+      "page_id": "log",
+      "title": "日志",
+      "display_points": 20,
+      "subscribed_keys": 19,
+      "pending": []
+    },
+    {
+      "page_id": "program",
+      "title": "程序监控",
+      "display_points": 47,
+      "subscribed_keys": 45,
+      "pending": []
+    }
+  ],
+  "subscribed_keys_total": 363,
+  "pending_points": [
+    "GVL.AlarmCounts｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.AlarmCounts",
+    "GVL.AnyAlarm｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.AnyAlarm",
+    "GVL.ArmMotorSpeeds｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.ArmMotorSpeeds",
+    "GVL.CurrentAlarm｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.CurrentAlarm",
+    "GVL.CurrentText｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.CurrentText",
+    "GVL.HASH_TABLE_SIZE｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.HASH_TABLE_SIZE",
+    "GVL.MAX_ALARM_ID｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.MAX_ALARM_ID",
+    "GVL.MAX_STORAGE_COL｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.MAX_STORAGE_COL",
+    "GVL.MAX_STORAGE_ROW｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.MAX_STORAGE_ROW",
+    "GVL.MAX_WORKSTATION｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.MAX_WORKSTATION",
+    "GVL.RCD_CONTEXT_LEN｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.RCD_CONTEXT_LEN",
+    "GVL.WCS_Connected｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.WCS_Connected",
+    "GVL.WorkStationConveyVelocity｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.WorkStationConveyVelocity",
+    "GVL.aAllowMoveAxisManual｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.aAllowMoveAxisManual",
+    "GVL.storageType｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.storageType",
+    "GVL.sucker_ret_pos｜未接入｜ns=4;s=|var|Inovance-ARM-Linux.Application.GVL.sucker_ret_pos"
+  ],
+  "pending_count": 16
+}

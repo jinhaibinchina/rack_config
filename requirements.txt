@@ -5,3 +5,6 @@ PySide6==6.10.2
 pymodbus==3.16.1
 # 代码中 snap7 相关导入目前是注释状态，需要时再启用
 python-snap7==2.0.2
+# OPC UA 客户端/服务端（common.com.opcua）。会带上 cryptography，
+# 打包体积约 +38 MB；没上 OPC UA 的项目可以不装。
+asyncua==2.1.0

@@ -1,9 +1,9 @@
 {
     "sceneRect": {
-        "x": 277.3603059977472,
-        "y": -2370.1178992502055,
-        "width": 2126.5533879124773,
-        "height": 4070.328633392808
+        "x": -1965.906873318565,
+        "y": -6342.145493029994,
+        "width": 7529.500683281179,
+        "height": 14411.83767147042
     },
     "backgroundColor": "#bee1f59b",
     "items": [
@@ -321,17 +321,17 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                2,
                 4,
-                9,
-                6,
-                11,
-                13,
-                5,
                 8,
+                6,
                 7,
+                12,
                 10,
-                12
+                2,
+                13,
+                9,
+                11,
+                5
             ],
             "group_id": 0,
             "center_pos": {
@@ -613,15 +613,15 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                24,
-                21,
-                39,
-                42,
                 27,
                 18,
-                33,
                 36,
-                30
+                42,
+                24,
+                39,
+                30,
+                33,
+                21
             ],
             "group_id": 0,
             "center_pos": {
@@ -651,15 +651,15 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                47,
-                53,
+                51,
+                55,
+                49,
                 48,
                 52,
-                55,
-                50,
-                49,
+                47,
+                53,
                 54,
-                51
+                50
             ],
             "group_id": 0,
             "center_pos": {
@@ -941,15 +941,15 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
+                62,
                 60,
-                61,
+                65,
+                58,
                 64,
                 59,
-                63,
-                65,
                 57,
-                58,
-                62
+                61,
+                63
             ],
             "group_id": 0,
             "center_pos": {
@@ -1569,9 +1569,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                93,
+                94,
                 92,
-                94
+                93
             ],
             "group_id": 0,
             "center_pos": {
@@ -1601,8 +1601,8 @@
             "type": "group",
             "parent_id": 158,
             "children_ids": [
-                97,
                 98,
+                97,
                 99
             ],
             "group_id": 158,
@@ -1758,8 +1758,8 @@
             "parent_id": 0,
             "children_ids": [
                 101,
-                103,
-                102
+                102,
+                103
             ],
             "group_id": 0,
             "center_pos": {
@@ -1913,9 +1913,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                106,
                 107,
-                108
+                108,
+                106
             ],
             "group_id": 0,
             "center_pos": {
@@ -2069,9 +2069,9 @@
             "type": "group",
             "parent_id": 158,
             "children_ids": [
-                110,
+                112,
                 111,
-                112
+                110
             ],
             "group_id": 158,
             "center_pos": {
@@ -2225,9 +2225,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                116,
                 114,
-                115
+                115,
+                116
             ],
             "group_id": 0,
             "center_pos": {
@@ -2381,9 +2381,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                120,
                 119,
-                121
+                121,
+                120
             ],
             "group_id": 0,
             "center_pos": {
@@ -2537,8 +2537,8 @@
             "type": "group",
             "parent_id": 158,
             "children_ids": [
-                125,
                 123,
+                125,
                 124
             ],
             "group_id": 158,
@@ -2849,9 +2849,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                131,
                 132,
-                133
+                133,
+                131
             ],
             "group_id": 0,
             "center_pos": {
@@ -3006,8 +3006,8 @@
             "parent_id": 158,
             "children_ids": [
                 136,
-                135,
-                137
+                137,
+                135
             ],
             "group_id": 158,
             "center_pos": {
@@ -3161,9 +3161,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                141,
+                140,
                 139,
-                140
+                141
             ],
             "group_id": 0,
             "center_pos": {
@@ -3317,9 +3317,9 @@
             "type": "group",
             "parent_id": 159,
             "children_ids": [
+                144,
                 143,
-                145,
-                144
+                145
             ],
             "group_id": 159,
             "center_pos": {
@@ -3473,9 +3473,9 @@
             "type": "group",
             "parent_id": 159,
             "children_ids": [
+                148,
                 147,
-                149,
-                148
+                149
             ],
             "group_id": 159,
             "center_pos": {
@@ -3629,9 +3629,9 @@
             "type": "group",
             "parent_id": 159,
             "children_ids": [
-                153,
                 151,
-                152
+                152,
+                153
             ],
             "group_id": 159,
             "center_pos": {
@@ -3785,9 +3785,9 @@
             "type": "group",
             "parent_id": 159,
             "children_ids": [
+                157,
                 155,
-                156,
-                157
+                156
             ],
             "group_id": 159,
             "center_pos": {
@@ -3941,9 +3941,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
+                96,
                 109,
                 134,
-                96,
                 122
             ],
             "group_id": 0,
@@ -3975,9 +3975,9 @@
             "parent_id": 0,
             "children_ids": [
                 142,
+                150,
                 146,
-                154,
-                150
+                154
             ],
             "group_id": 0,
             "center_pos": {
@@ -4163,9 +4163,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
+                168,
                 166,
-                167,
-                168
+                167
             ],
             "group_id": 0,
             "center_pos": {
@@ -4319,8 +4319,8 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
-                172,
                 171,
+                172,
                 170
             ],
             "group_id": 0,
@@ -4475,9 +4475,9 @@
             "type": "group",
             "parent_id": 0,
             "children_ids": [
+                174,
                 176,
-                175,
-                174
+                175
             ],
             "group_id": 0,
             "center_pos": {

@@ -854,49 +854,49 @@ class SafetyCarWindow(QMainWindow):
 
 
 
-# def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     
 
-#     app = QApplication.instance()
-#     owns_app = app is None
-#     if app is None:
-#         app = QApplication(sys.argv[:1])
-#     app.setApplicationName("安全车配置运行态")
-#     app.setOrganizationName("SafetyCarConfig")
-#     app.setApplicationDisplayName(APP_TITLE)
+    app = QApplication.instance()
+    owns_app = app is None
+    if app is None:
+        app = QApplication(sys.argv[:1])
+    app.setApplicationName("安全车配置运行态")
+    app.setOrganizationName("SafetyCarConfig")
+    app.setApplicationDisplayName(APP_TITLE)
 
-#     icon_path = res_manager.get_icon_path("app_icon.ico")
-#     if os.path.isfile(icon_path):
-#         app.setWindowIcon(QIcon(icon_path))
+    icon_path = res_manager.get_icon_path("app_icon.ico")
+    if os.path.isfile(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
 
-#     try:
+    try:
         
-#         window = SafetyCarWindow(
+        window = SafetyCarWindow(
             
-#             plc_ip='192.168.1.150',
-#             enable_plc=True,
-#         )
-#     except Exception as exc:  # noqa: BLE001 - 启动失败要给出可读提示
-#         traceback.print_exc()
-#         print(f"[运行态] 启动失败: {type(exc).__name__}: {exc}", file=sys.stderr)
-#         if owns_app:
-#             QMessageBox.critical(
-#                 None,
-#                 "运行态启动失败",
-#                 f"{type(exc).__name__}: {exc}\n\n请检查 --scene / --page 参数。",
-#             )
-#         return 2
+            plc_ip='192.168.1.150',
+            enable_plc=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - 启动失败要给出可读提示
+        traceback.print_exc()
+        print(f"[运行态] 启动失败: {type(exc).__name__}: {exc}", file=sys.stderr)
+        if owns_app:
+            QMessageBox.critical(
+                None,
+                "运行态启动失败",
+                f"{type(exc).__name__}: {exc}\n\n请检查 --scene / --page 参数。",
+            )
+        return 2
 
-#     window.show()
+    window.show()
    
-#     print(
-#         "PLC: " + ("未连接（离线模式）" if not window.enable_plc else window.plc_ip),
-#         flush=True,
-#     )
+    print(
+        "PLC: " + ("未连接（离线模式）" if not window.enable_plc else window.plc_ip),
+        flush=True,
+    )
 
-#     if owns_app:
-#         return app.exec()
-#     return 0
+    if owns_app:
+        return app.exec()
+    return 0
 
 
 

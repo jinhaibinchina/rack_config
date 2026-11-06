@@ -4,13 +4,8 @@
     "pages": [
         {
             "id": "page_1",
-            "name": "主场景",
+            "name": "料架主场景",
             "file": "datas/design/pages/page_1.json"
-        },
-        {
-            "id": "page_2",
-            "name": "页面 2",
-            "file": "datas/design/pages/page_2.json"
         },
         {
             "id": "page_3",
@@ -18,13 +13,8 @@
             "file": "datas/design/pages/page_3.json"
         },
         {
-            "id": "page_4",
-            "name": "页面 4",
-            "file": "datas/design/pages/page_4.json"
-        },
-        {
             "id": "page_5",
-            "name": "页面 5",
+            "name": "料架全局参数",
             "file": "datas/design/pages/page_5.json"
         },
         {
@@ -38,14 +28,14 @@
             "file": "datas/design/pages/page_7.json"
         },
         {
-            "id": "page_8",
-            "name": "页面 8",
-            "file": "datas/design/pages/page_8.json"
-        },
-        {
             "id": "page_9",
             "name": "页面 9",
             "file": "datas/design/pages/page_9.json"
+        },
+        {
+            "id": "page_10",
+            "name": "页面 10",
+            "file": "datas/design/pages/page_10.json"
         }
     ]
 }

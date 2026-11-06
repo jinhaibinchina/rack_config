@@ -15,6 +15,10 @@
 否则两页会缩在中间或溢出边界。重算只改缩放，不改状态：普通视图不动、已经
 收起的左侧页面也不会被摊开。
 
+「最前面两页」变化时对外发 :attr:`PopPickWindow.front_page_changed`：交换、
+重置布局、收起/展开都会改变这两页的身份，外部只接这一条信号即可；初值用
+:meth:`PopPickWindow.front_pages` 直接读。
+
 运行方式::
 
     python pop_pick_main.py                 # 经统一入口（--app PopPick）
@@ -53,19 +57,22 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, QTimer
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 from Designer.Core.myQuadTreeScene import QuadTreeScene, SceneManager, SceneSerializer
 from Designer.Core.my_common import SceneMode
-# 用绝对导入而不是 ``from .page_deck``：本文件也支持被直接当脚本跑
-# （``python App_PopPick/pop_pick_entry.py``），那时没有包上下文。
+# 一律用绝对导入而不是 ``from .xxx``：本文件也支持被直接当脚本跑
+# （``python App_PopPick/pop_pick_entry.py``），那时没有包上下文；
+# 相对导入会在这一行就抛 "attempted relative import with no known parent
+# package"。包方式（``python -m App_PopPick``）下绝对导入同样成立。
 from App_PopPick.page_deck import PageDeck, find_page_cards
-
-from  .rack_global_parameters_model import Page0_Model ,Page1_Model,Page3_Model
+from App_PopPick.hmi import attach_hmi_pages
 
 APP_TITLE = "PopPick 拣选工作站"
+# page_10 是 page_9 派生出来的 7 卡版本（tools/gen_hmi_scene.py 生成）：
+# 7 个 HMI 页面需要 7 张 widget 卡片，page_9 只有 Page0..Page5。
 DEFAULT_PAGE = "page_9"
 DEFAULT_PLC_IP = "192.168.1.88"
 # 窗口尺寸变化后重算最大视图取景的合并窗口（毫秒）：拖动过程中不重算，
@@ -144,11 +151,16 @@ def _page_file_candidates(page: str) -> list[str]:
         )
     ]
     if getattr(sys, "frozen", False):
-        # 打包后设计工程不一定跟着走，退到 res 下的运行态场景副本
+        # 打包后设计工程不一定跟着走，退到 res 下的运行态场景副本。
+        # 7 卡快照优先：旧 pop_pick_scene.json 只有 Page0..Page5，用它的话
+        # 第 7 页（程序监控）找不到卡片，只会挂 6 页。
         try:
             from res.designer_resource_manager import resource_manager as res_mng
 
-            candidates.append(res_mng.get_json_path("pop_pick_scene.json"))
+            for name in ("pop_pick_scene_7.json", "pop_pick_scene.json"):
+                path = res_mng.get_json_path(name)
+                if path and os.path.isfile(path):
+                    candidates.append(path)
         except Exception:  # noqa: BLE001 - 资源包缺失时按"没找到"处理
             pass
     return candidates
@@ -165,6 +177,15 @@ def resolve_page_file(page: str) -> str:
 class PopPickWindow(_DeferredNativeClose, QMainWindow):
     """运行态主窗口：一张场景 + 一个页面堆叠交互。"""
 
+    # 画面上「最前面」的两页变了就发一次：``(当前页名, 左侧堆叠最上层页名)``。
+    #
+    # 外部只接这一条信号就够了，不用分别去接 deck 的 ``swap_finished`` /
+    # ``fold_changed``：交换、重置布局、收起/展开这些路径都会改变"正对着看的
+    # 是哪两页"，逐个订阅一定会漏（重置布局就不发 swap_finished）。
+    # 只在**身份真的变了**时发：放大到最大视图、重算取景这类只改缩放的操作不触发。
+    # 初值不发信号，需要的话直接读 :meth:`front_pages`。
+    front_page_changed = Signal(str, str)
+
     def __init__(
         self,
         *,
@@ -172,11 +193,16 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
         scene_path: Optional[str] = None,
         plc_ip: str = DEFAULT_PLC_IP,
         enable_plc: bool = True,
+        hmi_demo: bool = False,
+        hmi_endpoint: str = "",
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.plc_ip = plc_ip
         self.enable_plc = enable_plc
+        # 统一入口的 --no-plc 走 enable_plc=False，等价于「不连 OPC UA、用模拟数据」
+        self.hmi_demo = bool(hmi_demo or not enable_plc)
+        self.hmi_endpoint = hmi_endpoint
         self.scene_path: Optional[str] = None
         self.deck: Optional[PageDeck] = None
 
@@ -192,6 +218,8 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
         # 子对象，只靠 parent 存活时拿不到 Python 侧句柄，closeEvent 里也就
         # 没法停它们的轮询/重连线程。
         self._page_models: list = []
+        # 上一次发信号时「最前面两页」的身份，用来只在真的换人时发一次
+        self._front_pages: tuple = ()
 
         self.setObjectName("popPickWindow")
         self.setWindowTitle(APP_TITLE)
@@ -203,16 +231,35 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
         self._install_deck()
         self._build_actions()
 
-        self._page_models = [
-            Page0_Model(self.scene_manager, parent=self),
-            Page1_Model(self.scene_manager, parent=self),
-            Page3_Model(self.scene_manager, parent=self),
-        ]
+        # 7 个 HMI 页面统一由 HmiPagesHost 挂载：按卡片名 set_widget_factory，
+        # 一个 OpcUaManager 共享一条订阅，断线重连/关窗停机都由它负责。
+        # attach_hmi_pages 默认 auto_start=True，不要再单独调一次 start()。
+        # （旧的 snap7 Page0/1/3_Model 与它抢同一批卡片工厂，已从 import 移除）
+        self._hmi = attach_hmi_pages(
+            self.scene_manager,
+            parent=self,
+            endpoint=self.hmi_endpoint,
+            demo=self.hmi_demo,
+            active_only=True,
+            auto_start=False,   # 先确定最前面两页，初始订阅就只覆盖这两页
+        )
+        self._hmi.connection_changed.connect(self._on_hmi_connection)
+        self.front_page_changed.connect(self._on_front_page_changed)
+        # front_page_changed 不发初值，构造时手动对齐一次
+        self._hmi.set_active_cards(self.front_pages())
+        self._hmi.start()
+        # 交换/收起动画结束时会统一把「位图快照渲染」关掉，跑完必须按当前
+        # 前台页重新恢复一次——否则后台那 5 页又变回真实控件，每次刷新都要
+        # 连带重渲染，帧时间会翻好几倍（详见 apply_static_pages 的说明）。
+        self.deck.busy_changed.connect(self._on_deck_busy)
 
         self.statusBar().showMessage(
             "点击左侧任意页面与右侧当前页互换 ｜ 拖动可平移画布 ｜ "
             "双击空白背景收起/展开左侧页面"
         )
+        # 记下初始的「最前面两页」但不发信号：构造期间没有谁接得上，
+        # 外部要初值直接读 front_pages()。
+        self._front_pages = self.front_pages()
 
     # ------------------------------------------------------------------
     # 场景
@@ -265,11 +312,51 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
         # 卡片布局依赖窗口尺寸（视图坐标），布局收敛后再对一次视图
         self.scene.refresh_embedded_widgets()
 
+    def _on_deck_busy(self, busy: bool) -> None:
+        """动画结束后恢复「后台页走快照、前台页用真实控件」的分配。"""
+        if not busy:
+            self._hmi.apply_static_pages()
+
     def _on_swap_finished(self, entered: str, left: str) -> None:
         self.statusBar().showMessage(f"已切换到「{entered}」，「{left}」已放回左侧", 4000)
         # 交换后 Z 值互换过，「堆叠最上层」可能换人 → 最大视图下放开交互的
         # 那张卡得跟着走，否则用户点着的是新最上层却还是只读。
         self._sync_card_readonly()
+
+    # ------------------------------------------------------------------
+    # 「最前面两页」及其变化通知
+    # ------------------------------------------------------------------
+    def front_pages(self) -> tuple:
+        """画面上正对着看的那两页：``(当前页名, 左侧堆叠最上层页名)``。
+
+        没有卡片时返回 ``("", "")``。放在这里而不是 :class:`PageDeck` 里：
+        "最前面"是**视图状态**的一部分（收起后左侧只剩封面、最大视图下只有
+        这两页在放大），只有窗口同时掌握折叠与取景信息。
+        """
+        if self.deck is None:
+            return ("", "")
+        slot = self.deck.slot_card()
+        stack = self.deck.stack_cards()
+        return (
+            slot.get_name() if slot is not None else "",
+            stack[0].get_name() if stack else "",
+        )
+
+    def _refresh_front_pages(self) -> None:
+        """核对「最前面两页」是否换人，变了就发 :attr:`front_page_changed`。
+
+        读当前状态比监听事件可靠：交换、重置布局、收起/展开都会改变这两页
+        的身份，而它们分散在 ``swap_finished`` / ``fold_changed`` / ``reset()``
+        三处，逐个订阅必漏。这里只做一次"快照比较"，可以放心挂在
+        :meth:`_sync_card_readonly` 后面——那里本来就在每个状态变化点被调用，
+        且状态没变时不会有额外开销（比一次元组比较更贵的只读同步都在它前面
+        被 ``widget_readonly()`` 挡掉了）。
+        """
+        current = self.front_pages()
+        if current == self._front_pages:
+            return
+        self._front_pages = current
+        self.front_page_changed.emit(*current)
 
     # ------------------------------------------------------------------
     # 卡片只读 / 可交互
@@ -306,6 +393,9 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
             # _auto_fit_size，无谓地走一遍尺寸贴合逻辑。
             if card.widget_readonly() != readonly:
                 card.set_widget_readonly(readonly)
+        # 只读刷完，顺手核对「最前面两页」是否换人：交换（Z 互换）、收起/
+        # 展开、重置布局都会走到这里，是唯一一个覆盖全的状态变化点。
+        self._refresh_front_pages()
 
     def _interactive_cards(self) -> tuple:
         """放开交互的卡片——画面上正对着看、撑得最开的那两页。
@@ -364,14 +454,36 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
         maximize_action.triggered.connect(self._maximize_view)
         toolbar.addAction(maximize_action)
 
+        # 数据链路已经从 snap7 换成 OPC UA，状态动作跟着改成真实连接状态，
+        # 不再写「预留地址 / 未接 PLC 数据链路」这种过期文案。
         self.plc_status_action = QAction(
-            "PLC：未接入" if self.enable_plc else "PLC：离线", self
+            "OPC UA：离线演示" if self.hmi_demo else "OPC UA：连接中…", self
         )
         self.plc_status_action.setEnabled(False)
         self.plc_status_action.setToolTip(
-            f"预留地址 {self.plc_ip}；当前版本只做页面交互，未接 PLC 数据链路"
+            "7 个 HMI 页面共用一条 OPC UA 订阅；端点取自变量表映射，"
+            "可用 --hmi-endpoint 覆盖"
         )
         toolbar.addAction(self.plc_status_action)
+
+    def _on_front_page_changed(self, current: str, stacked: str) -> None:
+        """「最前面两页」换人：只让这两页继续收数据和重绘。
+
+        交换 / 重置 / 收起展开都会走到这里（窗口只发这一条信号），
+        不需要分别订阅 deck 的各个事件。
+        """
+        if getattr(self, "_hmi", None) is not None:
+            self._hmi.set_active_cards((current, stacked))
+
+    def _on_hmi_connection(self, connected: bool) -> None:
+        """HmiPagesHost 广播的连接状态 → 工具栏 + 状态栏。"""
+        text = "OPC UA：已连接" if connected else "OPC UA：未连接（自动重连中）"
+        self.plc_status_action.setText(text)
+        self.plc_status_action.setToolTip(
+            f"端点 {self._hmi.endpoint}｜"
+            f"{len(self._hmi.subscribe_keys)} 个订阅点"
+        )
+        self.statusBar().showMessage(text, 4000)
 
     def _reset_layout(self) -> None:
         if self.deck is None:
@@ -567,6 +679,8 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
             if press is not None and not dragged:
                 self._handle_click(QPointF(event.position()))
         elif kind == QEvent.Wheel:
+            if not self.scene.is_canvas_navigation_enabled():
+                return super().eventFilter(obj, event)
             # 滚轮缩放等于重新取景，最大视图状态随之失效，锁定一并解除；
             # 否则用户缩回全貌后会发现最上面那页点不动。
             self._set_maximized(False)
@@ -619,10 +733,13 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
     # ------------------------------------------------------------------
     def closeEvent(self, event):  # noqa: N802 - Qt 命名
         _close_trace("closeEvent 进入")
-        # 先让窗口消失：后面的清理（停线程、回收 6 个承载控件）实测要
-        # 100~500ms，卡多久屏幕就空白多久。
+        # 先让窗口消失：后面的清理（停 OPC UA 线程、回收 7 个承载控件）实测
+        # 要 100~500ms，OPC UA 停机最坏还会等 3s，卡多久屏幕就空白多久。
         self.hide()
         _close_trace("窗口已 hide")
+        if getattr(self, "_hmi", None) is not None:
+            self._hmi.shutdown()
+            _close_trace("HMI 客户端与页面已 shutdown")
         if self._maximize_refit_timer is not None:
             self._maximize_refit_timer.stop()
         _close_trace("refit 定时器已停")
@@ -660,8 +777,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--page", default=DEFAULT_PAGE, help=f"设计工程里的页面 id（默认 {DEFAULT_PAGE}）"
     )
     parser.add_argument("--scene", default=None, help="直接指定页面 JSON 的绝对路径")
-    parser.add_argument("--plc-ip", default=DEFAULT_PLC_IP, help="预留的 PLC 地址")
-    parser.add_argument("--no-plc", action="store_true", help="离线模式（当前版本无差别）")
+    parser.add_argument("--plc-ip", default=DEFAULT_PLC_IP,
+                        help="预留的 PLC 地址（HMI 已改走 OPC UA，当前仅作记录）")
+    parser.add_argument("--no-plc", action="store_true",
+                        help="离线模式：HMI 页面用模拟数据，不连 OPC UA")
+    parser.add_argument("--hmi-demo", action="store_true",
+                        help="同 --no-plc：不连 PLC，只看 7 个页面的版式")
+    parser.add_argument("--hmi-endpoint", default="",
+                        help="覆盖变量表映射里的 OPC UA 端点，如 opc.tcp://192.168.1.88:4840")
     args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
 
     app = QApplication.instance()
@@ -675,6 +798,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             scene_path=args.scene,
             plc_ip=args.plc_ip,
             enable_plc=not args.no_plc,
+            hmi_demo=args.hmi_demo or args.no_plc,
+            hmi_endpoint=args.hmi_endpoint,
         )
     except Exception as exc:  # noqa: BLE001 - 启动失败要给出可读原因
         traceback.print_exc()

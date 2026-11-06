@@ -5,6 +5,7 @@
     python main.py                 # 工具选择页
     python main.py --app rack      # 直接进「料架 PLC 配置工具」
     python main.py --app safety    # 直接进「大小车安全 PLC 客户端」
+    python main.py --app logplot   # 直接进「RCD 日志解析工具」
     python main.py --no-plc        # 离线模式，不连 PLC（无设备时调试用）
 
 ``rack_config_main.py`` / ``safety_car_main.py`` 保留为薄壳，转发到本模块的
@@ -25,6 +26,12 @@ from __future__ import annotations
 import argparse
 import faulthandler
 import os
+
+# 日志绘图工具会拉起 matplotlib 的 Qt 后端；后端默认按 PyQt6 → PyQt5 →
+# PySide6 挑绑定，机器上同时装着 PyQt 时会抢到 PyQt 上、与本进程混用直接崩。
+# 必须在任何 Qt / matplotlib 导入之前钉死。
+os.environ.setdefault("QT_API", "pyside6")
+
 import sys
 import tempfile
 import threading
@@ -38,6 +45,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -205,6 +213,24 @@ def _make_pop_pick(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
     return PopPickWindow(plc_ip=plc_ip or POPPICK_PLC_IP, enable_plc=enable_plc)
 
 
+def _make_log_plot(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
+    """RCD 日志解析工具（不涉及 PLC，后两个参数只是对齐工厂签名）。
+
+    ``log_plot_main`` 的绘图模块在 import 时会初始化 matplotlib 的 Qt 后端，
+    必须等本进程的 QApplication 建好再导入；``run()`` 满足这个顺序，
+    这里也因此在点击卡片时才 import。
+    """
+    from App_LogPlot.log_plot_entry import MainWidget
+
+    return MainWidget()
+
+
+def _make_designer(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
+
+    from Designer import DesignWindow
+
+    return DesignWindow()
+
 TOOLS: tuple[Tool, ...] = (
     Tool(
         key="rack",
@@ -227,6 +253,20 @@ TOOLS: tuple[Tool, ...] = (
         badge="POPPICK",
         factory=_make_pop_pick,
     ),
+    Tool(
+        key="logplot",
+        title="RCD 日志解析工具",
+        subtitle="日志导入、曲线绘制、主副轴组合图与数据播放",
+        badge="LOGPLOT",
+        factory=_make_log_plot,
+    ),
+    Tool(
+        key="Designer",
+        title="场景设计器",
+        subtitle="设计页面，导出Json文件",
+        badge="DESIGNER",
+        factory=_make_designer,
+        ),
 )
 
 
@@ -409,14 +449,15 @@ class ToolLauncher(QWidget):
         root.addWidget(subtitle)
         root.addSpacing(24)
 
-        row = QHBoxLayout()
-        row.setSpacing(18)
-        for tool in TOOLS:
+        # 两列网格：工具数增加到 4 个后，单行横排会把窗口撑到屏幕外
+        cards = QGridLayout()
+        cards.setSpacing(18)
+        cards.setColumnStretch(2, 1)  # 右侧留白吃掉多余宽度
+        for index, tool in enumerate(TOOLS):
             card = ToolCard(tool)
             card.clicked.connect(self._open)
-            row.addWidget(card)
-        row.addStretch(1)
-        root.addLayout(row)
+            cards.addWidget(card, index // 2, index % 2)
+        root.addLayout(cards)
         root.addStretch(1)
 
         footer = QHBoxLayout()
@@ -453,7 +494,7 @@ class ToolLauncher(QWidget):
             )
             return
 
-        # 两个工具的 closeEvent 都会做真实清理（停线程 / 断 PLC），
+        # 各工具的 closeEvent 都会做真实清理（停线程 / 断 PLC / 停播放任务），
         # 因此关闭即销毁，不缓存实例复用。
         window.setAttribute(Qt.WA_DeleteOnClose, True)
         window.installEventFilter(self)
@@ -680,8 +721,9 @@ def run(
 ) -> int:
     """启动工具或选择页。
 
-    :param app_key: ``"rack"`` / ``"safety"`` 直接启动对应工具；
-        为空或 ``"launcher"`` 时显示选择页。
+    :param app_key: ``TOOLS`` 里注册的 key（``rack`` / ``safety`` /
+        ``PopPick`` / ``logplot``）直接启动对应工具；为空或 ``"launcher"``
+        时显示选择页。
     :param argv: 传给 ``QApplication`` 的参数，默认只用程序名，
         避免 Qt 去解析本模块的 ``--app`` 等自定义参数。
     """

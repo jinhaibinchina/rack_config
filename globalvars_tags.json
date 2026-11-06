@@ -1,0 +1,1963 @@
+{
+  "endpoint": "opc.tcp://192.168.1.88:4840",
+  "count": 391,
+  "nodes": {
+    "工程描述": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.\udcb9\udca4\udcb3\udccc\udcc3\udce8\udcca\udcf6",
+    "aallowmovejogn": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aAllowMoveJogN",
+    "aallowmovejogp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aAllowMoveJogP",
+    "ack": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ack",
+    "ack_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ack_id",
+    "alarms2hmii_0_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].AlarmCode",
+    "alarms2hmii_0_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].Timestamp",
+    "alarms2hmii_0_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].Category",
+    "alarms2hmii_0_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].wsText",
+    "alarms2hmii_0_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].bVisible",
+    "alarms2hmii_1_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].AlarmCode",
+    "alarms2hmii_1_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].Timestamp",
+    "alarms2hmii_1_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].Category",
+    "alarms2hmii_1_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].wsText",
+    "alarms2hmii_1_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].bVisible",
+    "alarms2hmii_2_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].AlarmCode",
+    "alarms2hmii_2_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].Timestamp",
+    "alarms2hmii_2_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].Category",
+    "alarms2hmii_2_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].wsText",
+    "alarms2hmii_2_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].bVisible",
+    "alarms2hmii_3_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].AlarmCode",
+    "alarms2hmii_3_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].Timestamp",
+    "alarms2hmii_3_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].Category",
+    "alarms2hmii_3_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].wsText",
+    "alarms2hmii_3_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].bVisible",
+    "alarms2hmii_4_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].AlarmCode",
+    "alarms2hmii_4_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].Timestamp",
+    "alarms2hmii_4_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].Category",
+    "alarms2hmii_4_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].wsText",
+    "alarms2hmii_4_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].bVisible",
+    "alarms2hmii_5_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].AlarmCode",
+    "alarms2hmii_5_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].Timestamp",
+    "alarms2hmii_5_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].Category",
+    "alarms2hmii_5_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].wsText",
+    "alarms2hmii_5_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].bVisible",
+    "alarms2hmii_6_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].AlarmCode",
+    "alarms2hmii_6_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].Timestamp",
+    "alarms2hmii_6_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].Category",
+    "alarms2hmii_6_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].wsText",
+    "alarms2hmii_6_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].bVisible",
+    "alarms2hmii_7_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].AlarmCode",
+    "alarms2hmii_7_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].Timestamp",
+    "alarms2hmii_7_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].Category",
+    "alarms2hmii_7_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].wsText",
+    "alarms2hmii_7_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].bVisible",
+    "alarms2hmii_8_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].AlarmCode",
+    "alarms2hmii_8_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].Timestamp",
+    "alarms2hmii_8_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].Category",
+    "alarms2hmii_8_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].wsText",
+    "alarms2hmii_8_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].bVisible",
+    "alarms2hmii_9_alarmcode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].AlarmCode",
+    "alarms2hmii_9_timestamp": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].Timestamp",
+    "alarms2hmii_9_category": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].Category",
+    "alarms2hmii_9_wstext": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].wsText",
+    "alarms2hmii_9_bvisible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].bVisible",
+    "alarms2hmii_dimensions": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII.Dimensions",
+    "alarms2hmii_indexmin": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII.IndexMin",
+    "alarms2hmii_indexmax": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII.IndexMax",
+    "asmanualservo_1_enable": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].enable",
+    "asmanualservo_1_jogpositive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].jogPositive",
+    "asmanualservo_1_jognegitive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].jogNegitive",
+    "asmanualservo_1_inchpositive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].InchPositive",
+    "asmanualservo_1_inchnegitive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].InchNegitive",
+    "asmanualservo_1_absexecute": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].absExecute",
+    "asmanualservo_1_absenable": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].absEnable",
+    "asmanualservo_1_velexecute": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].velExecute",
+    "asmanualservo_1_gethome": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].getHome",
+    "asmanualservo_1_stop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].stop",
+    "asmanualservo_1_acknowerr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].acknowErr",
+    "asmanualservo_1_inchdistance": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].inchDistance",
+    "asmanualservo_1_absdistance": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].absDistance",
+    "asmanualservo_1_velocity": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].velocity",
+    "asmanualservo_2_enable": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].enable",
+    "asmanualservo_2_jogpositive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].jogPositive",
+    "asmanualservo_2_jognegitive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].jogNegitive",
+    "asmanualservo_2_inchpositive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].InchPositive",
+    "asmanualservo_2_inchnegitive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].InchNegitive",
+    "asmanualservo_2_absexecute": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].absExecute",
+    "asmanualservo_2_absenable": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].absEnable",
+    "asmanualservo_2_velexecute": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].velExecute",
+    "asmanualservo_2_gethome": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].getHome",
+    "asmanualservo_2_stop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].stop",
+    "asmanualservo_2_acknowerr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].acknowErr",
+    "asmanualservo_2_inchdistance": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].inchDistance",
+    "asmanualservo_2_absdistance": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].absDistance",
+    "asmanualservo_2_velocity": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].velocity",
+    "asmanualservo_3_enable": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].enable",
+    "asmanualservo_3_jogpositive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].jogPositive",
+    "asmanualservo_3_jognegitive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].jogNegitive",
+    "asmanualservo_3_inchpositive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].InchPositive",
+    "asmanualservo_3_inchnegitive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].InchNegitive",
+    "asmanualservo_3_absexecute": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].absExecute",
+    "asmanualservo_3_absenable": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].absEnable",
+    "asmanualservo_3_velexecute": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].velExecute",
+    "asmanualservo_3_gethome": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].getHome",
+    "asmanualservo_3_stop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].stop",
+    "asmanualservo_3_acknowerr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].acknowErr",
+    "asmanualservo_3_inchdistance": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].inchDistance",
+    "asmanualservo_3_absdistance": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].absDistance",
+    "asmanualservo_3_velocity": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].velocity",
+    "asmanualservo_4_enable": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].enable",
+    "asmanualservo_4_jogpositive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].jogPositive",
+    "asmanualservo_4_jognegitive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].jogNegitive",
+    "asmanualservo_4_inchpositive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].InchPositive",
+    "asmanualservo_4_inchnegitive": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].InchNegitive",
+    "asmanualservo_4_absexecute": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].absExecute",
+    "asmanualservo_4_absenable": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].absEnable",
+    "asmanualservo_4_velexecute": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].velExecute",
+    "asmanualservo_4_gethome": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].getHome",
+    "asmanualservo_4_stop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].stop",
+    "asmanualservo_4_acknowerr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].acknowErr",
+    "asmanualservo_4_inchdistance": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].inchDistance",
+    "asmanualservo_4_absdistance": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].absDistance",
+    "asmanualservo_4_velocity": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].velocity",
+    "asmanualservo_dimensions": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo.Dimensions",
+    "asmanualservo_indexmin": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo.IndexMin",
+    "asmanualservo_indexmax": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo.IndexMax",
+    "asservostatus_1_xdriveready": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xDriveReady",
+    "asservostatus_1_xerr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xErr",
+    "asservostatus_1_xenabled": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xEnabled",
+    "asservostatus_1_xerrstop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xErrStop",
+    "asservostatus_1_xstandstill": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xStandStill",
+    "asservostatus_1_xmoving": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xMoving",
+    "asservostatus_1_xconnected": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xConnected",
+    "asservostatus_1_xhomedone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xHomeDone",
+    "asservostatus_1_xservoopmode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xServoOPmode",
+    "asservostatus_1_xposlimit": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xPosLimit",
+    "asservostatus_1_xneglimit": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xNegLimit",
+    "asservostatus_1_xreference": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xReference",
+    "asservostatus_1_istate": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].iState",
+    "asservostatus_1_fpositionnow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].fPositionNow",
+    "asservostatus_1_fvelocitynow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].fVelocityNow",
+    "asservostatus_1_ftorquenow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].fTorqueNow",
+    "asservostatus_1_ffollowerrvalue": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].fFollowErrValue",
+    "asservostatus_1_sdrivererrorid": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].sDriverErrorID",
+    "asservostatus_1_serrnote": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].sErrNote",
+    "asservostatus_1_bcontrolmode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].bControlMode",
+    "asservostatus_2_xdriveready": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xDriveReady",
+    "asservostatus_2_xerr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xErr",
+    "asservostatus_2_xenabled": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xEnabled",
+    "asservostatus_2_xerrstop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xErrStop",
+    "asservostatus_2_xstandstill": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xStandStill",
+    "asservostatus_2_xmoving": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xMoving",
+    "asservostatus_2_xconnected": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xConnected",
+    "asservostatus_2_xhomedone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xHomeDone",
+    "asservostatus_2_xservoopmode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xServoOPmode",
+    "asservostatus_2_xposlimit": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xPosLimit",
+    "asservostatus_2_xneglimit": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xNegLimit",
+    "asservostatus_2_xreference": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xReference",
+    "asservostatus_2_istate": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].iState",
+    "asservostatus_2_fpositionnow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].fPositionNow",
+    "asservostatus_2_fvelocitynow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].fVelocityNow",
+    "asservostatus_2_ftorquenow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].fTorqueNow",
+    "asservostatus_2_ffollowerrvalue": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].fFollowErrValue",
+    "asservostatus_2_sdrivererrorid": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].sDriverErrorID",
+    "asservostatus_2_serrnote": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].sErrNote",
+    "asservostatus_2_bcontrolmode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].bControlMode",
+    "asservostatus_3_xdriveready": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xDriveReady",
+    "asservostatus_3_xerr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xErr",
+    "asservostatus_3_xenabled": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xEnabled",
+    "asservostatus_3_xerrstop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xErrStop",
+    "asservostatus_3_xstandstill": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xStandStill",
+    "asservostatus_3_xmoving": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xMoving",
+    "asservostatus_3_xconnected": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xConnected",
+    "asservostatus_3_xhomedone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xHomeDone",
+    "asservostatus_3_xservoopmode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xServoOPmode",
+    "asservostatus_3_xposlimit": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xPosLimit",
+    "asservostatus_3_xneglimit": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xNegLimit",
+    "asservostatus_3_xreference": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xReference",
+    "asservostatus_3_istate": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].iState",
+    "asservostatus_3_fpositionnow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].fPositionNow",
+    "asservostatus_3_fvelocitynow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].fVelocityNow",
+    "asservostatus_3_ftorquenow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].fTorqueNow",
+    "asservostatus_3_ffollowerrvalue": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].fFollowErrValue",
+    "asservostatus_3_sdrivererrorid": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].sDriverErrorID",
+    "asservostatus_3_serrnote": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].sErrNote",
+    "asservostatus_3_bcontrolmode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].bControlMode",
+    "asservostatus_4_xdriveready": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xDriveReady",
+    "asservostatus_4_xerr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xErr",
+    "asservostatus_4_xenabled": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xEnabled",
+    "asservostatus_4_xerrstop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xErrStop",
+    "asservostatus_4_xstandstill": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xStandStill",
+    "asservostatus_4_xmoving": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xMoving",
+    "asservostatus_4_xconnected": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xConnected",
+    "asservostatus_4_xhomedone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xHomeDone",
+    "asservostatus_4_xservoopmode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xServoOPmode",
+    "asservostatus_4_xposlimit": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xPosLimit",
+    "asservostatus_4_xneglimit": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xNegLimit",
+    "asservostatus_4_xreference": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xReference",
+    "asservostatus_4_istate": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].iState",
+    "asservostatus_4_fpositionnow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].fPositionNow",
+    "asservostatus_4_fvelocitynow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].fVelocityNow",
+    "asservostatus_4_ftorquenow": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].fTorqueNow",
+    "asservostatus_4_ffollowerrvalue": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].fFollowErrValue",
+    "asservostatus_4_sdrivererrorid": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].sDriverErrorID",
+    "asservostatus_4_serrnote": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].sErrNote",
+    "asservostatus_4_bcontrolmode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].bControlMode",
+    "asservostatus_dimensions": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus.Dimensions",
+    "asservostatus_indexmin": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus.IndexMin",
+    "asservostatus_indexmax": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus.IndexMax",
+    "astoragetaskinqueue": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aStorageTaskInQueue",
+    "astoragetaskreq": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aStorageTaskReq",
+    "author": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Author",
+    "avl_main_task_circle_time": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.avl_main_task_circle_time",
+    "avl_motion_task_exe_time": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.avl_motion_task_exe_time",
+    "aworkstationsrcposition_0_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[0].row",
+    "aworkstationsrcposition_0_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[0].col",
+    "aworkstationsrcposition_0_taskno": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[0].TaskNo",
+    "aworkstationsrcposition_0_storagetype": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[0].storageType",
+    "aworkstationsrcposition_1_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[1].row",
+    "aworkstationsrcposition_1_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[1].col",
+    "aworkstationsrcposition_1_taskno": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[1].TaskNo",
+    "aworkstationsrcposition_1_storagetype": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[1].storageType",
+    "aworkstationsrcposition_2_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[2].row",
+    "aworkstationsrcposition_2_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[2].col",
+    "aworkstationsrcposition_2_taskno": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[2].TaskNo",
+    "aworkstationsrcposition_2_storagetype": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[2].storageType",
+    "aworkstationsrcposition_dimensions": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition.Dimensions",
+    "aworkstationsrcposition_indexmin": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition.IndexMin",
+    "aworkstationsrcposition_indexmax": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition.IndexMax",
+    "aworkstationtaskinqueue": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationTaskInQueue",
+    "aworkstationtaskreq": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationTaskReq",
+    "barmconveyrunningnegi": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bArmConveyRunningNegi",
+    "barmconveyrunningposi": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bArmConveyRunningPosi",
+    "bhasboxonarm": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bHasBoxOnArm",
+    "bhasboxonarmconvey": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bHasBoxOnArmConvey",
+    "boottime": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.BootTime",
+    "boxinfoonworkstation_0_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].id",
+    "boxinfoonworkstation_0_weight": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].weight",
+    "boxinfoonworkstation_0_pickdone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].pickDone",
+    "boxinfoonworkstation_0_readyforpick": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].readyForPick",
+    "boxinfoonworkstation_0_src_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].src_row",
+    "boxinfoonworkstation_0_src_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].src_col",
+    "boxinfoonworkstation_0_taskno": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].TaskNo",
+    "boxinfoonworkstation_1_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].id",
+    "boxinfoonworkstation_1_weight": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].weight",
+    "boxinfoonworkstation_1_pickdone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].pickDone",
+    "boxinfoonworkstation_1_readyforpick": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].readyForPick",
+    "boxinfoonworkstation_1_src_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].src_row",
+    "boxinfoonworkstation_1_src_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].src_col",
+    "boxinfoonworkstation_1_taskno": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].TaskNo",
+    "boxinfoonworkstation_2_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].id",
+    "boxinfoonworkstation_2_weight": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].weight",
+    "boxinfoonworkstation_2_pickdone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].pickDone",
+    "boxinfoonworkstation_2_readyforpick": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].readyForPick",
+    "boxinfoonworkstation_2_src_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].src_row",
+    "boxinfoonworkstation_2_src_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].src_col",
+    "boxinfoonworkstation_2_taskno": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].TaskNo",
+    "boxinfoonworkstation_dimensions": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation.Dimensions",
+    "boxinfoonworkstation_indexmin": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation.IndexMin",
+    "boxinfoonworkstation_indexmax": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation.IndexMax",
+    "bshowsubanimation": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bShowSubAnimation",
+    "bsucker_on": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bSucker_On",
+    "btn_estop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_Estop",
+    "btn_moveto_p_workstation_0": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_moveTo_P_WorkStation_0",
+    "btn_moveto_p_workstation_1": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_moveTo_P_WorkStation_1",
+    "btn_moveto_p_workstation_2": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_moveTo_P_WorkStation_2",
+    "btn_moveto_teach_p_storage_00": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_moveTo_teach_P_Storage_00",
+    "btn_pickdone0": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_pickDone0",
+    "btn_pickdone1": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_pickDone1",
+    "btn_pickdone2": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_pickDone2",
+    "btn_prg_page_next": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_prg_page_next",
+    "btn_prg_page_prev": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_prg_page_prev",
+    "btn_reset": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_reset",
+    "btn_speed_add": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_speed_add",
+    "btn_speed_min": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_speed_min",
+    "btn_start": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_start",
+    "btn_stop": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_stop",
+    "btn_teach_p_storage_00": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_teach_P_Storage_00",
+    "btn_teach_p_workstation_0": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_teach_P_WorkStation_0",
+    "btn_teach_p_workstation_1": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_teach_P_WorkStation_1",
+    "btn_teach_p_workstation_2": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_teach_P_WorkStation_2",
+    "btn_vacuumize": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_vacuumize",
+    "btncanceltask": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnCancelTask",
+    "btnclearalltask": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnClearAllTask",
+    "btnfwd_left": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnFwd_left",
+    "btnfwd_mid": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnFwd_mid",
+    "btnfwd_right": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnFwd_right",
+    "btnrev_left": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnRev_left",
+    "btnrev_mid": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnRev_mid",
+    "btnrev_right": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnRev_right",
+    "xready": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.xReady",
+    "xbusy": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.xBusy",
+    "xerror": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.xError",
+    "eerrorid": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.eErrorID",
+    "roffsetx": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.rOffsetX",
+    "roffsety": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.rOffsetY",
+    "roffsetangle": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.rOffsetAngle",
+    "xparseok": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.xParseOK",
+    "cmd_add": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_add",
+    "cmd_dest_storage_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_dest_storage_col",
+    "cmd_dest_storage_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_dest_storage_row",
+    "cmd_dest_workstation": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_dest_workstation",
+    "cmd_dir": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_dir",
+    "cmd_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_id",
+    "cmd_src_storage_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_src_storage_col",
+    "cmd_src_storage_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_src_storage_row",
+    "cmd_src_workstation": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_src_workstation",
+    "codeguid": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CodeGuid",
+    "cpu_usage": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CPU_usage",
+    "current_exe_line": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.current_exe_line",
+    "current_task": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.current_task",
+    "current_task_executing": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.current_task_Executing",
+    "current_task_visible": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.current_task_visible",
+    "currenttaskneedack": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.currentTaskNeedAck",
+    "currenttaskreply": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.currentTaskReply",
+    "displayarm_x": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArm_x",
+    "displayarm_y": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArm_y",
+    "displayarm_z": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArm_z",
+    "displayarmpositions_x": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArmPositions.x",
+    "y": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArmPositions.y",
+    "displayarmpositions_z": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArmPositions.z",
+    "itype": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayStorageInfo.iType",
+    "displaystorageinfo_axhasbox": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayStorageInfo.axHasBox",
+    "displaystorageinfo_axselected": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayStorageInfo.axSelected",
+    "displaystorageinfo_axselectedissrc": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayStorageInfo.axSelectedIsSrc",
+    "displayworkstationinfo_axhasbox": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayWorkstationInfo.axHasBox",
+    "displayworkstationinfo_axselected": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayWorkstationInfo.axSelected",
+    "displayworkstationinfo_axselectedissrc": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayWorkstationInfo.axSelectedIsSrc",
+    "erramount2hmi": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ErrAmount2HMI",
+    "exe_line_offset": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.exe_line_offset",
+    "gateway": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Gateway",
+    "holdresisterin": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.HoldResisterIn",
+    "holdresisterout": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.HoldResisterOut",
+    "ipaddress": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.IPAddress",
+    "lastchanges": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.LastChanges",
+    "local_input": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.LOCAL_INPUT",
+    "local_output": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.LOCAL_OUTPUT",
+    "macaddress": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.MACAddress",
+    "manual_switch": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.manual_switch",
+    "max_main_task_circle_time": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.max_main_task_circle_time",
+    "max_motion_task_exe_time": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.max_motion_task_exe_time",
+    "memsize": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.MemSize",
+    "memusage": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.MemUsage",
+    "netmask": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Netmask",
+    "overallratio": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.overallRatio",
+    "paramsrecoverdone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ParamsRecoverDone",
+    "paramstransferdone": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ParamsTransferDone",
+    "plc_version": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.plc_version",
+    "positiononarmconvey": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.positionOnArmConvey",
+    "prev_task": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prev_task",
+    "prev_task_executing": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prev_task_Executing",
+    "prevtaskneedack": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prevTaskNeedAck",
+    "prevtaskreply": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prevTaskReply",
+    "prg_page": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prg_page",
+    "prg_texts": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prg_texts",
+    "productname": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ProductName",
+    "program_version": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.program_version",
+    "projectname": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ProjectName",
+    "rcd_page": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.rcd_page",
+    "rcd_texts": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.rcd_texts",
+    "remote_input": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.REMOTE_INPUT",
+    "remote_output": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.REMOTE_OUTPUT",
+    "storageready": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.storageReady",
+    "tasklist": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.taskList",
+    "textproperty": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.TextProperty",
+    "timestrip_left": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.timestrip_left",
+    "timestrip_ms": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.timestrip_ms",
+    "timestrip_right": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.timestrip_right",
+    "tip": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Tip",
+    "version": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Version",
+    "wagv_connected": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.wAGV_Connected",
+    "wdevicemode": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.wDeviceMode",
+    "workconveyrunning": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.WorkConveyRunning",
+    "workconveyrunningnegi": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.WorkConveyRunningNegi",
+    "workconveyrunningposi": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.WorkConveyRunningPosi",
+    "wsyserr": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.wSysErr",
+    "wsysrun": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.wSysRun",
+    "btn_do": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.btn_do",
+    "btn_undo": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.btn_undo",
+    "camera_offset_xz_p_storage_xx_x": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.Camera_offset_XZ_P_Storage_XX.x",
+    "camera_offset_xz_p_storage_xx_z": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.Camera_offset_XZ_P_Storage_XX.z",
+    "camera_offset_y": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.Camera_offset_Y",
+    "p_storage_xx_x": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_Storage_XX.x",
+    "p_storage_xx_z": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_Storage_XX.z",
+    "p_storage_xx_col": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_Storage_XX_Col",
+    "p_storage_xx_row": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_Storage_XX_Row",
+    "p_workstation_0_x": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_0.x",
+    "p_workstation_0_z": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_0.z",
+    "p_workstation_1_x": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_1.x",
+    "p_workstation_1_z": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_1.z",
+    "p_workstation_2_x": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_2.x",
+    "p_workstation_2_z": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_2.z",
+    "speedoverall": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.SpeedOverall",
+    "gvl_parameters_storagetype": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.storageType",
+    "sucker_ext_pos": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_ext_pos",
+    "sucker_gearinout_pos": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_gearInOut_pos",
+    "sucker_prev_ext_pos": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_prev_ext_pos",
+    "sucker_prev_ret_pos": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_prev_ret_pos",
+    "sucker_ret_pos": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_ret_pos",
+    "workstationconveyvelocity": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.WorkStationConveyVelocity"
+  },
+  "detail": [
+    {
+      "key": "工程描述",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.\udcb9\udca4\udcb3\udccc\udcc3\udce8\udcca\udcf6"
+    },
+    {
+      "key": "aallowmovejogn",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aAllowMoveJogN"
+    },
+    {
+      "key": "aallowmovejogp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aAllowMoveJogP"
+    },
+    {
+      "key": "ack",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ack"
+    },
+    {
+      "key": "ack_id",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ack_id"
+    },
+    {
+      "key": "alarms2hmii_0_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_0_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_0_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].Category"
+    },
+    {
+      "key": "alarms2hmii_0_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].wsText"
+    },
+    {
+      "key": "alarms2hmii_0_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[0].bVisible"
+    },
+    {
+      "key": "alarms2hmii_1_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_1_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_1_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].Category"
+    },
+    {
+      "key": "alarms2hmii_1_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].wsText"
+    },
+    {
+      "key": "alarms2hmii_1_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[1].bVisible"
+    },
+    {
+      "key": "alarms2hmii_2_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_2_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_2_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].Category"
+    },
+    {
+      "key": "alarms2hmii_2_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].wsText"
+    },
+    {
+      "key": "alarms2hmii_2_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[2].bVisible"
+    },
+    {
+      "key": "alarms2hmii_3_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_3_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_3_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].Category"
+    },
+    {
+      "key": "alarms2hmii_3_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].wsText"
+    },
+    {
+      "key": "alarms2hmii_3_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[3].bVisible"
+    },
+    {
+      "key": "alarms2hmii_4_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_4_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_4_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].Category"
+    },
+    {
+      "key": "alarms2hmii_4_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].wsText"
+    },
+    {
+      "key": "alarms2hmii_4_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[4].bVisible"
+    },
+    {
+      "key": "alarms2hmii_5_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_5_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_5_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].Category"
+    },
+    {
+      "key": "alarms2hmii_5_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].wsText"
+    },
+    {
+      "key": "alarms2hmii_5_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[5].bVisible"
+    },
+    {
+      "key": "alarms2hmii_6_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_6_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_6_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].Category"
+    },
+    {
+      "key": "alarms2hmii_6_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].wsText"
+    },
+    {
+      "key": "alarms2hmii_6_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[6].bVisible"
+    },
+    {
+      "key": "alarms2hmii_7_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_7_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_7_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].Category"
+    },
+    {
+      "key": "alarms2hmii_7_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].wsText"
+    },
+    {
+      "key": "alarms2hmii_7_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[7].bVisible"
+    },
+    {
+      "key": "alarms2hmii_8_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_8_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_8_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].Category"
+    },
+    {
+      "key": "alarms2hmii_8_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].wsText"
+    },
+    {
+      "key": "alarms2hmii_8_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[8].bVisible"
+    },
+    {
+      "key": "alarms2hmii_9_alarmcode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].AlarmCode"
+    },
+    {
+      "key": "alarms2hmii_9_timestamp",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].Timestamp"
+    },
+    {
+      "key": "alarms2hmii_9_category",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].Category"
+    },
+    {
+      "key": "alarms2hmii_9_wstext",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].wsText"
+    },
+    {
+      "key": "alarms2hmii_9_bvisible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII[9].bVisible"
+    },
+    {
+      "key": "alarms2hmii_dimensions",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII.Dimensions"
+    },
+    {
+      "key": "alarms2hmii_indexmin",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII.IndexMin"
+    },
+    {
+      "key": "alarms2hmii_indexmax",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.Alarms2HMII.IndexMax"
+    },
+    {
+      "key": "asmanualservo_1_enable",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].enable"
+    },
+    {
+      "key": "asmanualservo_1_jogpositive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].jogPositive"
+    },
+    {
+      "key": "asmanualservo_1_jognegitive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].jogNegitive"
+    },
+    {
+      "key": "asmanualservo_1_inchpositive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].InchPositive"
+    },
+    {
+      "key": "asmanualservo_1_inchnegitive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].InchNegitive"
+    },
+    {
+      "key": "asmanualservo_1_absexecute",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].absExecute"
+    },
+    {
+      "key": "asmanualservo_1_absenable",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].absEnable"
+    },
+    {
+      "key": "asmanualservo_1_velexecute",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].velExecute"
+    },
+    {
+      "key": "asmanualservo_1_gethome",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].getHome"
+    },
+    {
+      "key": "asmanualservo_1_stop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].stop"
+    },
+    {
+      "key": "asmanualservo_1_acknowerr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].acknowErr"
+    },
+    {
+      "key": "asmanualservo_1_inchdistance",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].inchDistance"
+    },
+    {
+      "key": "asmanualservo_1_absdistance",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].absDistance"
+    },
+    {
+      "key": "asmanualservo_1_velocity",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[1].velocity"
+    },
+    {
+      "key": "asmanualservo_2_enable",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].enable"
+    },
+    {
+      "key": "asmanualservo_2_jogpositive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].jogPositive"
+    },
+    {
+      "key": "asmanualservo_2_jognegitive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].jogNegitive"
+    },
+    {
+      "key": "asmanualservo_2_inchpositive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].InchPositive"
+    },
+    {
+      "key": "asmanualservo_2_inchnegitive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].InchNegitive"
+    },
+    {
+      "key": "asmanualservo_2_absexecute",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].absExecute"
+    },
+    {
+      "key": "asmanualservo_2_absenable",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].absEnable"
+    },
+    {
+      "key": "asmanualservo_2_velexecute",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].velExecute"
+    },
+    {
+      "key": "asmanualservo_2_gethome",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].getHome"
+    },
+    {
+      "key": "asmanualservo_2_stop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].stop"
+    },
+    {
+      "key": "asmanualservo_2_acknowerr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].acknowErr"
+    },
+    {
+      "key": "asmanualservo_2_inchdistance",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].inchDistance"
+    },
+    {
+      "key": "asmanualservo_2_absdistance",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].absDistance"
+    },
+    {
+      "key": "asmanualservo_2_velocity",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[2].velocity"
+    },
+    {
+      "key": "asmanualservo_3_enable",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].enable"
+    },
+    {
+      "key": "asmanualservo_3_jogpositive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].jogPositive"
+    },
+    {
+      "key": "asmanualservo_3_jognegitive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].jogNegitive"
+    },
+    {
+      "key": "asmanualservo_3_inchpositive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].InchPositive"
+    },
+    {
+      "key": "asmanualservo_3_inchnegitive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].InchNegitive"
+    },
+    {
+      "key": "asmanualservo_3_absexecute",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].absExecute"
+    },
+    {
+      "key": "asmanualservo_3_absenable",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].absEnable"
+    },
+    {
+      "key": "asmanualservo_3_velexecute",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].velExecute"
+    },
+    {
+      "key": "asmanualservo_3_gethome",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].getHome"
+    },
+    {
+      "key": "asmanualservo_3_stop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].stop"
+    },
+    {
+      "key": "asmanualservo_3_acknowerr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].acknowErr"
+    },
+    {
+      "key": "asmanualservo_3_inchdistance",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].inchDistance"
+    },
+    {
+      "key": "asmanualservo_3_absdistance",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].absDistance"
+    },
+    {
+      "key": "asmanualservo_3_velocity",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[3].velocity"
+    },
+    {
+      "key": "asmanualservo_4_enable",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].enable"
+    },
+    {
+      "key": "asmanualservo_4_jogpositive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].jogPositive"
+    },
+    {
+      "key": "asmanualservo_4_jognegitive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].jogNegitive"
+    },
+    {
+      "key": "asmanualservo_4_inchpositive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].InchPositive"
+    },
+    {
+      "key": "asmanualservo_4_inchnegitive",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].InchNegitive"
+    },
+    {
+      "key": "asmanualservo_4_absexecute",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].absExecute"
+    },
+    {
+      "key": "asmanualservo_4_absenable",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].absEnable"
+    },
+    {
+      "key": "asmanualservo_4_velexecute",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].velExecute"
+    },
+    {
+      "key": "asmanualservo_4_gethome",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].getHome"
+    },
+    {
+      "key": "asmanualservo_4_stop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].stop"
+    },
+    {
+      "key": "asmanualservo_4_acknowerr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].acknowErr"
+    },
+    {
+      "key": "asmanualservo_4_inchdistance",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].inchDistance"
+    },
+    {
+      "key": "asmanualservo_4_absdistance",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].absDistance"
+    },
+    {
+      "key": "asmanualservo_4_velocity",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo[4].velocity"
+    },
+    {
+      "key": "asmanualservo_dimensions",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo.Dimensions"
+    },
+    {
+      "key": "asmanualservo_indexmin",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo.IndexMin"
+    },
+    {
+      "key": "asmanualservo_indexmax",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asManualServo.IndexMax"
+    },
+    {
+      "key": "asservostatus_1_xdriveready",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xDriveReady"
+    },
+    {
+      "key": "asservostatus_1_xerr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xErr"
+    },
+    {
+      "key": "asservostatus_1_xenabled",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xEnabled"
+    },
+    {
+      "key": "asservostatus_1_xerrstop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xErrStop"
+    },
+    {
+      "key": "asservostatus_1_xstandstill",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xStandStill"
+    },
+    {
+      "key": "asservostatus_1_xmoving",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xMoving"
+    },
+    {
+      "key": "asservostatus_1_xconnected",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xConnected"
+    },
+    {
+      "key": "asservostatus_1_xhomedone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xHomeDone"
+    },
+    {
+      "key": "asservostatus_1_xservoopmode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xServoOPmode"
+    },
+    {
+      "key": "asservostatus_1_xposlimit",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xPosLimit"
+    },
+    {
+      "key": "asservostatus_1_xneglimit",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xNegLimit"
+    },
+    {
+      "key": "asservostatus_1_xreference",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].xReference"
+    },
+    {
+      "key": "asservostatus_1_istate",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].iState"
+    },
+    {
+      "key": "asservostatus_1_fpositionnow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].fPositionNow"
+    },
+    {
+      "key": "asservostatus_1_fvelocitynow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].fVelocityNow"
+    },
+    {
+      "key": "asservostatus_1_ftorquenow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].fTorqueNow"
+    },
+    {
+      "key": "asservostatus_1_ffollowerrvalue",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].fFollowErrValue"
+    },
+    {
+      "key": "asservostatus_1_sdrivererrorid",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].sDriverErrorID"
+    },
+    {
+      "key": "asservostatus_1_serrnote",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].sErrNote"
+    },
+    {
+      "key": "asservostatus_1_bcontrolmode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[1].bControlMode"
+    },
+    {
+      "key": "asservostatus_2_xdriveready",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xDriveReady"
+    },
+    {
+      "key": "asservostatus_2_xerr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xErr"
+    },
+    {
+      "key": "asservostatus_2_xenabled",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xEnabled"
+    },
+    {
+      "key": "asservostatus_2_xerrstop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xErrStop"
+    },
+    {
+      "key": "asservostatus_2_xstandstill",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xStandStill"
+    },
+    {
+      "key": "asservostatus_2_xmoving",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xMoving"
+    },
+    {
+      "key": "asservostatus_2_xconnected",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xConnected"
+    },
+    {
+      "key": "asservostatus_2_xhomedone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xHomeDone"
+    },
+    {
+      "key": "asservostatus_2_xservoopmode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xServoOPmode"
+    },
+    {
+      "key": "asservostatus_2_xposlimit",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xPosLimit"
+    },
+    {
+      "key": "asservostatus_2_xneglimit",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xNegLimit"
+    },
+    {
+      "key": "asservostatus_2_xreference",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].xReference"
+    },
+    {
+      "key": "asservostatus_2_istate",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].iState"
+    },
+    {
+      "key": "asservostatus_2_fpositionnow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].fPositionNow"
+    },
+    {
+      "key": "asservostatus_2_fvelocitynow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].fVelocityNow"
+    },
+    {
+      "key": "asservostatus_2_ftorquenow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].fTorqueNow"
+    },
+    {
+      "key": "asservostatus_2_ffollowerrvalue",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].fFollowErrValue"
+    },
+    {
+      "key": "asservostatus_2_sdrivererrorid",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].sDriverErrorID"
+    },
+    {
+      "key": "asservostatus_2_serrnote",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].sErrNote"
+    },
+    {
+      "key": "asservostatus_2_bcontrolmode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[2].bControlMode"
+    },
+    {
+      "key": "asservostatus_3_xdriveready",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xDriveReady"
+    },
+    {
+      "key": "asservostatus_3_xerr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xErr"
+    },
+    {
+      "key": "asservostatus_3_xenabled",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xEnabled"
+    },
+    {
+      "key": "asservostatus_3_xerrstop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xErrStop"
+    },
+    {
+      "key": "asservostatus_3_xstandstill",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xStandStill"
+    },
+    {
+      "key": "asservostatus_3_xmoving",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xMoving"
+    },
+    {
+      "key": "asservostatus_3_xconnected",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xConnected"
+    },
+    {
+      "key": "asservostatus_3_xhomedone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xHomeDone"
+    },
+    {
+      "key": "asservostatus_3_xservoopmode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xServoOPmode"
+    },
+    {
+      "key": "asservostatus_3_xposlimit",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xPosLimit"
+    },
+    {
+      "key": "asservostatus_3_xneglimit",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xNegLimit"
+    },
+    {
+      "key": "asservostatus_3_xreference",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].xReference"
+    },
+    {
+      "key": "asservostatus_3_istate",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].iState"
+    },
+    {
+      "key": "asservostatus_3_fpositionnow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].fPositionNow"
+    },
+    {
+      "key": "asservostatus_3_fvelocitynow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].fVelocityNow"
+    },
+    {
+      "key": "asservostatus_3_ftorquenow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].fTorqueNow"
+    },
+    {
+      "key": "asservostatus_3_ffollowerrvalue",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].fFollowErrValue"
+    },
+    {
+      "key": "asservostatus_3_sdrivererrorid",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].sDriverErrorID"
+    },
+    {
+      "key": "asservostatus_3_serrnote",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].sErrNote"
+    },
+    {
+      "key": "asservostatus_3_bcontrolmode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[3].bControlMode"
+    },
+    {
+      "key": "asservostatus_4_xdriveready",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xDriveReady"
+    },
+    {
+      "key": "asservostatus_4_xerr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xErr"
+    },
+    {
+      "key": "asservostatus_4_xenabled",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xEnabled"
+    },
+    {
+      "key": "asservostatus_4_xerrstop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xErrStop"
+    },
+    {
+      "key": "asservostatus_4_xstandstill",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xStandStill"
+    },
+    {
+      "key": "asservostatus_4_xmoving",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xMoving"
+    },
+    {
+      "key": "asservostatus_4_xconnected",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xConnected"
+    },
+    {
+      "key": "asservostatus_4_xhomedone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xHomeDone"
+    },
+    {
+      "key": "asservostatus_4_xservoopmode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xServoOPmode"
+    },
+    {
+      "key": "asservostatus_4_xposlimit",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xPosLimit"
+    },
+    {
+      "key": "asservostatus_4_xneglimit",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xNegLimit"
+    },
+    {
+      "key": "asservostatus_4_xreference",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].xReference"
+    },
+    {
+      "key": "asservostatus_4_istate",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].iState"
+    },
+    {
+      "key": "asservostatus_4_fpositionnow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].fPositionNow"
+    },
+    {
+      "key": "asservostatus_4_fvelocitynow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].fVelocityNow"
+    },
+    {
+      "key": "asservostatus_4_ftorquenow",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].fTorqueNow"
+    },
+    {
+      "key": "asservostatus_4_ffollowerrvalue",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].fFollowErrValue"
+    },
+    {
+      "key": "asservostatus_4_sdrivererrorid",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].sDriverErrorID"
+    },
+    {
+      "key": "asservostatus_4_serrnote",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].sErrNote"
+    },
+    {
+      "key": "asservostatus_4_bcontrolmode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus[4].bControlMode"
+    },
+    {
+      "key": "asservostatus_dimensions",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus.Dimensions"
+    },
+    {
+      "key": "asservostatus_indexmin",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus.IndexMin"
+    },
+    {
+      "key": "asservostatus_indexmax",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.asServoStatus.IndexMax"
+    },
+    {
+      "key": "astoragetaskinqueue",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aStorageTaskInQueue"
+    },
+    {
+      "key": "astoragetaskreq",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aStorageTaskReq"
+    },
+    {
+      "key": "author",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Author"
+    },
+    {
+      "key": "avl_main_task_circle_time",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.avl_main_task_circle_time"
+    },
+    {
+      "key": "avl_motion_task_exe_time",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.avl_motion_task_exe_time"
+    },
+    {
+      "key": "aworkstationsrcposition_0_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[0].row"
+    },
+    {
+      "key": "aworkstationsrcposition_0_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[0].col"
+    },
+    {
+      "key": "aworkstationsrcposition_0_taskno",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[0].TaskNo"
+    },
+    {
+      "key": "aworkstationsrcposition_0_storagetype",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[0].storageType"
+    },
+    {
+      "key": "aworkstationsrcposition_1_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[1].row"
+    },
+    {
+      "key": "aworkstationsrcposition_1_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[1].col"
+    },
+    {
+      "key": "aworkstationsrcposition_1_taskno",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[1].TaskNo"
+    },
+    {
+      "key": "aworkstationsrcposition_1_storagetype",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[1].storageType"
+    },
+    {
+      "key": "aworkstationsrcposition_2_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[2].row"
+    },
+    {
+      "key": "aworkstationsrcposition_2_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[2].col"
+    },
+    {
+      "key": "aworkstationsrcposition_2_taskno",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[2].TaskNo"
+    },
+    {
+      "key": "aworkstationsrcposition_2_storagetype",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition[2].storageType"
+    },
+    {
+      "key": "aworkstationsrcposition_dimensions",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition.Dimensions"
+    },
+    {
+      "key": "aworkstationsrcposition_indexmin",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition.IndexMin"
+    },
+    {
+      "key": "aworkstationsrcposition_indexmax",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationSrcPosition.IndexMax"
+    },
+    {
+      "key": "aworkstationtaskinqueue",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationTaskInQueue"
+    },
+    {
+      "key": "aworkstationtaskreq",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.aWorkstationTaskReq"
+    },
+    {
+      "key": "barmconveyrunningnegi",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bArmConveyRunningNegi"
+    },
+    {
+      "key": "barmconveyrunningposi",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bArmConveyRunningPosi"
+    },
+    {
+      "key": "bhasboxonarm",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bHasBoxOnArm"
+    },
+    {
+      "key": "bhasboxonarmconvey",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bHasBoxOnArmConvey"
+    },
+    {
+      "key": "boottime",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.BootTime"
+    },
+    {
+      "key": "boxinfoonworkstation_0_id",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].id"
+    },
+    {
+      "key": "boxinfoonworkstation_0_weight",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].weight"
+    },
+    {
+      "key": "boxinfoonworkstation_0_pickdone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].pickDone"
+    },
+    {
+      "key": "boxinfoonworkstation_0_readyforpick",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].readyForPick"
+    },
+    {
+      "key": "boxinfoonworkstation_0_src_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].src_row"
+    },
+    {
+      "key": "boxinfoonworkstation_0_src_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].src_col"
+    },
+    {
+      "key": "boxinfoonworkstation_0_taskno",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[0].TaskNo"
+    },
+    {
+      "key": "boxinfoonworkstation_1_id",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].id"
+    },
+    {
+      "key": "boxinfoonworkstation_1_weight",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].weight"
+    },
+    {
+      "key": "boxinfoonworkstation_1_pickdone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].pickDone"
+    },
+    {
+      "key": "boxinfoonworkstation_1_readyforpick",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].readyForPick"
+    },
+    {
+      "key": "boxinfoonworkstation_1_src_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].src_row"
+    },
+    {
+      "key": "boxinfoonworkstation_1_src_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].src_col"
+    },
+    {
+      "key": "boxinfoonworkstation_1_taskno",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[1].TaskNo"
+    },
+    {
+      "key": "boxinfoonworkstation_2_id",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].id"
+    },
+    {
+      "key": "boxinfoonworkstation_2_weight",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].weight"
+    },
+    {
+      "key": "boxinfoonworkstation_2_pickdone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].pickDone"
+    },
+    {
+      "key": "boxinfoonworkstation_2_readyforpick",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].readyForPick"
+    },
+    {
+      "key": "boxinfoonworkstation_2_src_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].src_row"
+    },
+    {
+      "key": "boxinfoonworkstation_2_src_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].src_col"
+    },
+    {
+      "key": "boxinfoonworkstation_2_taskno",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation[2].TaskNo"
+    },
+    {
+      "key": "boxinfoonworkstation_dimensions",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation.Dimensions"
+    },
+    {
+      "key": "boxinfoonworkstation_indexmin",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation.IndexMin"
+    },
+    {
+      "key": "boxinfoonworkstation_indexmax",
+      "node_id": "ns=4;s=|vprop|Inovance-ARM-Linux.Application.GVL_HMI.boxInfoOnWorkstation.IndexMax"
+    },
+    {
+      "key": "bshowsubanimation",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bShowSubAnimation"
+    },
+    {
+      "key": "bsucker_on",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.bSucker_On"
+    },
+    {
+      "key": "btn_estop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_Estop"
+    },
+    {
+      "key": "btn_moveto_p_workstation_0",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_moveTo_P_WorkStation_0"
+    },
+    {
+      "key": "btn_moveto_p_workstation_1",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_moveTo_P_WorkStation_1"
+    },
+    {
+      "key": "btn_moveto_p_workstation_2",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_moveTo_P_WorkStation_2"
+    },
+    {
+      "key": "btn_moveto_teach_p_storage_00",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_moveTo_teach_P_Storage_00"
+    },
+    {
+      "key": "btn_pickdone0",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_pickDone0"
+    },
+    {
+      "key": "btn_pickdone1",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_pickDone1"
+    },
+    {
+      "key": "btn_pickdone2",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_pickDone2"
+    },
+    {
+      "key": "btn_prg_page_next",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_prg_page_next"
+    },
+    {
+      "key": "btn_prg_page_prev",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_prg_page_prev"
+    },
+    {
+      "key": "btn_reset",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_reset"
+    },
+    {
+      "key": "btn_speed_add",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_speed_add"
+    },
+    {
+      "key": "btn_speed_min",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_speed_min"
+    },
+    {
+      "key": "btn_start",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_start"
+    },
+    {
+      "key": "btn_stop",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_stop"
+    },
+    {
+      "key": "btn_teach_p_storage_00",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_teach_P_Storage_00"
+    },
+    {
+      "key": "btn_teach_p_workstation_0",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_teach_P_WorkStation_0"
+    },
+    {
+      "key": "btn_teach_p_workstation_1",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_teach_P_WorkStation_1"
+    },
+    {
+      "key": "btn_teach_p_workstation_2",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_teach_P_WorkStation_2"
+    },
+    {
+      "key": "btn_vacuumize",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btn_vacuumize"
+    },
+    {
+      "key": "btncanceltask",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnCancelTask"
+    },
+    {
+      "key": "btnclearalltask",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnClearAllTask"
+    },
+    {
+      "key": "btnfwd_left",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnFwd_left"
+    },
+    {
+      "key": "btnfwd_mid",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnFwd_mid"
+    },
+    {
+      "key": "btnfwd_right",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnFwd_right"
+    },
+    {
+      "key": "btnrev_left",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnRev_left"
+    },
+    {
+      "key": "btnrev_mid",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnRev_mid"
+    },
+    {
+      "key": "btnrev_right",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.btnRev_right"
+    },
+    {
+      "key": "xready",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.xReady"
+    },
+    {
+      "key": "xbusy",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.xBusy"
+    },
+    {
+      "key": "xerror",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.xError"
+    },
+    {
+      "key": "eerrorid",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.eErrorID"
+    },
+    {
+      "key": "roffsetx",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.rOffsetX"
+    },
+    {
+      "key": "roffsety",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.rOffsetY"
+    },
+    {
+      "key": "roffsetangle",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.rOffsetAngle"
+    },
+    {
+      "key": "xparseok",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CameraDatas.xParseOK"
+    },
+    {
+      "key": "cmd_add",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_add"
+    },
+    {
+      "key": "cmd_dest_storage_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_dest_storage_col"
+    },
+    {
+      "key": "cmd_dest_storage_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_dest_storage_row"
+    },
+    {
+      "key": "cmd_dest_workstation",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_dest_workstation"
+    },
+    {
+      "key": "cmd_dir",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_dir"
+    },
+    {
+      "key": "cmd_id",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_id"
+    },
+    {
+      "key": "cmd_src_storage_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_src_storage_col"
+    },
+    {
+      "key": "cmd_src_storage_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_src_storage_row"
+    },
+    {
+      "key": "cmd_src_workstation",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.cmd_src_workstation"
+    },
+    {
+      "key": "codeguid",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CodeGuid"
+    },
+    {
+      "key": "cpu_usage",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.CPU_usage"
+    },
+    {
+      "key": "current_exe_line",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.current_exe_line"
+    },
+    {
+      "key": "current_task",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.current_task"
+    },
+    {
+      "key": "current_task_executing",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.current_task_Executing"
+    },
+    {
+      "key": "current_task_visible",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.current_task_visible"
+    },
+    {
+      "key": "currenttaskneedack",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.currentTaskNeedAck"
+    },
+    {
+      "key": "currenttaskreply",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.currentTaskReply"
+    },
+    {
+      "key": "displayarm_x",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArm_x"
+    },
+    {
+      "key": "displayarm_y",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArm_y"
+    },
+    {
+      "key": "displayarm_z",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArm_z"
+    },
+    {
+      "key": "displayarmpositions_x",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArmPositions.x"
+    },
+    {
+      "key": "y",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArmPositions.y"
+    },
+    {
+      "key": "displayarmpositions_z",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayArmPositions.z"
+    },
+    {
+      "key": "itype",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayStorageInfo.iType"
+    },
+    {
+      "key": "displaystorageinfo_axhasbox",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayStorageInfo.axHasBox"
+    },
+    {
+      "key": "displaystorageinfo_axselected",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayStorageInfo.axSelected"
+    },
+    {
+      "key": "displaystorageinfo_axselectedissrc",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayStorageInfo.axSelectedIsSrc"
+    },
+    {
+      "key": "displayworkstationinfo_axhasbox",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayWorkstationInfo.axHasBox"
+    },
+    {
+      "key": "displayworkstationinfo_axselected",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayWorkstationInfo.axSelected"
+    },
+    {
+      "key": "displayworkstationinfo_axselectedissrc",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.displayWorkstationInfo.axSelectedIsSrc"
+    },
+    {
+      "key": "erramount2hmi",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ErrAmount2HMI"
+    },
+    {
+      "key": "exe_line_offset",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.exe_line_offset"
+    },
+    {
+      "key": "gateway",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Gateway"
+    },
+    {
+      "key": "holdresisterin",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.HoldResisterIn"
+    },
+    {
+      "key": "holdresisterout",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.HoldResisterOut"
+    },
+    {
+      "key": "ipaddress",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.IPAddress"
+    },
+    {
+      "key": "lastchanges",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.LastChanges"
+    },
+    {
+      "key": "local_input",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.LOCAL_INPUT"
+    },
+    {
+      "key": "local_output",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.LOCAL_OUTPUT"
+    },
+    {
+      "key": "macaddress",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.MACAddress"
+    },
+    {
+      "key": "manual_switch",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.manual_switch"
+    },
+    {
+      "key": "max_main_task_circle_time",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.max_main_task_circle_time"
+    },
+    {
+      "key": "max_motion_task_exe_time",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.max_motion_task_exe_time"
+    },
+    {
+      "key": "memsize",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.MemSize"
+    },
+    {
+      "key": "memusage",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.MemUsage"
+    },
+    {
+      "key": "netmask",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Netmask"
+    },
+    {
+      "key": "overallratio",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.overallRatio"
+    },
+    {
+      "key": "paramsrecoverdone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ParamsRecoverDone"
+    },
+    {
+      "key": "paramstransferdone",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ParamsTransferDone"
+    },
+    {
+      "key": "plc_version",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.plc_version"
+    },
+    {
+      "key": "positiononarmconvey",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.positionOnArmConvey"
+    },
+    {
+      "key": "prev_task",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prev_task"
+    },
+    {
+      "key": "prev_task_executing",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prev_task_Executing"
+    },
+    {
+      "key": "prevtaskneedack",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prevTaskNeedAck"
+    },
+    {
+      "key": "prevtaskreply",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prevTaskReply"
+    },
+    {
+      "key": "prg_page",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prg_page"
+    },
+    {
+      "key": "prg_texts",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.prg_texts"
+    },
+    {
+      "key": "productname",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ProductName"
+    },
+    {
+      "key": "program_version",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.program_version"
+    },
+    {
+      "key": "projectname",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.ProjectName"
+    },
+    {
+      "key": "rcd_page",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.rcd_page"
+    },
+    {
+      "key": "rcd_texts",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.rcd_texts"
+    },
+    {
+      "key": "remote_input",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.REMOTE_INPUT"
+    },
+    {
+      "key": "remote_output",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.REMOTE_OUTPUT"
+    },
+    {
+      "key": "storageready",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.storageReady"
+    },
+    {
+      "key": "tasklist",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.taskList"
+    },
+    {
+      "key": "textproperty",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.TextProperty"
+    },
+    {
+      "key": "timestrip_left",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.timestrip_left"
+    },
+    {
+      "key": "timestrip_ms",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.timestrip_ms"
+    },
+    {
+      "key": "timestrip_right",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.timestrip_right"
+    },
+    {
+      "key": "tip",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Tip"
+    },
+    {
+      "key": "version",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.Version"
+    },
+    {
+      "key": "wagv_connected",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.wAGV_Connected"
+    },
+    {
+      "key": "wdevicemode",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.wDeviceMode"
+    },
+    {
+      "key": "workconveyrunning",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.WorkConveyRunning"
+    },
+    {
+      "key": "workconveyrunningnegi",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.WorkConveyRunningNegi"
+    },
+    {
+      "key": "workconveyrunningposi",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.WorkConveyRunningPosi"
+    },
+    {
+      "key": "wsyserr",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.wSysErr"
+    },
+    {
+      "key": "wsysrun",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_HMI.wSysRun"
+    },
+    {
+      "key": "btn_do",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.btn_do"
+    },
+    {
+      "key": "btn_undo",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.btn_undo"
+    },
+    {
+      "key": "camera_offset_xz_p_storage_xx_x",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.Camera_offset_XZ_P_Storage_XX.x"
+    },
+    {
+      "key": "camera_offset_xz_p_storage_xx_z",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.Camera_offset_XZ_P_Storage_XX.z"
+    },
+    {
+      "key": "camera_offset_y",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.Camera_offset_Y"
+    },
+    {
+      "key": "p_storage_xx_x",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_Storage_XX.x"
+    },
+    {
+      "key": "p_storage_xx_z",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_Storage_XX.z"
+    },
+    {
+      "key": "p_storage_xx_col",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_Storage_XX_Col"
+    },
+    {
+      "key": "p_storage_xx_row",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_Storage_XX_Row"
+    },
+    {
+      "key": "p_workstation_0_x",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_0.x"
+    },
+    {
+      "key": "p_workstation_0_z",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_0.z"
+    },
+    {
+      "key": "p_workstation_1_x",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_1.x"
+    },
+    {
+      "key": "p_workstation_1_z",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_1.z"
+    },
+    {
+      "key": "p_workstation_2_x",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_2.x"
+    },
+    {
+      "key": "p_workstation_2_z",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.P_WorkStation_2.z"
+    },
+    {
+      "key": "speedoverall",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.SpeedOverall"
+    },
+    {
+      "key": "gvl_parameters_storagetype",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.storageType"
+    },
+    {
+      "key": "sucker_ext_pos",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_ext_pos"
+    },
+    {
+      "key": "sucker_gearinout_pos",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_gearInOut_pos"
+    },
+    {
+      "key": "sucker_prev_ext_pos",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_prev_ext_pos"
+    },
+    {
+      "key": "sucker_prev_ret_pos",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_prev_ret_pos"
+    },
+    {
+      "key": "sucker_ret_pos",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.sucker_ret_pos"
+    },
+    {
+      "key": "workstationconveyvelocity",
+      "node_id": "ns=4;s=|var|Inovance-ARM-Linux.Application.GVL_PARAMETERS.WorkStationConveyVelocity"
+    }
+  ]
+}

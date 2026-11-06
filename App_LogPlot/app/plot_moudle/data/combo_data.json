@@ -1,0 +1,24 @@
+{
+    "额外": {
+        "plot_type": "2",
+        "plot_info": [
+            {
+                "location": "00",
+                "items": [
+                    "positionX",
+                    "positionZ",
+                    "velocityX",
+                    "velocityY",
+                    "velocityZ"
+                ]
+            },
+            {
+                "location": "10",
+                "items": [
+                    "velocityX",
+                    "positionY"
+                ]
+            }
+        ]
+    }
+}
