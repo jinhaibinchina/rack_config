@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QComboBox, QMenu, QProgressDialog,
     QCompleter, QToolTip
 )
-from Robot3D_6axis_Com import SignalBridge,TcpPositionWorker,ModbusClient
+from .Robot3D_6axis_Com import SignalBridge,TcpPositionWorker,ModbusClient
 import sys
 
 # ==================== 6轴关节机器人 3D 可视化 ====================

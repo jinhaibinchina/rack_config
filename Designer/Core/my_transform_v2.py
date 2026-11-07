@@ -219,6 +219,41 @@ class Transform:
             # 当 w ≈ 0 时，返回无效点
             return QPointF(float('nan'), float('nan'))
     
+    def map_many(self, points) -> list[tuple[float, float]]:
+        """批量把局部点映射到目标坐标系，返回 ``(x, y)`` 元组列表。
+
+        与逐个调用 :meth:`map` 完全同式（含 w 归一化与 w≈0 时返回 nan），
+        区别只在两点：矩阵只展开一次，且不为每个点构造 ``QPointF``。
+        坐标点支持 ``QPointF`` / ``(x, y)`` 序列 / ``None``。
+
+        热路径（``on_mouse_move`` 收集吸附端点）里每个图元要算 1~5 个点，
+        原来每个点都走一遍 ``mapToScene -> sceneTransform -> map`` 并新建一个
+        PySide 包装对象；这里一次变换、纯浮点循环，省掉绝大部分解释器开销。
+        """
+        m = self.m
+        ax, ay, at = m[0][0], m[1][0], m[2][0]
+        bx, by, bt = m[0][1], m[1][1], m[2][1]
+        cx, cy, ct = m[0][2], m[1][2], m[2][2]
+        nan = float("nan")
+        out: list[tuple[float, float]] = []
+        append = out.append
+        for p in points:
+            if p is None:
+                append((nan, nan))
+                continue
+            if isinstance(p, QPointF):
+                x, y = p.x(), p.y()
+            else:
+                x, y = p[0], p[1]
+            wx = ax * x + ay * y + at
+            wy = bx * x + by * y + bt
+            w = cx * x + cy * y + ct
+            if w > 1e-10 or w < -1e-10:
+                append((wx / w, wy / w))
+            else:
+                append((nan, nan))
+        return out
+
     def map_inverse(self, point: QPointF) -> QPointF:
         """应用逆变换到点"""
         inv = self.inverted()

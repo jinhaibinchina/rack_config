@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from .element import*
 from .embedded_widget_layer import EmbeddedWidgetLayer
+from .scene_fast import brush_for, dashed_pen_for, font_for, pen_for
 from res.designer_resource_manager import  resource_manager as res_mng
 # 图元析构时的调试输出。默认关闭：一次场景加载会产生上千行日志，
 # 需要排查时可设置环境变量 RACK_DEBUG_DESTROY=1 打开。
@@ -415,7 +416,7 @@ class line_element(base_element):
         # self.m_display_color = color
 
             
-        painter.setPen(QPen(color, self.get_line_width()))
+        painter.setPen(pen_for(color, self.get_line_width()))
         
         pos0=self.m_scene.sceneToView(self.get_scene_head_pos())
         pos1=self.m_scene.sceneToView(self.get_scene_end_pos())
@@ -965,11 +966,11 @@ class rect_element(base_element):
         fill_color = self._fill_color
         if self.get_fill():
             # 设置填充颜色（蓝色）
-            painter.setBrush(fill_color)   
+            painter.setBrush(brush_for(fill_color))   
         if self.get_line_width()>0:
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
         else:
-            painter.setPen(QPen(fill_color, 0))
+            painter.setPen(pen_for(fill_color, 0))
 
         radius = self.get_corner_radius()
         if radius > 0:
@@ -1006,11 +1007,11 @@ class rect_element(base_element):
 
     #     if self.get_fill():
     #         # 设置填充颜色（蓝色）
-    #         painter.setBrush(fill_color)   
+    #         painter.setBrush(brush_for(fill_color))   
     #     if self.get_line_width()>0:
-    #         painter.setPen(QPen(color, self.get_line_width()))
+    #         painter.setPen(pen_for(color, self.get_line_width()))
     #     else:
-    #         painter.setPen(QPen(fill_color, 0))
+    #         painter.setPen(pen_for(fill_color, 0))
 
     #     painter.drawPolygon([pos1,pos2,pos3,pos4])
     #     painter.restore()
@@ -1202,11 +1203,11 @@ class checkbox_element(rect_element):
 
         fill_color = self._fill_color
         if self.get_fill():
-            painter.setBrush(fill_color)
+            painter.setBrush(brush_for(fill_color))
         if self.get_line_width() > 0:
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
         else:
-            painter.setPen(QPen(fill_color, 0))
+            painter.setPen(pen_for(fill_color, 0))
 
         radius = self.get_corner_radius()
         if radius > 0:
@@ -1224,7 +1225,7 @@ class checkbox_element(rect_element):
             short = min(w, h)
             if short > 4.0:
                 pen_w = max(2.0, short * 0.12)
-                painter.setPen(QPen(color, pen_w))
+                painter.setPen(pen_for(color, pen_w))
                 # 对勾从方框左上区域画到中下、再折向右上，占方框约 0.6 高。
                 s = short * 0.18
                 p1 = QPointF(-w * 0.28, h * 0.02)
@@ -1931,11 +1932,11 @@ class widget_element(rect_element):
 
         fill_color = self._fill_color
         if self.get_fill():
-            painter.setBrush(fill_color)
+            painter.setBrush(brush_for(fill_color))
         if self.get_line_width() > 0:
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
         else:
-            painter.setPen(QPen(fill_color, 0))
+            painter.setPen(pen_for(fill_color, 0))
 
         radius = self.get_corner_radius()
         if radius > 0:
@@ -1949,7 +1950,7 @@ class widget_element(rect_element):
 
         # 占位标识：中央画一个 "Widget" 字样，提示这是控件图元。
         if w > 30 and h > 20:
-            painter.setPen(QPen(color, 1))
+            painter.setPen(pen_for(color, 1))
             font = painter.font()
             font.setPointSizeF(max(7.0, min(w, h) * 0.16))
             painter.setFont(font)
@@ -1984,9 +1985,9 @@ class widget_element(rect_element):
         # 一定要显式 NoBrush：这里省掉的正是填底，别继承上一个图元留下的画刷。
         painter.setBrush(Qt.NoBrush)
         if self.get_line_width() > 0:
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
         else:
-            painter.setPen(QPen(self._fill_color, 0))
+            painter.setPen(pen_for(self._fill_color, 0))
 
         radius = self.get_corner_radius()
         if radius > 0:
@@ -2314,30 +2315,12 @@ class group_element(rect_element):
             super().paint(painter,shine_flag)
             return
         painter.save()
-        def create_pen_style(color: QColor) -> QPen:
-            # 创建基础画笔
-            pen = QPen()
-            
-            # 设置画笔属性
-            pen.setColor(color)  # 黑色钢笔
-            pen.setWidth(1)                # 线宽3像素
-            
-            # 格式: [实线长度, 空白长度, 点长度, 空白长度] 重复
-            dash_pattern = [8, 4, 2, 4]  # 8像素实线 - 4像素空白 - 2像素点 - 4像素空白
-            
-            pen.setDashPattern(dash_pattern)  # 设置自定义虚线模式
-            pen.setStyle(Qt.CustomDashLine)   # 必须设置为自定义虚线模式
-            
-            # 优化端点样式
-            pen.setCapStyle(Qt.RoundCap)      # 圆角端点
-            pen.setJoinStyle(Qt.RoundJoin)    # 圆角连接
-            return pen
-        
+        # 虚线画笔按颜色复用，见 scene_fast.dashed_pen_for()
         color = self.get_color()
         if self.get_selected() and shine_flag or self.get_hover() or self._is_group_in_hover :
             color = QColor(14,248,236)
 
-        pen = create_pen_style(color)
+        pen = dashed_pen_for(color)
        
         painter.setPen(pen)
         
@@ -2699,11 +2682,11 @@ class circle_element(base_element):
       
         if self.get_fill():
             # 设置填充颜色（蓝色）
-            painter.setBrush(fill_color)    
+            painter.setBrush(brush_for(fill_color))    
         if self.get_line_width()>0:
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
         else:
-            painter.setPen(QPen(fill_color, 0))
+            painter.setPen(pen_for(fill_color, 0))
 
         center_pos_view=self.m_scene.sceneToView(self.get_scene_center_pos())
         # view_r = self.radius* (self.m_scene.grid_size ) / self.m_scene.scene_units_per_grid_x
@@ -3312,10 +3295,8 @@ class text_element(base_element):
         # topleft =center_pos_view-QPointF(w/2.0,h/2.0)
         # bg_rect = QRectF(topleft.x(),topleft.y(),w,h)
         bg_rect =QRectF(-w/2.0 ,-h/2.0,w,h)
-        # 设置大号字体
-        font = QFont("Arial", self.font_size)  # 使用固定大字号
-        font.setBold(True)
-        painter.setFont(font)
+        # 设置大号字体（按 字体/字号/粗体 复用，避免每帧新建 QFont）
+        painter.setFont(font_for("Arial", self.font_size, True))
        
          # 应用视图变换
         painter.translate(center_pos_view)
@@ -3323,15 +3304,15 @@ class text_element(base_element):
         painter.rotate(-angle)
 
         if self.get_line_width()>0:
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
             if self.get_fill():
-                painter.setBrush(self._fill_color)
+                painter.setBrush(brush_for(self._fill_color))
             painter.drawRect(bg_rect)
         else:
-            painter.setPen(QPen(color, 1))
+            painter.setPen(pen_for(color, 1))
             if self.get_fill():
                 painter.fillRect(bg_rect, self._fill_color)
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
 
 
         # 绘制背景
@@ -3774,30 +3755,12 @@ class image_element(base_element):
         # 关键：启用渲染提示以提高绘制质量
         painter.setRenderHint(QPainter.Antialiasing, True)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-        def create_pen_style(color: QColor) -> QPen:
-            # 创建基础画笔
-            pen = QPen()
-            
-            # 设置画笔属性
-            pen.setColor(color)  # 黑色钢笔
-            pen.setWidth(1)                # 线宽3像素
-            
-            # 格式: [实线长度, 空白长度, 点长度, 空白长度] 重复
-            dash_pattern = [8, 4, 2, 4]  # 8像素实线 - 4像素空白 - 2像素点 - 4像素空白
-            
-            pen.setDashPattern(dash_pattern)  # 设置自定义虚线模式
-            pen.setStyle(Qt.CustomDashLine)   # 必须设置为自定义虚线模式
-            
-            # 优化端点样式
-            pen.setCapStyle(Qt.RoundCap)      # 圆角端点
-            pen.setJoinStyle(Qt.RoundJoin)    # 圆角连接
-            return pen
-        
+        # 虚线画笔按颜色复用，见 scene_fast.dashed_pen_for()
         color = self.get_color()
         if self.get_selected()  or self.get_hover() or self._is_group_in_hover :
             color = QColor(14,248,236)
 
-        pen = create_pen_style(color)
+        pen = dashed_pen_for(color)
        
         painter.setPen(pen)
 
@@ -4304,11 +4267,11 @@ class triangle_element(rect_element):
         path.closeSubpath()
 
         fill_color = self._fill_color
-        painter.setBrush(fill_color if self.get_fill() else Qt.NoBrush)
+        painter.setBrush(brush_for(fill_color) if self.get_fill() else Qt.NoBrush)
         if self.get_line_width() > 0:
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
         else:
-            painter.setPen(QPen(fill_color, 0))
+            painter.setPen(pen_for(fill_color, 0))
         painter.drawPath(path)
         painter.restore()
 
@@ -4738,11 +4701,11 @@ class path_element(base_element):
                 view_path.lineTo(vp)
 
         fill_color = self._fill_color
-        painter.setBrush(fill_color if self.get_fill() else Qt.NoBrush)
+        painter.setBrush(brush_for(fill_color) if self.get_fill() else Qt.NoBrush)
         if self.get_line_width() > 0:
-            painter.setPen(QPen(color, self.get_line_width()))
+            painter.setPen(pen_for(color, self.get_line_width()))
         else:
-            painter.setPen(QPen(fill_color, 0))
+            painter.setPen(pen_for(fill_color, 0))
         painter.drawPath(view_path)
         painter.restore()
 

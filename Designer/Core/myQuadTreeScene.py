@@ -38,6 +38,7 @@ from PySide6.QtCore import QRegularExpression
 
 
 from .mySnapSystem import SnapSystem
+from . import scene_fast
 import copy
 
 from res.designer_resource_manager import  resource_manager as res_mng
@@ -1009,7 +1010,7 @@ class QuadTreeScene(myGraphicsScene):
             print('切换到设计态')
 
     def handle_frame_count(self) -> None:
-        # print(f"当前帧率{self.frame_count}fps")
+        print(f"当前帧率{self.frame_count}fps")
         self.frame_count= 0
 
     def prepareItemGeometryChange(self,item:base_element) -> None:
@@ -1158,32 +1159,63 @@ class QuadTreeScene(myGraphicsScene):
         # 旧实现先遍历全部图元（1600 图元的页面每次移动都跑一遍），再对
         # 区域外每一个"在组内"的图元无条件 emit hover_sta_change —— 实测
         # 单次鼠标移动会发 1500+ 次信号，占该函数 77% 的耗时。
-        for item in items:
-            item.check_hover(self.sence_pos_mouse)
+        if scene_fast.ENABLED:
+            # 一次取 sceneTransform 批量算完该图元的所有吸附点，返回 (x, y)
+            # 元组；SnapSystem 已兼容元组输入，省掉每个点一次的
+            # mapToScene + QPointF 包装对象。点顺序与旧实现严格一致。
+            for item in items:
+                item.check_hover(self.sence_pos_mouse)
 
-            if not( item.get_selected() and  self.CTRL_pressed_flag ): 
-                if isinstance(item,line_element):
-                    head_pos = item.get_scene_head_pos()
-                    end_pos =  item.get_scene_end_pos()
-                    center_pos = item.get_scene_center_pos()
-                    end_points.append(head_pos)
-                    end_points.append(end_pos)
-                    center_points.append(center_pos)
-                if isinstance(item,rect_element) or isinstance(item,text_element) or isinstance(item,image_element):
-                    head_pos = item.get_scene_head_pos()
-                    end_pos =  item.get_scene_end_pos()
-                    center_pos = item.get_scene_center_pos()
-                    topRight   = item.get_scene_topRight()
-                    bottomLeft = item.get_scene_bottomLeft()
-                
-                    end_points.append(head_pos)
-                    end_points.append(end_pos)
-                    end_points.append(topRight)
-                    end_points.append(bottomLeft)
-                    center_points.append(center_pos)
-                if isinstance(item,circle_element):
-                    center_pos = item.get_scene_center_pos()
-                    center_points.append(center_pos)
+                if not (item.get_selected() and self.CTRL_pressed_flag):
+                    if isinstance(item, line_element):
+                        pts = item.map_scene_points(
+                            item._head_pos, item._end_pos, item._center_pos
+                        )
+                        end_points.append(pts[0])
+                        end_points.append(pts[1])
+                        center_points.append(pts[2])
+                    if isinstance(item, rect_element) or isinstance(item, text_element) or isinstance(item, image_element):
+                        pts = item.map_scene_points(
+                            item._head_pos, item._end_pos, item._center_pos,
+                            item._topRight, item._bottomLeft,
+                        )
+                        end_points.append(pts[0])
+                        end_points.append(pts[1])
+                        end_points.append(pts[3])
+                        end_points.append(pts[4])
+                        center_points.append(pts[2])
+                    if isinstance(item, circle_element):
+                        center_points.append(
+                            item.map_scene_points(item._center_pos)[0]
+                        )
+        else:
+            # 改造前的逐点路径，保留供 RACK_SCENE_FAST=0 回滚 / A/B 对拍。
+            for item in items:
+                item.check_hover(self.sence_pos_mouse)
+
+                if not( item.get_selected() and  self.CTRL_pressed_flag ):
+                    if isinstance(item,line_element):
+                        head_pos = item.get_scene_head_pos()
+                        end_pos =  item.get_scene_end_pos()
+                        center_pos = item.get_scene_center_pos()
+                        end_points.append(head_pos)
+                        end_points.append(end_pos)
+                        center_points.append(center_pos)
+                    if isinstance(item,rect_element) or isinstance(item,text_element) or isinstance(item,image_element):
+                        head_pos = item.get_scene_head_pos()
+                        end_pos =  item.get_scene_end_pos()
+                        center_pos = item.get_scene_center_pos()
+                        topRight   = item.get_scene_topRight()
+                        bottomLeft = item.get_scene_bottomLeft()
+
+                        end_points.append(head_pos)
+                        end_points.append(end_pos)
+                        end_points.append(topRight)
+                        end_points.append(bottomLeft)
+                        center_points.append(center_pos)
+                    if isinstance(item,circle_element):
+                        center_pos = item.get_scene_center_pos()
+                        center_points.append(center_pos)
 
         # 复位"上一次在 hover、这次已离开"的图元。差集通常只有 0~2 个，
         # 并且只在 hover 状态真的从 True 变 False 时才通知组。

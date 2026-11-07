@@ -4,7 +4,7 @@ complier.py (v3.0 AST 版) 测试套件
 - 覆盖：词法/语法/代码生成/校验/反汇编
 - 内置指令级虚拟机 VM，对新协议 (IF=条件不成立跳转 + JUMP) 做语义级验证
 """
-from complier import (
+from .complier import (
     OpCode, Instruction, ParseError, RobotParser, RobotFormatter,
     TEMP_VAR_INDEX, MAX_PROGRAM_LEN,
 )

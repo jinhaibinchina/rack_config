@@ -347,8 +347,8 @@ class PythonPackager(QMainWindow):
         res_layout = QVBoxLayout(resource_group)
 
         res_layout.addWidget(QLabel(
-            "双击列表项可修改「包内目标目录」：摊平填 ui / cfg / ico，"
-            "保持层级填 App_PopPick/hmi/data，根目录填 ."
+            "双击列表项可修改「包内目标目录」。默认保持源码层级"
+            "（如 App_PopPick/hmi/data）；只有代码按 cwd 相对读取时才填 ."
         ))
         self.resource_list = QListWidget()
         self.resource_list.itemDoubleClicked.connect(self._edit_resource_dest)
@@ -489,6 +489,18 @@ class PythonPackager(QMainWindow):
                 self._log(f"➕ 添加隐藏导入: {module}")
                 self._edited_spec = None
 
+    def _add_hidden_imports(self, modules) -> None:
+        """批量补隐藏导入（扫描报告里「加入隐藏导入」按钮用）。"""
+        added = 0
+        for module in modules:
+            if module and module not in self.hidden_imports:
+                self.hidden_imports.append(module)
+                self.hidden_imports_list.addItem(module)
+                added += 1
+        if added:
+            self._edited_spec = None
+            self._log(f"➕ 已从扫描结果补齐 {added} 个隐藏导入: {', '.join(modules)}")
+
     def _remove_hidden_import(self):
         current = self.hidden_imports_list.currentRow()
         if current >= 0:
@@ -531,9 +543,9 @@ class PythonPackager(QMainWindow):
         dest, ok = QInputDialog.getText(
             self, "包内目标目录",
             "该资源放进包里的哪个目录？\n"
-            "· 摊平到根下某目录：ui / cfg / ico\n"
-            "· 保持层级：App_PopPick/hmi/data\n"
-            "· exe 根目录：.",
+            "· 默认（推荐）：保持源码层级，如 App_LogPlot/app/plot_moudle/ui\n"
+            "· 代码按 sys._MEIPASS/<名字> 找时才填短名：ui / cfg / ico\n"
+            "· 代码按 cwd 相对读取时填 .（并考虑放到 exe 同层）",
             text=default_dest,
         )
         if not ok:
@@ -636,15 +648,19 @@ class PythonPackager(QMainWindow):
         return imports, dynamic
 
     def _suggest_dest(self, directory: Path) -> str:
-        """推断资源在包里的目标目录。
+        """资源目标默认就是「保持源码层级」。
 
-        普通资源保持层级就行；但 ``plot_moudle/resource_manager.py`` 这类
-        资源管理器在 frozen 下是按 ``sys._MEIPASS/<名字>`` 找的，
-        同级目录必须**摊平**（``ui`` / ``cfg`` / ``ico`` / ``data``），
-        保持 ``App_LogPlot/app/plot_moudle/ui`` 反而找不到。
+        项目里的资源读取方（``resource_manager`` / ``tag_catalog`` /
+        ``designer_resource_manager``）现在统一用
+        ``Path(__file__).parent`` 定位；frozen 下 ``__file__`` 落在
+        ``<_MEIPASS>/<包路径>/``，所以包内目录照抄源码相对路径即可，
+        不需要 ``if frozen`` 分支，也不会把 ``ui`` / ``cfg`` / ``ico``
+        这类通用短名堆到 ``_internal`` 根下互相撞名。
+
+        只保留一个显式例外并打标记：代码若按 cwd 相对读取（如
+        ``open("cfg/config.json")``），那属于第三种语义，得放到 exe 同层，
+        datas 目标填 ``.``；这由人在 UI 里双击改，不自动猜。
         """
-        if (directory.parent / "resource_manager.py").is_file():
-            return directory.name
         return self._default_dest(directory)
 
     def _scan_resource_dirs(self):
@@ -657,13 +673,14 @@ class PythonPackager(QMainWindow):
                 counts[path.parent] = counts.get(path.parent, 0) + 1
         return sorted(counts.items(), key=lambda kv: (-kv[1], str(kv[0])))
 
-    def _scan_project(self):
-        """生成一份只读扫描报告：第三方依赖 / 动态导入 / 资源目录。"""
-        if not self.project_path:
-            QMessageBox.warning(self, "提示", "请先选择项目目录")
-            return
+    def _probe_import_origins(self, python_exe: str) -> dict:
+        """在**打包用的解释器**里查 AST 扫到的第三方模块来自哪里。
 
-        imports, dynamic = self._scan_imports()
+        返回 ``{模块名: origin 或 None}``。GUI 自己的解释器不算数：真正
+        执行 PyInstaller 的是 ``python_exe``，它的 site-packages 才是
+        模块收集的来源。
+        """
+        imports, _ = self._scan_imports()
         local_names = {p.name for p in self.project_path.iterdir()
                        if p.is_dir() and (p / "__init__.py").exists()}
         local_names |= {p.stem for p in self.project_path.glob("*.py")}
@@ -673,41 +690,82 @@ class PythonPackager(QMainWindow):
             and m not in local_names
             and not m.startswith("_")
         )
-
-        # 用「真正要打包的那个解释器」判定模块存不存在、来自哪里
-        python_exe = self.python_edit.text().strip() or sys.executable
-        origins = {}
-        if candidates and Path(python_exe).is_file():
-            code = (
-                "import importlib.util, json\n"
-                "out = {}\n"
-                "for m in " + repr(candidates) + ":\n"
-                "    try:\n"
-                "        s = importlib.util.find_spec(m)\n"
-                "    except Exception:\n"
-                "        s = None\n"
-                "    out[m] = (s.origin or '') if s else None\n"
-                "print(json.dumps(out))\n"
+        if not candidates or not Path(python_exe).is_file():
+            return {}
+        code = (
+            "import importlib.util, json\n"
+            "out = {}\n"
+            "for m in " + repr(candidates) + ":\n"
+            "    try:\n"
+            "        s = importlib.util.find_spec(m)\n"
+            "    except Exception:\n"
+            "        s = None\n"
+            "    out[m] = (s.origin or '') if s else None\n"
+            "print(json.dumps(out))\n"
+        )
+        try:
+            raw = subprocess.check_output(
+                [python_exe, "-c", code], text=True,
+                encoding="utf-8", errors="replace", timeout=60,
             )
-            try:
-                raw = subprocess.check_output(
-                    [python_exe, "-c", code], text=True,
-                    encoding="utf-8", errors="replace", timeout=60,
-                )
-                origins = json.loads(raw.strip().splitlines()[-1])
-            except Exception as exc:
-                self._log(f"⚠️ 依赖扫描子进程失败: {exc}")
+            return json.loads(raw.strip().splitlines()[-1])
+        except Exception as exc:  # noqa: BLE001 - 探针失败不该阻断生成
+            self._log(f"⚠️ 依赖扫描子进程失败: {exc}")
+            return {}
 
-        third_party = []
-        missing = []
-        for m in candidates:
-            origin = origins.get(m) if origins else None
-            if origins and origin and "site-packages" in origin.replace("\\", "/"):
-                third_party.append(m)
-            elif origins and origin is None:
-                missing.append(m)
-            elif not origins:
-                third_party.append(m)  # 拿不到结果时只列出，不做结论
+    @staticmethod
+    def _is_site_packages(origin) -> bool:
+        return bool(origin) and "site-packages" in str(origin).replace("\\", "/")
+
+    def _installed_third_party(self, python_exe: str) -> list:
+        """打包解释器里确实来自 site-packages 的第三方模块名。"""
+        origins = self._probe_import_origins(python_exe)
+        return sorted(m for m, origin in origins.items()
+                      if self._is_site_packages(origin))
+
+    def _optional_import_roots(self, python_exe: str,
+                               installed=None) -> list:
+        """被 ``try/except ImportError`` 包起来的第三方导入。
+
+        这类导入 PyInstaller 静态分析最容易判成「可选」而漏收，而且实现
+        往往藏在子模块里（``asyncua`` 就是典型）。即使 UI 的「隐藏导入」
+        被清空，也要自动把它们加进 ``SUBMODULE_ROOTS``。
+        """
+        optional = set()
+        for path in self._scan_python_files():
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+            except (SyntaxError, OSError):
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Try):
+                    continue
+                if not any(isinstance(h.type, ast.Name)
+                           and h.type.id == "ImportError" for h in node.handlers):
+                    continue
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Import):
+                        optional.update(a.name.split(".")[0] for a in sub.names)
+                    elif isinstance(sub, ast.ImportFrom) and sub.module \
+                            and sub.level == 0:
+                        optional.add(sub.module.split(".")[0])
+        if installed is None:
+            installed = self._installed_third_party(python_exe)
+        return sorted(optional & set(installed))
+
+    def _scan_project(self):
+        """生成一份只读扫描报告：第三方依赖 / 动态导入 / 资源目录。"""
+        if not self.project_path:
+            QMessageBox.warning(self, "提示", "请先选择项目目录")
+            return
+
+        _, dynamic = self._scan_imports()
+        python_exe = self.python_edit.text().strip() or sys.executable
+        origins = self._probe_import_origins(python_exe)
+        third_party = sorted(m for m, origin in origins.items()
+                             if self._is_site_packages(origin))
+        missing = sorted(m for m, origin in origins.items() if origin is None)
+        optional_roots = self._optional_import_roots(python_exe)
 
         resources = self._scan_resource_dirs()
         already = {str(Path(r).resolve()) for r in self.include_resources}
@@ -730,7 +788,10 @@ class PythonPackager(QMainWindow):
         lines += [f"    ! {m}" for m in missing] or ["    （无）"]
         lines += ["", "【3】代码里的动态导入（字符串形式，静态分析看不到）"]
         lines += [f"    ? {m}" for m in sorted(dynamic)] or ["    （无）"]
-        lines += ["", "【4】资源目录（含 json/ui/qss/ico/dll 等非 .py 文件）",
+        lines += ["", "【4】被 try/except ImportError 包住的第三方包",
+                  "     静态分析最容易判成「可选」而漏收，会自动收子模块："]
+        lines += [f"    * {m}" for m in optional_roots] or ["    （无）"]
+        lines += ["", "【5】资源目录（含 json/ui/qss/ico/dll 等非 .py 文件）",
                   "     未加入资源列表的目录，打包后运行期会找不到文件："]
         for d, n in suggested[:40]:
             try:
@@ -738,15 +799,16 @@ class PythonPackager(QMainWindow):
             except ValueError:
                 rel = str(d)
             dest = self._suggest_dest(d)
-            flag = "  ← 摊平(检测到 resource_manager)" if dest == d.name else ""
-            lines.append(f"    · {rel}  ({n} 个文件)  → 建议目标 {dest}{flag}")
+            lines.append(f"    · {rel}  ({n} 个文件)  → 建议目标 {dest}")
         if not suggested:
             lines.append("    （无，或都已加入）")
         lines += [
             "",
-            "【提醒】资源目标目录不能一律用相对层级：",
-            "  · resource_manager 按 sys._MEIPASS/<名字> 找 → 要摊平成 ui / cfg / ico",
-            "  · tag_catalog 按 Path(__file__).parent/'data' 找 → 必须保持层级",
+            "【提醒】本项目资源一律按「保持源码层级」放置：",
+            "  · resource_manager / tag_catalog 都用 Path(__file__).parent 定位",
+            "    → dest 照抄源码相对目录，开发和打包两种模式同构",
+            "  · 例外：代码按 cwd 相对读取（cfg/config.json）要放 exe 同层，",
+            "    或按 sys._MEIPASS/<名字> 读取时才需要短名；这类请双击列表项改",
             "  添加资源时可以在弹窗里改，或双击列表项修改。",
             "",
             f"当前已配置隐藏导入：{self.hidden_imports}",
@@ -764,6 +826,12 @@ class PythonPackager(QMainWindow):
         view.setFont(QFont("Consolas", 9))
         layout.addWidget(view)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        if optional_roots:
+            import_btn = buttons.addButton("把关键包加入隐藏导入",
+                                           QDialogButtonBox.ButtonRole.ActionRole)
+            import_btn.clicked.connect(
+                lambda: self._add_hidden_imports(optional_roots)
+            )
         apply_btn = buttons.addButton("把建议的资源目录加入列表",
                                       QDialogButtonBox.ButtonRole.ActionRole)
         apply_btn.clicked.connect(
@@ -774,8 +842,33 @@ class PythonPackager(QMainWindow):
         dialog.exec()
 
     def _apply_scan_resources(self, dirs):
+        """把扫描建议的目录加入资源列表。
+
+        一刀切全加会出两个事故：项目根本身（目录下直接有 json/txt）会被算成
+        ``(ROOT, '.')``，把 ``.venv`` / ``dist`` / ``build`` 整个塞进包；同一棵
+        目录树上的父子目录会重复进 datas，COLLECT 时同名目标文件互相覆盖。
+        所以这里先排除不该打包的目录，再做「保留顶层父、丢掉后代」去重。
+        """
+        exclude_parts = {"tools", "build", "dist", "__pycache__", ".venv", "venv",
+                         ".git", ".workbuddy", "node_modules", "data.json"}
+        project = self.project_path.resolve()
+        roots = []
+        for d in sorted({Path(x).resolve() for x in dirs},
+                        key=lambda p: (len(p.parts), str(p))):
+            if d == project:          # 绝不能把整个项目根加进 datas
+                continue
+            try:
+                rel = d.relative_to(project)
+            except ValueError:
+                continue
+            if any(part in exclude_parts for part in rel.parts):
+                continue
+            if any(r == d or r in d.parents for r in roots):
+                continue              # 已有祖先，子目录内容已被覆盖
+            roots.append(d)
+
         added = 0
-        for d in dirs:
+        for d in roots:
             src = str(d)
             if src in self.include_resources:
                 continue
@@ -783,8 +876,8 @@ class PythonPackager(QMainWindow):
             self.resource_dests[src] = self._suggest_dest(d)
             added += 1
         self._reload_resource_list()
-        self._log(f"🔍 已加入 {added} 个资源目录（默认保持层级，"
-                  "需要摊平的请双击列表项改目标）")
+        self._log(f"🔍 已加入 {added} 个资源目录（已排除项目根 / 工具目录 / 设计工程，"
+                  "并去掉父子重复；保持源码层级）")
         self._edited_spec = None
 
     # -------------------- Spec 生成核心 --------------------
@@ -829,6 +922,12 @@ class PythonPackager(QMainWindow):
 
         hiddenimports = list(self.hidden_imports)
         submodule_roots = hiddenimports if self.collect_submodules_cb.isChecked() else []
+        python_exe = self.python_edit.text().strip() or sys.executable
+        # 自检与子模块收集不能只靠 UI 手填：配置被清空过一次（hidden_imports
+        # 变成 []），结果生成的 spec 既不检查依赖、也不收 asyncua 子模块。
+        # 现在从源码 AST 自动算出两条兜底清单。
+        scanned_imports = self._installed_third_party(python_exe)
+        auto_roots = self._optional_import_roots(python_exe, scanned_imports)
 
         # 图标 / 运行时钩子（都按 ROOT 相对写）
         icon_expr = "None"
@@ -863,7 +962,6 @@ class PythonPackager(QMainWindow):
         console = self.console_cb.isChecked()
         onefile = self.onefile_cb.isChecked()
         upx = self.upx_cb.isChecked()
-        python_exe = self.python_edit.text().strip() or sys.executable
 
         # 所有字符串一律 repr，避免项目名/路径里的引号把 spec 写坏。
         lines = [
@@ -879,22 +977,33 @@ class PythonPackager(QMainWindow):
             "ROOT = Path(SPECPATH).resolve()",
             "",
             "# ---- 前置自检：缺依赖直接中止，不产出运行期才报错的包 ----",
+            "# DECLARED 是 UI 手填，SCANNED 是从源码 AST 自动扫出的第三方包；",
+            "# 两者取并集，避免「隐藏导入被清空 → 自检形同虚设」。",
             f"DECLARED_IMPORTS = {hiddenimports!r}",
-            "_missing = [m for m in DECLARED_IMPORTS if find_spec(m) is None]",
+            f"SCANNED_IMPORTS = {scanned_imports!r}",
+            "REQUIRED_IMPORTS = sorted(set(DECLARED_IMPORTS) | set(SCANNED_IMPORTS))",
+            "_missing = [m for m in REQUIRED_IMPORTS if find_spec(m) is None]",
             "if _missing:",
-            "    print('打包中止：当前解释器缺少隐藏导入依赖', _missing, file=sys.stderr)",
+            "    print('打包中止：当前解释器缺少依赖', _missing, file=sys.stderr)",
             "    print('解释器:', sys.executable, file=sys.stderr)",
             "    print('site-packages:', [p for p in sys.path if 'site-packages' in p], file=sys.stderr)",
             "    raise SystemExit(1)",
             "",
             "# 顶层包名不等于整个包：asyncua 之类 __init__ 只导出几个名字，",
-            "# 实现全在子模块里，必须显式收集。",
-            f"SUBMODULE_ROOTS = {submodule_roots!r}",
+            "# 实现全在子模块里，必须显式收集。AUTO 来自被 try/except ImportError",
+            "# 包住的第三方导入，即使 UI 手填为空也会自动兜底。",
+            f"MANUAL_SUBMODULE_ROOTS = {submodule_roots!r}",
+            f"AUTO_SUBMODULE_ROOTS = {auto_roots!r}",
+            "SUBMODULE_ROOTS = sorted(set(MANUAL_SUBMODULE_ROOTS) | set(AUTO_SUBMODULE_ROOTS))",
             "hiddenimports = list(DECLARED_IMPORTS)",
             "for _root in SUBMODULE_ROOTS:",
             "    hiddenimports.extend(collect_submodules(_root))",
             "hiddenimports = sorted(set(hiddenimports))",
             "",
+        ]
+        if not hiddenimports:
+            lines.insert(3, "# ⚠️ UI 的「隐藏导入」为空；已用 AST 扫描结果自动兜底自检与子模块收集。")
+        lines += [
             "a = Analysis(",
             f"    [str(ROOT / {entry_rel.as_posix()!r})],",
             "    pathex=[str(ROOT)],",
@@ -966,9 +1075,11 @@ class PythonPackager(QMainWindow):
         GUI 自己跑在哪个解释器里不重要；以前只 ``import PyInstaller`` 做检查，
         而打包命令用的是另一个 python，检查等于没做。
         """
-        modules = list(self.hidden_imports)
+        modules = sorted(set(self.hidden_imports)
+                         | set(self._installed_third_party(python_exe)))
         if not modules:
-            return True, "无需检查隐藏导入"
+            return True, "无需检查依赖"
+        self._log(f"🔍 依赖自检范围：{', '.join(modules)}")
         code = (
             "import importlib.util, json; "
             "print(json.dumps({m: importlib.util.find_spec(m) is not None "
@@ -985,7 +1096,7 @@ class PythonPackager(QMainWindow):
         missing = [m for m, ok in result.items() if not ok]
         if missing:
             return False, (
-                "指定解释器缺少隐藏导入：" + ", ".join(missing)
+                "指定解释器缺少依赖：" + ", ".join(missing)
                 + f"\n解释器: {python_exe}\n"
                 "请换到装齐依赖的 .venv/Scripts/python.exe，或先 pip install。"
             )
@@ -1090,7 +1201,10 @@ class PythonPackager(QMainWindow):
             python_exe=python_exe,
             distpath=self.output_dir_edit.text().strip(),
             extra_args=extra_args,
-            hidden_imports=list(self.hidden_imports),
+            # warn 文件里出现这些模块的「missing module」时判致命，
+            # 不只看 UI 手填 —— 隐藏导入被清空过一次，不能让它静默漏掉。
+            hidden_imports=sorted(set(self.hidden_imports)
+                                  | set(self._installed_third_party(python_exe))),
         )
         self.current_thread.log_signal.connect(self._log)
         self.current_thread.progress_signal.connect(self._update_progress)

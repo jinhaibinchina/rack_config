@@ -23,5 +23,8 @@ if __package__ in (None, ""):
 else:
     from .pop_pick_entry import main
 
+
+from res.designer_resource_manager import resource_manager as designer_resource_manager
+  # 预加载资源，避免首次打开时卡顿
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit( main(["--scene", designer_resource_manager.get_json_path("pop_pick_scene.json")] + sys.argv[1:]))

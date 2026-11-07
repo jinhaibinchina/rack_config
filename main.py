@@ -209,8 +209,9 @@ def _make_safety(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
 
 def _make_pop_pick(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
     from App_PopPick import PopPickWindow
+    from res.designer_resource_manager import resource_manager 
 
-    return PopPickWindow(plc_ip=plc_ip or POPPICK_PLC_IP, enable_plc=enable_plc)
+    return PopPickWindow(scene_path=resource_manager.get_json_path("pop_pick_scene.json") , plc_ip=plc_ip or POPPICK_PLC_IP, enable_plc=enable_plc)
 
 
 def _make_log_plot(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:

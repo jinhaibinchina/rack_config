@@ -125,15 +125,26 @@ class SnapSystem(QObject):
 
         # self.timer = QTimer()
     
+    @staticmethod
+    def _as_point_tuple(pos) -> tuple:
+        """兼容 QPointF 与批量映射直接产出的 ``(x, y)`` 元组。"""
+        if isinstance(pos, tuple):
+            return pos
+        return pos.toTuple()
+
     def update_endpoints(self, poses: Iterable[QPointF]) -> None:
         self.snap_points['endpoints'].clear()
+        add = self.snap_points['endpoints'].add
+        to_tuple = self._as_point_tuple
         for pos in poses:
-            self.snap_points['endpoints'].add(pos.toTuple())
+            add(to_tuple(pos))
 
     def update_midpoints(self, poses: Iterable[QPointF]) -> None:
         self.snap_points['midpoints'].clear()
+        add = self.snap_points['midpoints'].add
+        to_tuple = self._as_point_tuple
         for pos in poses:
-            self.snap_points['midpoints'].add(pos.toTuple())
+            add(to_tuple(pos))
 
 
 

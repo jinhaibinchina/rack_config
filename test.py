@@ -34,4 +34,4 @@ def collect_directory(source_dir,target_dir):
     return result
 
 if __name__ == '__main__':
-    pass
+    print(0 or '测试收集目录' )

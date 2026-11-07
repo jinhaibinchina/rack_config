@@ -12,16 +12,26 @@ class _ResourceManager:
         self._base_path = self._get_base_path()
     
     def _get_base_path(self) -> Path:
-        """获取资源文件的基础路径"""
-        # 如果是打包后的可执行文件
-        if getattr(sys, 'frozen', False):
-            # PyInstaller 创建的临时文件夹
-            base_path = Path(sys._MEIPASS)
-        else:
-            # 脚本文件所在路径
-            base_path = Path(__file__).parent
-        
-        return base_path
+        """资源根目录 = **本模块所在目录**，两种运行模式下结构完全一致。
+
+        源码运行：``<项目根>/App_LogPlot/app/plot_moudle``
+        打包运行：``<_MEIPASS>/App_LogPlot/app/plot_moudle``
+
+        PyInstaller 的 frozen importer 会把 ``__file__`` 设成
+        ``sys._MEIPASS`` + 模块点分路径 + ``.pyc``，所以
+        ``Path(__file__).parent`` 在开发态和打包态只差一个前缀。只要
+        ``datas`` 按「保持源码层级」放置，同一句
+        ``get_ui_path("rcd_plot.ui")`` 两边都能命中，不需要 ``if frozen``
+        分支。
+
+        以前这里写的是 ``if frozen: return Path(sys._MEIPASS)``，于是资源
+        必须摊平到 ``_internal/ui`` / ``cfg`` / ``ico`` 这类通用短名目录：
+        既和源码布局脱钩，又容易和别的包撞名（同名文件会被静默覆盖）。
+        ``res/designer_resource_manager.py`` 的注释里就记着当年这么写导致
+        exe 打不开。现在统一收敛成保持层级，spec 里对应的 5 条 datas
+        目标已改成 ``App_LogPlot/app/plot_moudle/<name>``。
+        """
+        return Path(__file__).resolve().parent
     
     def _detect_package_name(self) -> str:
         """自动检测包名"""

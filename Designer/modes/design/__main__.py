@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-if __name__ == "__main__" and not __package__:
+if not __package__:
     # ``python modes/design/design_window.py`` puts this folder (not the
     # project root) on sys.path, and the package-relative imports below need a
     # parent package.  Delegate to the documented entry point instead of
@@ -20,6 +20,8 @@ if __name__ == "__main__" and not __package__:
 
 else:
     from .design_window_entry import main
+
+
 
 
 

@@ -25,6 +25,7 @@ from math import sin,cos ,atan,pi,sqrt
 from typing import Any, overload,Union,List,Optional,TYPE_CHECKING
 from PySide6.QtGui import QFont,QColor, QPainter, QTransform, QRegion,QAction, QRegularExpressionValidator, QPalette,QPen,QPainterPath,QPainterPathStroker,QFontMetrics,QPixmap
 from .my_transform_v2 import Transform
+from . import scene_fast
 import time
 from .my_common import SceneMode
 if TYPE_CHECKING:
@@ -214,6 +215,11 @@ class base_element(QObject):
        
         self._sceneBoundingRect = QRectF()
         self._select_sceneBoundingRect = QRectF()
+        # viewBoundingRect() 的缓存：key = (视图映射参数, 场景包围盒对象身份)。
+        # 持有 _vbr_rect 引用可防止 QRectF 被回收后 id 复用造成误命中。
+        self._vbr_sig = None
+        self._vbr_rect = None
+        self._vbr_value = None
 
         self.m_scene =None#场景引用
         self.m_scene_manager =None#场景管理器引用
@@ -693,7 +699,18 @@ class base_element(QObject):
         """
         self.__is_moving = self.__moving_flag
         return self.sceneTransform().map(point)
-    
+
+    def map_scene_points(self, *points) -> list[tuple[float, float]]:
+        """一次取场景变换，批量映射多个局部点，返回 ``(x, y)`` 元组。
+
+        保留 :meth:`mapToScene` 的 ``__is_moving`` 副作用（``check_hover``
+        依赖它判断拖拽中的图元），但整组点只走一次 ``sceneTransform()``，
+        且不构造 ``QPointF``。只适用于数值消费方（hover / 吸附端点），
+        需要 ``QPointF`` 的调用点仍用各个 ``get_scene_*_pos()``。
+        """
+        self.__is_moving = self.__moving_flag
+        return self.sceneTransform().map_many(points)
+
     def mapFromParent(self, point: QPointF) -> QPointF:
         """将点从父坐标系映射到局部坐标系"""
         # 计算逆变换
@@ -1380,7 +1397,33 @@ class base_element(QObject):
         return out
 
     def viewBoundingRect(self) -> QRectF:
-        return self.m_scene.rect_sceneToView(self._sceneBoundingRect)
+        """场景包围盒 → 视图包围盒。
+
+        ``rect_sceneToView`` 内部要调 4 次 ``sceneToView``（每次新建 QPointF），
+        一帧里每个图元 paint 都会问一次。视图映射在平移/缩放之间是不变的，
+        所以按「映射参数 + 包围盒对象身份」缓存；两者任一变化立即重算。
+        ``RACK_SCENE_FAST=0`` 时退回原来的逐次计算。
+        """
+        scene = self.m_scene
+        rect = self._sceneBoundingRect
+        if not scene_fast.ENABLED:
+            return scene.rect_sceneToView(rect)
+        sig = (
+            scene.is_use_for_agv_map,
+            scene.grid_size,
+            scene.scene_units_per_grid_x,
+            scene.scene_units_per_grid_y,
+            scene.scene_origin.x(),
+            scene.scene_origin.y(),
+        )
+        if self._vbr_sig == sig and self._vbr_rect is rect:
+            return self._vbr_value
+        value = scene.rect_sceneToView(rect)
+        self._vbr_sig = sig
+        self._vbr_rect = rect
+        self._vbr_value = value
+        return value
+
     def selectViewBoundingRect(self) -> QRectF:
         return self.m_scene.rect_sceneToView(self._select_sceneBoundingRect)
 
