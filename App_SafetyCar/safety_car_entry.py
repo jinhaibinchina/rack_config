@@ -66,7 +66,7 @@ from Designer.Core.NavigationContentWidget import NavigationContentWidget
 from Designer.Core.station_pages import StationCatalog
 from App_SafetyCar.ip_setup import ip_setup_window
 
-from Designer.modes.design.project_store import ProjectStore
+from Designer.Core.ui.project_store import ProjectStore
 from Designer.Core.my_common import SceneMode
 from common.com.modbus.modbus_data_broker import DataBroker
 from common.com.modbus.modbus import get_bool, set_bool

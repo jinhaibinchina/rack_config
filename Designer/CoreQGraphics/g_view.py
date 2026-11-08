@@ -37,6 +37,10 @@ _GRID_MAJOR = QColor(90, 120, 150, 110)
 
 # 鼠标附近吸附标记：小于这个屏幕像素的偏移不吸附，避免抖动
 _SNAP_MIN_PX = 2.0
+# 捕捉点十字：与旧 Core 一致用纯红（选中中心红点 214,51,46 更暗、支点环是蓝的，
+# 三者不会混淆）。门控打开时更饱和、更粗，表示「现在按 T 会吸过去」。
+_SNAP_CROSS_COLOR = QColor(255, 0, 0)
+_SNAP_CROSS_IDLE = QColor(255, 34, 34)
 
 # 拖角改尺寸手柄（固定屏幕像素，仅设计模式 + 单选时显示）
 _HANDLE_HALF = 4.0            # 方块半边长
@@ -46,7 +50,7 @@ _HANDLE_MIN_SPAN = 28.0       # 四角屏幕跨度下限：太小的图元不画
 _HANDLE_MIN_SCALE = 0.02      # 缩到 2% 停住，防止翻转 / 零尺寸
 _HANDLE_COLOR = QColor(22, 119, 255)
 _HANDLE_EDGE = QColor(12, 70, 160)
-# item.snap_points() 的端点顺序：[左上, 右上, 左下, 右下]
+# item.frame_corners() 的端点顺序：[左上, 右上, 左下, 右下]
 _CORNER_INDEX = {"nw": 0, "ne": 1, "sw": 2, "se": 3}
 _OPPOSITE_INDEX = {"nw": "se", "ne": "sw", "sw": "ne", "se": "nw"}
 
@@ -80,6 +84,11 @@ class GraphicsView(QGraphicsView):
         # 最后一次落在画布上的光标位置：光标移出画布（leaveEvent 会清 snap.hover）
         # 后按 T 仍能按上一次位置吸附，不必先把鼠标挪回来
         self._last_hover: QPointF | None = None
+        # 上一次画出去的捕捉十字（重绘区并集用，省一次全量 aim）
+        self._drawn_marker: QPointF | None = None
+        # 选中项自身捕捉点的缓存（见 _selection_own_points）
+        self._own_cache: set | None = None
+        self._own_key: tuple | None = None
         # 绘制模式（CAD 式分点）：激活工具后图元跟随鼠标，点击画布落点
         self._draw_type = ""
         # 右键位置（page 场景坐标）：供「旋转中心设到此处」使用
@@ -100,7 +109,12 @@ class GraphicsView(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setViewportUpdateMode(QGraphicsView.SmartViewportUpdate)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
-        self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
+        # 尺寸变化时钉住视口左上角对应的场景点（Qt 的 ``NoAnchor`` 语义）。
+        # 默认的 ``AnchorViewCenter`` 会在 dock 显隐 / 分隔条拖动 / 窗口缩放时
+        # 保持「视口中心场景点」，画面就跟着上下左右平移（底部属性 dock 展开
+        # 一次能推掉半屏高度）；旧 ``Core`` 是自绘 QWidget，``scene_origin``
+        # 只在 showEvent 定一次，resize 不动，所以观感上是「画面不动、边缘被裁」。
+        self.setResizeAnchor(QGraphicsView.NoAnchor)
         self.setMouseTracking(True)
         self.setAcceptDrops(True)
         if scene is not None:
@@ -121,9 +135,20 @@ class GraphicsView(QGraphicsView):
                 old.selectionChanged.disconnect(self._on_scene_selection_changed)
             except (RuntimeError, TypeError):
                 pass
+            geo = getattr(old, "geometryChanged", None)
+            if geo is not None:
+                try:
+                    geo.disconnect(self._invalidate_own_points)
+                except (RuntimeError, TypeError):
+                    pass
+        self._invalidate_own_points()
         super().setScene(scene)
         if scene is not None:
             scene.selectionChanged.connect(self._on_scene_selection_changed)
+            geo = getattr(scene, "geometryChanged", None)
+            if geo is not None:
+                # 图元被改位姿（跟手 / 属性面板 / 撤销）后，自身捕捉点缓存必须失效
+                geo.connect(self._invalidate_own_points)
             self._sync_grid_origin()
         self._sync_view_metrics()
 
@@ -150,6 +175,7 @@ class GraphicsView(QGraphicsView):
 
     def _on_scene_selection_changed(self) -> None:
         """选中集合变化时整屏重绘：中心点标记只覆盖选中项，局部更新会留残影。"""
+        self._invalidate_own_points()
         if self._follow_items:
             # 图层树 / 属性面板改了选中（或被删掉）时跟手就失去意义了，
             # 直接落定，别让「跟着一个已经取消选中的图元」这种状态留着。
@@ -192,6 +218,7 @@ class GraphicsView(QGraphicsView):
 
     def refresh_snap_points(self) -> None:
         scene = self.scene()
+        self._invalidate_own_points()
         if scene is not None and hasattr(scene, "snap_points"):
             ends, mids = scene.snap_points()
             self.snap.update_points(ends, mids)
@@ -509,8 +536,12 @@ class GraphicsView(QGraphicsView):
         return sel[0]
 
     def _handle_points(self, item) -> dict[str, QPointF]:
-        """四个角在视口里的位置（用 snap_points 的端点，自动跟随旋转）。"""
-        ends, _ = item.snap_points()
+        """四个角在视口里的位置（用**包围盒**四角，自动跟随旋转）。
+
+        不能用 ``snap_points()``：顶点类（线 / 三角 / 多边形 / 路径）的捕捉点
+        已经改成真实顶点了，拿它当角锚点会把缩放算错。
+        """
+        ends = item.frame_corners() if hasattr(item, "frame_corners") else []
         if len(ends) < 4:
             return {}
         pts = {
@@ -547,7 +578,7 @@ class GraphicsView(QGraphicsView):
         inv, ok = item.sceneTransform().inverted()
         if not ok:
             return
-        ends, _ = item.snap_points()
+        ends = item.frame_corners() if hasattr(item, "frame_corners") else []
         lp = inv.map(ends[_CORNER_INDEX[corner]])
         la = inv.map(ends[_CORNER_INDEX[_OPPOSITE_INDEX[corner]]])
         d0 = (lp.x() - la.x(), lp.y() - la.y())
@@ -757,8 +788,9 @@ class GraphicsView(QGraphicsView):
                     self.snap.hover = QPointF(self._last_hover)
                 moved = self._apply_snap_follow(allow_release=False,
                                                 require_movable=False)
-                # 光标不在画布上就别去挪系统光标，只把图元吸过去
-                if self.viewport().underMouse():
+                # 光标不在画布上、或十字正落在选中项自己的点上（那里不吸附）
+                # 就别去挪系统光标，只把图元吸过去
+                if self.viewport().underMouse() and self._hover_marker()[1]:
                     self._warp_cursor_to_snap()
                 if moved:
                     # 吸附真的挪了图元：记一个撤销点（拖动路径靠 release 记）
@@ -832,16 +864,31 @@ class GraphicsView(QGraphicsView):
     # 吸附：以**鼠标位置**为基准，鼠标吸了多少偏移，选中图元就移动多少
     # ------------------------------------------------------------------
     def _selection_own_points(self) -> set:
-        """选中项自身的捕捉点：拖动自己时不能吸到自己身上。"""
+        """选中项自身的捕捉点：拖动自己时不能吸到自己身上。
+
+        ``_hover_marker`` / ``_apply_snap_follow`` 每次鼠标移动都要这份集合，
+        而全选 1600 个图元时它有一万多个点（每次重算约 60ms，鼠标会明显发涩），
+        所以按选中集合缓存；几何变化（``geometryChanged`` / ``refresh_snap_points``
+        / 换场景）时显式失效。
+        """
         scene = self.scene()
         own: set = set()
         if scene is None or not hasattr(scene, "selected_items"):
             return own
-        for it in scene.selected_items():
+        sel = scene.selected_items()
+        key = tuple(it.item_id for it in sel)
+        if self._own_cache is not None and key == self._own_key:
+            return self._own_cache
+        for it in sel:
             e, m = it.snap_points()
             for p in e + m:
                 own.add((p.x(), p.y()))
+        self._own_cache, self._own_key = own, key
         return own
+
+    def _invalidate_own_points(self, *_args) -> None:
+        self._own_cache = None
+        self._own_key = None
 
     def _view_scale(self) -> float:
         scale = abs(self.transform().m11())
@@ -887,6 +934,9 @@ class GraphicsView(QGraphicsView):
         吸附目标用 ``always=True`` 取「最近的捕捉点」：附近有端点 / 中点就吸它，
         没有就吸最近的格子交汇点。因此**每个图元类型**（含顶点类、文本、图片、
         成组）按 T 都能动，不会出现「有的图元按 T 没反应」。
+
+        选中项**自己**的捕捉点会被跳过（十字照样画在那里，但不吸）：吸到自己
+        身上等于「点随图元动」，每帧再按 offset 叠加一次会把图元指数级甩飞。
         """
         scene = self.scene()
         hover = self.snap.hover if self.snap.hover is not None else self._last_hover
@@ -993,13 +1043,29 @@ class GraphicsView(QGraphicsView):
 
         ``always=True``：附近没端点 / 中点时退到最近的格子交汇点，保证「光标
         附近始终只有一个十字」——大图元内部（自己的点被排除）也有标记可吸。
+
+        选中项**自己**的端点 / 中点也画（比别的候选更近时顶替格点）：鼠标凑到
+        刚选中的那个图元的端点时，十字就画在端点上，否则看着像「端点上根本没有
+        捕捉点」。但它**不是**吸附目标（``active`` 恒为 False、只画细十字），
+        吸附仍然跳过自身 —— 理由见 ``_apply_snap_follow``。
         """
         hover = self.snap.hover
         if hover is None:
             return None, False
-        target, _kind = self.snap.aim(hover, exclude=self._selection_own_points(),
-                                      always=True)
-        return target, bool(self.snap.enabled)
+        own = self._selection_own_points()
+        target, _kind = self.snap.aim(hover, exclude=own, always=True)
+        activated = bool(self.snap.enabled)
+        if own:
+            # 只问「全局最近点是不是选中项自己的点」——走 SnapSystem 的空间哈希
+            # 局部扫描；全选 1600 个图元时逐点遍历自己的一万多个点要 10ms/帧。
+            near, dist = self.snap._nearest_indexed(hover, self.snap.threshold)
+            if near is not None and (near.x(), near.y()) in own:
+                far = (math.inf if target is None
+                       else math.hypot(target.x() - hover.x(),
+                                       target.y() - hover.y()))
+                if dist < far - 1e-9:
+                    return near, False
+        return target, activated
 
     def _draw_hover_snap_points(self, painter: QPainter) -> None:
         """只画**最近的那一个**捕捉点（固定屏幕像素）。
@@ -1007,39 +1073,55 @@ class GraphicsView(QGraphicsView):
         把附近所有候选点都画出来时，端点 / 中点 / 格点在同一小片区域里会挤成
         一片十字，反而看不出「松手会吸到哪」。``aim()`` 已经按「图元点优先、
         格点严格更近才顶替」排出了最近点，直接画它：门控打开时加粗 + 套圆环
-        （表示按 T / 松手会吸过去），门控关闭时只画细十字当预告。
+        （表示按 T 会吸过去），门控关闭时只画细十字当预告。
+
+        红色十字先描一圈半透明深色底：捕捉点常常正好落在图元的黑色描边上，
+        只画 1px 红线会被描边吃掉，看着就像「端点上没有十字」（旧 Core 也是
+        纯红 1px，同样容易被盖住）。
         """
         target, active = self._hover_marker()
+        self._drawn_marker = QPointF(target) if target is not None else None
         if target is None:
             return
         vp = QPointF(self.mapFromScene(target))
+        half = 10.0 if active else 8.0
         painter.save()
         painter.resetTransform()
         painter.setRenderHint(QPainter.Antialiasing, True)
-        if active:
-            painter.setPen(QPen(QColor(255, 130, 0, 255), 1.8))
-            half = 5.0
-        else:
-            painter.setPen(QPen(QColor(255, 150, 0, 190), 1.0))
-            half = 3.5
-        painter.drawLine(QPointF(vp.x() - half, vp.y()),
-                         QPointF(vp.x() + half, vp.y()))
-        painter.drawLine(QPointF(vp.x(), vp.y() - half),
-                         QPointF(vp.x(), vp.y() + half))
+        arms = (
+            (QPointF(vp.x() - half, vp.y()), QPointF(vp.x() + half, vp.y())),
+            (QPointF(vp.x(), vp.y() - half), QPointF(vp.x(), vp.y() + half)),
+        )
+        # 深色底：让红字在黑描边 / 亮网格上都有对比
+        halo = QPen(QColor(20, 20, 20, 110), 2.6 if active else 2.2)
+        halo.setCapStyle(Qt.RoundCap)
+        painter.setPen(halo)
+        for a, b in arms:
+            painter.drawLine(a, b)
+        pen = QPen(_SNAP_CROSS_COLOR if active else _SNAP_CROSS_IDLE, 
+                   2.0 if active else 1.4)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        for a, b in arms:
+            painter.drawLine(a, b)
         if active:
             painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(vp, 8.0, 8.0)
+            painter.drawEllipse(vp, 8.5, 8.5)
         painter.restore()
 
     def _set_hover(self, scene_pt: QPointF | None) -> None:
-        """更新光标场景坐标，并只重绘「旧位置 + 新位置」两小块区域。"""
+        """更新光标场景坐标，并只重绘「旧位置 + 新位置 + 标记」几小块区域。"""
         old = self.snap.hover
+        old_marker = self._drawn_marker
         self.snap.hover = QPointF(scene_pt) if scene_pt is not None else None
         if scene_pt is not None:
             self._last_hover = QPointF(scene_pt)
         if not self.snap.show_markers:
             return
-        for p in (old, self.snap.hover):
+        # 捕捉点可能落在离光标几十像素外的格点 / 邻图元端点上（放大后更远），
+        # 只刷光标周围会留下旧十字的残影，所以把新旧标记位置一起并入重绘区。
+        new_marker = self._hover_marker()[0]
+        for p in (old, self.snap.hover, old_marker, new_marker):
             if p is None:
                 continue
             vp = self.mapFromScene(p)

@@ -14,8 +14,8 @@ from PySide6.QtWidgets import QApplication
 app = QApplication([])
 
 from Designer.Core.elements import base_element, group_element
-from Designer.modes.design.design_window_entry import DesignWindow
-from Designer.modes.design.element_factory import create_element
+from Designer.Core.ui.design_window_entry import DesignWindow
+from Designer.Core.ui.element_factory import create_element
 
 tmp = tempfile.mkdtemp(prefix="design_tab_repro_")
 win = DesignWindow(project_root=tmp)

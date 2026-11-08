@@ -120,7 +120,7 @@ class PackagerThread(QThread):
             declared_missing, other_missing = self._scan_warn_files()
             if declared_missing:
                 self.log_signal.emit("=" * 60)
-                self.log_signal.emit("❌ 严重：以下「隐藏导入」在打包环境里根本找不到！")
+                self.log_signal.emit("❌ 严重：以下顶层包在打包解释器里确实找不到！")
                 for name in declared_missing:
                     self.log_signal.emit(f"    - {name}")
                 self.log_signal.emit(
@@ -130,15 +130,25 @@ class PackagerThread(QThread):
                 self.log_signal.emit("=" * 60)
                 self.finished_signal.emit(
                     False,
-                    "❌ 打包进程返回 0，但声明的隐藏导入没找到："
+                    "❌ 打包进程返回 0，但顶层依赖包没找到："
                     + ", ".join(declared_missing),
                 )
                 return
-            if other_missing:
+            # 包内子模块/属性级缺失是 PyInstaller 静态分析的常见噪声，
+            # 单独报数，不混进「真正缺失模块」里。
+            noise = {m for m in other_missing
+                     if any(m.startswith(n + ".") for n in self.hidden_imports)}
+            real_missing = other_missing - noise
+            if noise:
                 self.log_signal.emit(
-                    f"⚠️ warn 文件里有 {len(other_missing)} 个缺失模块"
+                    f"ℹ️ warn 里 {len(noise)} 条「包内子模块/属性」缺失"
+                    "（如 numpy._core.zeros，多为 re-export 的函数/类误判），已忽略。"
+                )
+            if real_missing:
+                self.log_signal.emit(
+                    f"⚠️ warn 文件里有 {len(real_missing)} 个缺失模块"
                     "（多为可选依赖，确认不是业务必需的即可）："
-                    + ", ".join(sorted(other_missing)[:12])
+                    + ", ".join(sorted(real_missing)[:12])
                 )
 
             self.finished_signal.emit(True, "✅ 打包成功，隐藏导入全部可用！")
@@ -149,8 +159,16 @@ class PackagerThread(QThread):
     def _scan_warn_files(self):
         """读 PyInstaller 的 warn-*.txt，找出 missing module。
 
-        返回 ``(声明过的隐藏导入里缺失的, 其它缺失模块)``。前者是致命的：
-        说明打包环境用错了，产物运行期必炸。
+        返回 ``(声明过的顶层包确实找不到的, 其它缺失模块)``。
+
+        只有「顶层包本身」在打包解释器里也 find_spec 不到，才是致命的。
+        warn 里绝大多数 ``missing module named pkg.sub`` 不是缺包：
+        PyInstaller 静态分析会把包内 re-export 的函数/类（numpy 2.x 的
+        ``numpy._core.zeros``、``pandas.core.internals.Block``）和可选组件
+        （``pyarrow._cuda`` / ``pyarrow.gandiva``）当成子模块写进 warn，
+        而顶层包其实已完整进 PYZ。旧逻辑用 ``startswith(name + '.')``
+        判致命，结果 numpy/pandas/pyarrow 装齐、spec 自检通过、返回码 0，
+        仍被误报成「打包解释器不对」。
         """
         warn_dir = self.project_path / "build" / self.spec_file.stem
         if not warn_dir.is_dir():
@@ -166,13 +184,31 @@ class PackagerThread(QThread):
                 match = pattern.search(line)
                 if match:
                     missing.add(match.group(1))
-        declared = set()
-        for name in self.hidden_imports:
-            for found in missing:
-                if found == name or found.startswith(name + "."):
-                    declared.add(name)
-                    break
+        # 精确匹配：包内子模块/属性缺失不算「整个包找不到」
+        candidates = set(self.hidden_imports) & missing
+        declared = self._unresolvable_roots(candidates) if candidates else []
         return sorted(declared), missing - set(self.hidden_imports)
+
+    def _unresolvable_roots(self, candidates) -> list:
+        """在真正跑 PyInstaller 的解释器里复核顶层包是否真的装不上。
+
+        spec 的前置自检可能被手工编辑绕过，所以这里再确认一次；
+        复核不了（解释器失效 / 子进程异常）就宁可按 warn 原样报错。
+        """
+        code = (
+            "import importlib.util, json; "
+            "print(json.dumps({m: importlib.util.find_spec(m) is not None "
+            "for m in " + repr(sorted(candidates)) + "}))"
+        )
+        try:
+            out = subprocess.check_output(
+                [self.python_exe or sys.executable, "-c", code], text=True,
+                encoding="utf-8", errors="replace", timeout=30,
+            )
+            result = json.loads(out.strip().splitlines()[-1])
+        except Exception:  # noqa: BLE001 - 复核失败不静默放过
+            return sorted(candidates)
+        return sorted(m for m, ok in result.items() if not ok)
 
 class SpecEditorDialog(QDialog):
     """Spec 文件预览/编辑对话框"""

@@ -796,6 +796,10 @@ class SafetySceneView(GraphicsView):
         self.centerOn(0.0, 0.0)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
+        # 「尺寸变化时画面不跟着平移」由基类 ``GraphicsView`` 的
+        # ``setResizeAnchor(NoAnchor)`` 统一负责（钉住视口左上角场景点），
+        # 语义等同旧 ``QuadTreeScene``：``scene_origin`` 只在 showEvent 定一次，
+        # resize 时不动，尺寸变小只是把右/下边缘裁掉。
         super().resizeEvent(event)
         if callable(self.on_viewport_resized):
             self.on_viewport_resized()

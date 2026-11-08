@@ -9,7 +9,7 @@ import sys
 
 
 if __package__ in (None, ""):
-    _ROOT =  os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    _ROOT =  os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if _ROOT not in sys.path:
         sys.path.insert(0, _ROOT)
         print(_ROOT)
@@ -24,7 +24,7 @@ if __package__ in (None, ""):
         return app, window
 
 else:
-    from .design_window import DesignerWindow
+    from .ui.design_window import DesignerWindow
     
 
 

@@ -228,9 +228,9 @@ def _make_log_plot(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
 
 def _make_designer(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
 
-    from Designer import DesignWindow
+    from Designer.CoreQGraphics.ui import DesignerWindow
 
-    return DesignWindow()
+    return DesignerWindow()
 
 def _make_motion_editer(enable_plc: bool, plc_ip: Optional[str]) -> QMainWindow:
 

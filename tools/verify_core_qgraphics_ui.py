@@ -1043,9 +1043,9 @@ def main() -> int:
 
     print("\n=== 8.15 背景网格 + 网格交汇点吸附（鼠标偏移即图元位移） ===")
 
-    def _is_amber(c) -> bool:
-        """光标旁的捕捉标记是橙色，与选中红点 (214,51,46) / 支点蓝要区分得开。"""
-        return c.red() > 200 and 90 < c.green() < 195 and c.blue() < 90
+    def _is_red_cross(c) -> bool:
+        """光标旁的捕捉标记是红色十字（旧 Core 同款纯红，抗锯齿后略有混色）。"""
+        return c.red() >= 195 and c.green() <= 110 and c.blue() <= 110
 
     scene.clearSelection()
     view.snap.enabled = False
@@ -1093,7 +1093,7 @@ def main() -> int:
     app.processEvents()
     vp_grid = view.mapFromScene(QPointF(nx, ny))
     check("画布上画出鼠标附近的捕捉标记",
-          _scan(_shot(), vp_grid.x(), vp_grid.y(), 10, _is_amber),
+          _scan(_shot(), vp_grid.x(), vp_grid.y(), 10, _is_red_cross),
           f"vp=({vp_grid.x()},{vp_grid.y()})")
 
     # 端点优先于网格：同距离时网格不得吃掉图元点
@@ -2008,6 +2008,91 @@ def main() -> int:
 
     zview.close()
     zview.deleteLater()
+    app.processEvents()
+
+    print("\n=== 8.26 捕捉点取真实端点：线头 / 三角顶点 / 选中项自身端点 ===")
+    # 独立场景 / 视图：不污染主窗口，也不影响 §9 的可见范围判断
+    nscene = GraphicsScene()
+    nview = GraphicsView(nscene)
+    nview.resize(900, 600)
+    nview.show()
+    app.processEvents()
+    hline = nscene.create_item("line", center=(300.0, 200.0))
+    hline.set_page_head_end(QPointF(200.0, 200.0), QPointF(400.0, 200.0))
+    tri3 = nscene.create_item("triangle", center=(300.0, 500.0))
+    tri3.set_page_vertices([QPointF(200.0, 560.0), QPointF(400.0, 560.0),
+                            QPointF(300.0, 440.0)])
+    nview.centerOn(nscene.projection.point(300.0, 350.0))
+    app.processEvents()
+    nview.refresh_snap_points()
+
+    def _sc(x, y) -> QPointF:
+        p = nscene.projection.point(x, y)
+        return QPointF(p.x(), p.y())
+
+    head, tail = _sc(200.0, 200.0), _sc(400.0, 200.0)
+    ends, _mids = hline.snap_points()
+    check("水平线的两端是真实端点（不再取加厚后的包围盒虚角）",
+          len(ends) == 2
+          and any(_close_pt((p.x(), p.y()), (head.x(), head.y()), 1e-6)
+                  for p in ends)
+          and any(_close_pt((p.x(), p.y()), (tail.x(), tail.y()), 1e-6)
+                  for p in ends),
+          f"ends={[(round(p.x(), 1), round(p.y(), 1)) for p in ends]}")
+
+    apex = _sc(300.0, 440.0)
+    tends, _tm = tri3.snap_points()
+    check("三角形顶点进入捕捉点",
+          len(tends) == 3
+          and any(_close_pt((p.x(), p.y()), (apex.x(), apex.y()), 1e-6)
+                  for p in tends),
+          f"ends={[(round(p.x(), 1), round(p.y(), 1)) for p in tends]}")
+
+    # 光标凑到线头：十字必须落在端点上（旧版这里会跳到旁边的格点）
+    nscene.clearSelection()
+    hv = nview.mapFromScene(head)
+    QTest.mouseMove(nview.viewport(), QPoint(hv.x() + 2, hv.y() + 1))
+    app.processEvents()
+    mk, _act = nview._hover_marker()
+    check("光标靠近线端点时十字就在端点上",
+          mk is not None
+          and _close_pt((mk.x(), mk.y()), (head.x(), head.y()), 1e-6),
+          f"marker=({mk.x():.2f},{mk.y():.2f}) "
+          f"head=({head.x():.2f},{head.y():.2f})" if mk else "marker=None")
+    check("端点上画出红色十字",
+          _scan(nview.viewport().grab().toImage(), hv.x(), hv.y(),
+                12, _is_red_cross),
+          f"vp=({hv.x()},{hv.y()})")
+
+    # 选中这条线后再凑近它自己的端点：十字仍然要显示（只是不参与吸附）
+    hline.setSelected(True)
+    app.processEvents()
+    QTest.mouseMove(nview.viewport(), QPoint(hv.x() + 2, hv.y() + 1))
+    app.processEvents()
+    mk2, act2 = nview._hover_marker()
+    check("选中后靠近自身端点仍显示十字",
+          mk2 is not None
+          and _close_pt((mk2.x(), mk2.y()), (head.x(), head.y()), 1e-6),
+          f"marker={mk2}")
+    check("自身端点只作显示、不参与吸附（十字不加粗）", act2 is False)
+    hover_pt = QPointF(nview.snap.hover)
+    snap_target, _sk = nview.snap.aim(hover_pt,
+                                      exclude=nview._selection_own_points(),
+                                      always=True)
+    keep = QPointF(hline.scenePos())
+    nview.snap.enabled = False
+    QTest.keyClick(nview, Qt.Key_T)
+    app.processEvents()
+    moved = QPointF(hline.scenePos()) - keep
+    want = QPointF(0.0, 0.0) if snap_target is None else snap_target - hover_pt
+    check("按 T 吸的仍是「格点 / 别人的点」，不会吸到自己端点上",
+          abs(moved.x() - want.x()) < 1e-6 and abs(moved.y() - want.y()) < 1e-6,
+          f"moved=({moved.x():.3f},{moved.y():.3f}) "
+          f"want=({want.x():.3f},{want.y():.3f})")
+
+    nview.snap.enabled = False
+    nview.close()
+    nview.deleteLater()
     app.processEvents()
 
     print("\n=== 9. 关窗不重写页面文件 ===")

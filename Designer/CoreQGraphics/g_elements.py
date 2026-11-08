@@ -654,6 +654,38 @@ class _PointBasedItem(BaseItem):
         self._w_view = self._local_rect.width()
         self._h_view = self._local_rect.height()
 
+    # ------------------------------------------------------------------
+    # 捕捉点：用真实顶点，而不是包围盒四角
+    # ------------------------------------------------------------------
+    def _snap_vertices_local(self) -> list[QPointF]:
+        """局部坐标下的可视顶点（子类可覆盖，如 path 走 ``_local_points()``）。"""
+        return list(getattr(self, "_points_local", []) or [])
+
+    def snap_closed(self) -> bool:
+        """形状是否闭合（闭合的再补一条「末点 → 首点」边的中点）。"""
+        return False
+
+    def snap_points(self) -> tuple[list[QPointF], list[QPointF]]:
+        """端点取**真实顶点**，中点取各边中点 + 图元中心。
+
+        基类按 ``_local_rect`` 取包围盒四角：线一旦斜放、三角形 / 多边形不是
+        轴对齐矩形，包围盒角点根本不在图形上（斜线的包围盒角能离可见端点几十个
+        单位），鼠标凑到看得见的端点旁边反而没有捕捉点。旧 Core 对线也是取
+        ``get_scene_head_pos() / get_scene_end_pos()``，这里与它对齐。
+        """
+        pts = self._snap_vertices_local()
+        if len(pts) < 2:
+            return super().snap_points()
+        tf = self.sceneTransform()
+        ends = [tf.map(p) for p in pts]
+        mids = [tf.map(QPointF(0.0, 0.0))]
+        for a, b in zip(ends, ends[1:]):
+            mids.append(QPointF((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0))
+        if self.snap_closed() and len(ends) > 2:
+            a, b = ends[-1], ends[0]
+            mids.append(QPointF((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0))
+        return ends, mids
+
 
 class LineItem(_PointBasedItem):
     TYPE = "line"
@@ -794,6 +826,10 @@ class TriangleItem(_PointBasedItem):
     def paint(self, painter: QPainter, option, widget=None) -> None:
         self._draw_polygon(painter)
 
+    def snap_closed(self) -> bool:
+        """三角形 / 多边形都是闭合图形：补首尾边中点。"""
+        return True
+
     def _draw_polygon(self, painter: QPainter) -> None:
         if len(self._points_local) < 2:
             return
@@ -875,6 +911,10 @@ class PathItem(_PointBasedItem):
         recs = self._page.get("vertices") or []
         n = min(len(recs), path.elementCount()) if recs else path.elementCount()
         return [QPointF(path.elementAt(i).x, path.elementAt(i).y) for i in range(n)]
+
+    def _snap_vertices_local(self) -> list[QPointF]:
+        """路径类没有 ``_points_local``，顶点在 ``_path_local`` 元素里。"""
+        return self._local_points()
 
     def _records_from_points(self, points: list[QPointF]) -> list[dict]:
         """按旧记录的 ``move`` 分段标记重排顶点表。"""

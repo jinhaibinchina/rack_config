@@ -513,3 +513,5 @@ class DesignerWindow(QMainWindow):
         for key in ("delete", "duplicate", "group", "ungroup", "z_front",
                     "z_back", "z_raise", "z_lower"):
             self.actions[key].setEnabled(has_sel)
+
+

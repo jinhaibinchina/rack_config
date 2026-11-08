@@ -344,15 +344,58 @@ def main() -> int:
     check("IO状态 / 维修区 组被关闭交互",
           not win.scene_manager.findItemByName("IO状态").is_interactive()
           and not win.scene_manager.findItemByName("维修区").is_interactive())
-    check("视图运行态只读（无平移缩放）",
-          not win.scene.is_canvas_navigation_enabled())
+    check("运行态默认放开画布导航（现场可平移/缩放）",
+          win.scene.is_canvas_navigation_enabled())
     check("视图无网格 / 无设计器标记",
           not win.scene.show_grid and not win.scene.snap.grid_enabled
           and not win.scene.snap.show_markers)
-    check("导航门控可显式打开",
-          (win.scene.set_canvas_navigation_enabled(True)
-           or win.scene.is_canvas_navigation_enabled()))
     win.scene.set_canvas_navigation_enabled(False)
+    check("导航门控可一键关掉", not win.scene.is_canvas_navigation_enabled())
+    win.scene.set_canvas_navigation_enabled(True)
+
+    # --- 属性区显隐不该推动画面（旧场景是自绘，scene_origin 固定）----------
+    anchor_item = win.scene_manager.findItemByName("IO状态")
+    probe = anchor_item.base_item().page_center()
+    view = win.scene
+    before_vp = view.viewport().rect()
+    before = view.mapFromScene(QPointF(*probe))
+    before_tl = view.mapToScene(0, 0)
+    win.property_dock.setVisible(True)
+    for _ in range(6):
+        app.processEvents()
+    after_vp = view.viewport().rect()
+    after = view.mapFromScene(QPointF(*probe))
+    after_tl = view.mapToScene(0, 0)
+    win.property_dock.setVisible(False)
+    for _ in range(6):
+        app.processEvents()
+    check("属性区展开后视口确实变矮（用例有效）",
+          after_vp.height() < before_vp.height() - 40,
+          f"{before_vp.height()} -> {after_vp.height()}")
+    check("属性区显隐后左上角场景点不变（画面不上下推）",
+          abs(after_tl.y() - before_tl.y()) < 0.01
+          and abs(after_tl.x() - before_tl.x()) < 0.01,
+          f"{before_tl} -> {after_tl}")
+    check("属性区显隐后图元屏幕坐标不变",
+          abs(after.y() - before.y()) <= 2 and abs(after.x() - before.x()) <= 2,
+          f"({before.x()},{before.y()}) -> ({after.x()},{after.y()})")
+    check("收回报后取景复原",
+          abs(view.mapFromScene(QPointF(*probe)).y() - before.y()) <= 2
+          and abs(view.mapToScene(0, 0).y() - before_tl.y()) < 0.01)
+
+    # centerOn 内部有像素取整，锚点补偿最容易在这里单向累积漂移。
+    drift, last_tl = False, before_tl
+    for w, h in ((1237, 761), (1103, 902), (1310, 720), (1200, 800)):
+        win.resize(w, h)
+        for _ in range(4):
+            app.processEvents()
+        last_tl = view.mapToScene(0, 0)
+        if (abs(last_tl.x() - before_tl.x()) > 0.01
+                or abs(last_tl.y() - before_tl.y()) > 0.01):
+            drift = True
+            break
+    check("连续改尺寸不累积漂移", not drift, f"{last_tl}")
+
     win.shutdown()
     win.close()
     app.processEvents()

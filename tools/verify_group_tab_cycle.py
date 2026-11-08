@@ -15,8 +15,8 @@ app = QApplication([])
 from Designer.Core.elements import base_element, group_element
 from Designer.Core.myQuadTreeScene import SceneManager
 from Designer.Core.my_common import SceneMode
-from Designer.modes.design.design_scene import DesignScene
-from Designer.modes.design.element_factory import create_element
+from Designer.Core.ui.design_scene import DesignScene
+from Designer.Core.ui.element_factory import create_element
 
 scene = DesignScene()
 manager = SceneManager(scene, parent=scene)

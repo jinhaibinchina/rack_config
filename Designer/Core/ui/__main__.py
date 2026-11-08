@@ -16,7 +16,7 @@ if not __package__:
     if _PROJECT_ROOT not in sys.path:
         sys.path.insert(0, _PROJECT_ROOT)
         print(_PROJECT_ROOT)
-    from Designer.modes.design.design_window_entry import main
+    from Designer.Core.ui.design_window_entry import main
 
 else:
     from .design_window_entry import main

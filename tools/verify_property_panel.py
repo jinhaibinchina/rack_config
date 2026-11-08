@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 
 from Designer.Core.NavigationContentWidget import NavigationContentWidget
 from Designer.Core.my_common import SceneMode
-from Designer.modes.design.element_factory import create_element
+from Designer.Core.ui.element_factory import create_element
 from tools.bench_scene import DEFAULT_PAGE, build_scene
 
 FAILURES: list[str] = []

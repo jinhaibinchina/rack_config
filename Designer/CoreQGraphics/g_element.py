@@ -879,15 +879,26 @@ class BaseItem(QGraphicsItem):
         else:
             self._turn_to(float(angle), rebuild=True)
 
-    def snap_points(self) -> tuple[list[QPointF], list[QPointF]]:
-        """端点 / 中点，返回视图场景坐标（与旧 SnapSystem 输入口径一致）。"""
+    def frame_corners(self) -> list[QPointF]:
+        """包围盒四角（视图场景坐标），顺序：[左上, 右上, 左下, 右下]。
+
+        拖角改尺寸要拿「轴对齐包围盒」的四角当锚点，这与捕捉点不是一回事
+        （顶点类的捕捉点是真实顶点，见 ``_PointBasedItem.snap_points``），所以
+        单独开一个入口，别再用 ``snap_points()`` 取角。
+        """
         r = self._local_rect
         corners = [
             QPointF(r.left(), r.top()), QPointF(r.right(), r.top()),
             QPointF(r.left(), r.bottom()), QPointF(r.right(), r.bottom()),
         ]
         tf: QTransform = self.sceneTransform()
-        ends = [tf.map(pt) for pt in corners]
+        return [tf.map(pt) for pt in corners]
+
+    def snap_points(self) -> tuple[list[QPointF], list[QPointF]]:
+        """端点 / 中点，返回视图场景坐标（与旧 SnapSystem 输入口径一致）。"""
+        r = self._local_rect
+        tf: QTransform = self.sceneTransform()
+        ends = self.frame_corners()
         mids = [
             tf.map(r.center()),
             tf.map(QPointF(r.center().x(), r.top())),
