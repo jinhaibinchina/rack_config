@@ -1,34 +1,28 @@
-# 项目通用约定
-- PySide6（已从 PyQt6 全量迁移），信号用 Signal/Slot/Property；.ui 走 `uic_compat.loadUi`。跑脚本/回归/打包一律 `.venv/Scripts/python.exe`
-- 打包：必须用本项目 .venv（PyInstaller 收集自身解释器的 site-packages，spec pathex 管不着）；改 `工具集.spec` 必须同步改 `packTool.py`；命令 `[UI 指定 python,'-m','PyInstaller']`；返回码 0 也扫 `build/<spec>/warn-*.txt`；spec 前置 `find_spec` 自检别删，asyncua 要 collect_submodules
-- 资源一律保持源码层级（resource_manager 用 `__file__`），例外 cset_parser 的 `cfg/config.json` 复制到 exe 同层；必须带 `myDesigner/data2.json`（漏了画面全空）；`hook-snap7.py` 的 add_dll_directory 只收目录；COLLECT 会 rmtree 旧 dist，被拦就先 mv；冒烟 `--app PopPick --no-plc` 离屏 exit=124 正常，**别冒烟 Designer**（关窗重写 page_*.json）
+# 通用约定
+- PySide6；`.ui` 走 `uic_compat.loadUi`；脚本/回归/打包一律 `.venv/Scripts/python.exe`
+- 打包必须本项目 .venv；`工具集.spec` 与 `packTool.py` 同步；返回码 0 也扫 warn；spec 前置 find_spec、asyncua collect_submodules
+- 资源保持源码层级；例外 cset_parser cfg/config.json；必带 myDesigner/data2.json；hook-snap7 add_dll_directory 只收目录；冒烟 `--app PopPick --no-plc` exit=124 正常，**别冒烟 Designer**
 
-# 料仓 / 图元几何 / HMI（旧 Designer/Core）
-- 料仓两层：`rack_store_model.py`（图元层）+ `rack_stores_status_model.py`（状态层=唯一真值）。重载 `load_element_info2` 后必须 `RackStoresWindow.refresh_models()`
-- 隐藏组递归清子图元可见标志，重显要重灌状态；反读状态用 `visual_key` 判等；判料位别用 `bool(state)`（EMPTY 恒真）
-- `group.m_children` 是 set 不保序；组内搬家用 `change_position()`（is_in_group 时 `setPos` 直接 return）；热路径禁 print，用 debug_log + `RACK_DEBUG_SCENE=1`；场景为空是合法状态
-- `change_size` 锚点：无父=旋转中心 `m_origin`，有父=左上角（`_resize_anchor_local`/`_axis_scale`/`_scale_about` 在 elements.py 顶部）；尺寸↔控件像素 `fit_widget_size` / `widget_pixel_size`，AGV 90° 下控件宽=场景高。回归 `tools/verify_resize_anchor.py`
-- 嵌入式 QWidget 图元：每控件一个透明 QGraphicsView + QGraphicsProxyWidget，缩放 `view.setTransform`、旋转 `proxy.setRotation(-angle)`；承载 view+viewport 必须 StrongFocus；`addWidget` 前不能 setParent；顶层 widget 必须 `setMinimumSize(1,1)`，尺寸用 `proxy.resize`；承载层 Run 才惰性创建，`set_scene_mode(Run)` 早于 load 时加载末尾补 `_sync_embedded_widgets(True)`；左键延迟派发（超 startDragDistance=平移，未超 release 补发），`PRESS_THROUGH_TYPES` 立即直通；换页快照后补 `scene._sync_embedded_widgets_geometry()`。回归 `verify_embedded_widget.py` / `overlay_widget_probe.py` / `verify_press_through.py` / `verify_hmi_press.py`
-- 场景加速层 `Core/scene_fast.py`：复用 QPen/QBrush/QFont，`RACK_SCENE_FAST=0` 可退回旧行为；`viewBoundingRect()` 缓存 + `Transform.map_many` 批量吸附点。基准 `tools/bench_scene.py --ab`，回归 `tools/verify_scene_fast.py`（逐像素对拍）。**numpy 在 5~620 点比纯 Python 慢，别引入**
-- App_PopPick HMI 7 页：画布固定 750×1000、1:1（`PAGE_PIXEL_SIZE`，`_refit()` 钉 scale=1.0）；`QSizePolicy.Ignored`+`setMinimumWidth` 会让同行重叠，改覆写 `minimumSizeHint`；Qt6 设「行数之外」的 rowStretch 无效，底部塞 QSpacerItem；字号一律 `_pixel_font`；卡片尺寸由页面控件反推 `HmiPagesHost._fit_card()`。回归 `tools/verify_hmi_layout.py --shot build/hmi_layout`；改 CRLF 的 `pages.py` 用 `open(newline="")`
-- App_LogPlot：`TOOLS` 注册 `factory(enable_plc, plc_ip)` 点击才 import；`QT_API=pyside6` 必须在 Qt/matplotlib 之前钉死；`lines_on_vice` 与 `lines` 等长同步；回归 `tools/verify_log_plot_pyside6.py`
+# 旧 Designer/Core
+- 料仓：`rack_store_model.py`+`rack_stores_status_model.py`（状态唯一真值）；重载后 `refresh_models()`；隐藏组递归清子可见、重显重灌；`visual_key` 判等；判料位别用 `bool(state)`；`m_children` 不保序，组内搬家 `change_position()`
+- `change_size` 锚点：无父=旋转中心 `m_origin`，有父=左上角（`_resize_anchor_local/_axis_scale/_scale_about`）；`fit_widget_size`/`widget_pixel_size`；AGV 90° 控件宽=场景高
+- 嵌入控件：透明 QGraphicsView+ProxyWidget，`view.setTransform`、`proxy.setRotation(-angle)`；承载层 StrongFocus；`addWidget` 前不能 setParent；顶层 widget `setMinimumSize(1,1)`；Run 惰性创建；回归 embedded_widget/press_through
+- `scene_fast.py` 复用 QPen/QBrush/QFont，`RACK_SCENE_FAST=0` 退回；numpy 5~620 点更慢，别引入
+- App_PopPick HMI 750×1000 1:1；`QSizePolicy.Ignored`+setMinimumWidth 会重叠→覆写 minimumSizeHint；Qt6 行数外 rowStretch 无效→底部 Spacer；`_pixel_font`
+- App_PopPick 运行态已跑 `qgraphics_runtime.py`（CoreQGraphics，Core 零改动）；动画靠「控件 grab 成位图」：proxy 对齐= `resize`+`setTransformOriginPoint(w/2,h/2)`+`pos=center-半尺寸`（**别用 setGeometry(-w/2,-w/2)**）；`_static`(长期意图) 与 `_cached`(谁在显示) 必须分开记账；位图按**逻辑宽×m11×view.dpr** 定标、启用 `devicePixelRatio()` 反算；重烘走 `_mark_snapshot_dirty`+分片空闲刷新（别同步 grab 一批）；`NoCache`+`MinimalViewportUpdate`+`ItemHasNoContents`；回归 `tools/verify_pop_pick_qgraphics.py`（63 项）
 
-# CoreQGraphics 重写版（Designer/CoreQGraphics/）
-入口 `python -m Designer.CoreQGraphics.ui [page.json]`；UI 类走顶层 `__getattr__` 延迟导出。复用 `Core/property_widgets.py`。旧项目**没有图层树**（`NavigationContentWidget` 是属性分页树），真工具箱/主窗口在 `modes/design/`。
-- **脏标记分离**：`_dirty`=任意编辑、`_geo_dirty`=几何重建；属性编辑只写 `_page` 对应字段，否则 center_pos 被 round(3) 改写破坏 round-trip 零改动。**关窗不无条件写盘**（`scene.is_modified()` 询问）；旧 `DesignWindow.closeEvent` 会重写 page_*.json
-- 首次 `fitInView` 放 `showEvent`（构造期 viewport 98×28）；`fit_saved_rect()` 按 page sceneRect 恢复视图，与 `fit_content()` 语义不同；清面板页用 `setParent(None)+deleteLater()`；Delete 走 `scene.delete_items()`（清索引）
-- 手动绘制（CAD 式分点落子，非拖拽）：工具箱/工具栏「绘制」→ `view.set_draw_tool`，`scene.begin_draw_tool` 立刻 `create_item(commit=False)` 建草稿；`mousePress` 经 `projection.inverse_point`（元组→QPointF）→ `draw_add_point`；矩形/线/圆 2 击、三角 3 击、多边形/路径 N 击+右键 `finish_polygon`、其余单击；`mouseMove`→`draw_preview`，`Esc`→`cancel_draw`，完成发 `drawFinished` → `_after_edit` 提历史。预览叠加 `drawForeground`+`_draw_preview_overlay`；`DRAW_KIND` 决定落点数，几何 setter 直写 `_page` 并置 `_geo_dirty`
-- **背景网格与吸附**（g_snap/g_view）：`adapt_grid_to_scale()` 维护 `snap.grid_step`（2 的幂，屏幕 18~90px），**画线步长=捕捉步长**；格点 `nearest_grid()` 解析算不进点集，端点/中点存空间哈希 cell 64；`hover` 由 `_set_hover()` 更新并只重绘 96×96 小块；`aim(..., always=True)` 无图元点时退最近格点（网格关了退 4× 阈值图元点）→ 光标附近恰好一个橙十字 (255,150,0)，别用红色（`_is_dot` 会误判选中红点）；T 在 hover 为空时退回 `_last_hover`，仅 `underMouse()` 时 warp 光标
-- 吸附基准是**鼠标点**：`offset=target-hover`，`_snap_offset` 记已叠加量；**拖动中不要 moveBy**（Qt 绝对定位每帧覆盖），只在松手补一次；T 键 `require_movable=False`，拖动 `require_movable=True` + `_items_moved_since_press()` 防止绕过「未按 CTRL 拖不动」
-- **右键自己接管**：QGraphicsView 右键按下即 `clearSelection`，`mousePressEvent` 对 RightButton 不转基类，走 `_prepare_context_target()`，release 直接 accept；菜单构造拆 `build_context_menu()`，首项「属性…」发 `"property"` → 抬升 `property_dock`
-- 移动需按 **CTRL**：`ItemIsMovable` 由 `scene._movable_gate` + 运行模式门控，Key_Control 切换、`focusOutEvent` 复位，运行模式恒不可拖
-- **父对象**（逻辑父，非 Qt 嵌套）：`set_page_parent(pid)` 改 `parent_id` + `index.rebuild_links()`，拒绝自指/成环；父移动靠 `on_item_moved` 刚体传播 `p'=R(dA)(p-C_old)+C_new`。**刻意不用 `setParentItem`**（page_1 的 1618 图元里 1589 个有 parent_id，改 Qt 父子会毁平铺 z 序与对拍）
-- **位姿锁只锁平移**：`translate_locked()`=`parent_id!=0`（`pose_locked()` 别名），子图元不能 `set_page_center`/拖，但 `set_page_angle`/`rotate_by` 照常；面板布局页 disabled 恒 2
-- **父坐标系**只是对外口径：`parent_frame()`/`page_local_center|angle|origin()`/`set_page_local_*`；磁盘与 `_page` 仍是场景绝对坐标（否则存量全改写、旧 Core 读错、对拍崩）
-- **旋转支点** `origin_pos` 与 `center_pos` 解耦：`_place()` 按 `q→pos+o+R(q-o)`，`|origin-center|<0.05` 吸附为「绕中心转」；`set_page_origin` 改支点保持可视中心不动，`set_page_center` 让支点刚性跟随；`to_page_record` 用 mapToScene 反算。右键「旋转中心设到此处」+ 蓝十字圆环；**中心点标识（红点+ID）画在 `pivot_scene_point()`（支点）**，它投影 `page_origin()`，别用 `mapToScene(transformOriginPoint())`（顶点类烘焙后原点被重置成 0）；支点环判据 `has_custom_origin()`；烘焙期置 `_suppress_propagate`（`setRotation(0)` 的位姿差分会把后代反向带一遍）
-- **顶点类**（polygon/triangle/line/path）自转必须**烘焙进顶点**再落盘（`bake_rotation` + `to_page_record` 钩子），否则重开弹回原位；`closeSubpath()` 让 `elementCount()` 比顶点表多 1，按元素数做守卫要用 `<` 不是 `!=`
-- **烘焙是纯记账，中心/支点原样带过去**：`set_page_vertices` / `PathItem._replace_points` / `LineItem.set_page_head_end` / `set_page_size` 的 `center=`/`pivot=` 传了就按传入值落（旋转烘焙、父级刚体、缩放都传），都不传才是「新形状→包围盒中心 + `_rebase_pivot(old,new)`」（绘制落子走这条，且在 `_suppress_geo=True` 里重建）。按新包围盒重找中心的话，三角/任意多边形转一次支点就跳（非中心对称，包围盒中心本就换点）——这是「多边形/三角形旋转中心偏移」的根因
-- 顶点类朝向记 `_baked_angle`：`page_angle()=_baked_angle-rotation()`，`_turn_to` 传残量 `angle-_baked_angle`（矩形类恒 0）；烘焙 `-=rotation()`、父级刚体 `_account_bake(dangle)`、缩放按总角度重记；落盘 `rotate`=真朝向（旧 Core 先反旋再正旋=恒等，安全）。`page_size()` 按总角度反旋，旋转后仍报自身尺寸
-- **选中项 ID 标注**：`drawForeground` 先 `_draw_selection_ids`；一律 `painter.resetTransform()` 后按视口像素画（红点 r=3 + 白底标签 alpha225，贴边翻转）；`view.show_ids` 总开关、运行模式不画、选中 >200 跳过；`setScene` 接 `selectionChanged`→`viewport().update()`；`itemChange` 在 isSelected 时对 `sceneBoundingRect().adjusted(-48,…)` 加脏区。**offscreen 无字体，文字全是豆腐块，字体断言只能用像素判据或 `QT_QPA_PLATFORM=windows`**
-- **隐藏图元可从图层树恢复**：Qt 不允许选中 `setVisible(False)` 图元；`LayerTreeDock.sync_selection` 把树里选中的隐藏节点并入 `wanted`，`_do("toggle_visible")` 无 payload 时回退 `layers.selected_ids()`；不要改 `selected_items()` 语义
-- 回归：`tools/verify_core_qgraphics.py`（page_1 逐图元对拍 0/1618 + JSON round-trip 零改动）、`tools/verify_core_qgraphics_ui.py`（§8.5 绘制 / §8.6 CTRL / §8.7 支点 / §8.8 父对象 / §8.9 ID / §8.15 网格 / §8.16 布局页 / §8.17 顶点类反复旋转不漂移）、`tools/probe_point_rotate.py`
+# CoreQGraphics
+入口 `python -m Designer.CoreQGraphics.ui [page.json]`；顶层 `__getattr__`；复用 `Core/property_widgets.py`；旧项目无图层树
+- **硬约束**：page_1 sceneBoundingRect 0/1618、JSON round-trip 零改动；主回归 `tools/verify_core_qgraphics.py`、`_ui.py` + 外围 8 项
+- **脏标记**：`_dirty`/`_geo_dirty`；属性编辑只写 `_page` 对应字段；关窗 `is_modified()`；Delete 走 `delete_items()`
+- **平铺层级**：`parent_id/children_ids`+SceneIndex，**不用 setParentItem**；`translate_locked()` 只锁平移；父移动 `on_item_moved` 刚体传播 `p'=R(dA)(p-C)+C'`
+- **支点**：`scene(q)=pos+o+R(q-o)`；`_place()` 解 o=R⁻¹(O-C)、pos=O-o；`set_page_origin` 保中心；`pivot_scene_point()`=page_origin；中心标识只画红点 r=3、**无 ID**
+- **平移必须用 `pos()` 不能 `scenePos()`**：有自定义支点+旋转非 0 时二者恒差 `o-R·o`，`setPos(scenePos()+delta)` 每帧白走这一段（斜图元漂/飞出，正放不暴露）。已修 `g_element.set_page_center`、`g_view` 拖根父分支；验证位姿只能读 `mapToScene(0,0)`，别读记录值（自洽）
+- **顶点类**旋转烘焙进顶点；烘焙纯记账，center=/pivot= 原样带（重找中心会让三角支点跳）；`_baked_angle`、`page_angle()=_baked_angle-rotation()`；`closeSubpath()` elementCount 多 1
+- **网格/吸附**：步长 2 的幂（屏幕 18~90px）；格点解析不进点集；`aim(always=True)` 退格点；唯一橙十字 (255,150,0)；T 键 offset=target-hover；**拖动中不要 moveBy**
+- **交互**：移动需 CTRL；右键自接管；CAD 分点落子（`set_draw_tool`/`draw_add_point`）；Esc 取消、右键 finish_polygon
+- **递归复制/组缩放**：`top_level_items()`；`_capture_subtree`；`_instantiate` 深拷贝、重发 id、重映射；平铺 offset 施加到每个几何点；组 `F(p)=A+(p-A)·(sx,sy)`，锚点无父=page_origin、有父=旋转后左上角；`apply_scale_about` 用 `_apply_pose`；成组/解组 `set_page_field`
+- **组名前缀/拖角**：成组 prepend `<组名>_`，解组剥一层，粘贴 `_free_from`；四角蓝方块（对面角锚、AGV `sx=d_local.y/d0.y`、跨度<28px 不画、运行态禁用）
+- **文本双向**：`style.font_size` 真值；字号/context 变→`text_metrics()`+`TEXT_PAD_X/Y` 改边框；W/H/拖角/组缩放→`_fit_font_size()` 二分（只写 font_size）；`_text_resizing`；加载/撤销不重算；AGV 两轴取 min
+- **widget 变体**：7 类；5 个**顶层**字段（不进 style/context）；`g_widgets.py` 占位自绘（字号=widgetFontSize 原值、`QFont()` 同族同字号，**别按框高缩**）；工具箱 `widget:<key>`
+- **运行预览 proxy**：`set_scene_mode(True)` 挂独立顶层 proxy（不做 Qt 子项、不进索引/page_data）；`create_control` 必须 `setMinimumSize(1,1)`；对齐 `resize(w,h)`+`setTransformOriginPoint(w/2,h/2)`+`setPos(mapToScene(0,0)-(w/2,h/2))`+`setRotation(it.rotation())`，**别用 setGeometry 再 setPos**

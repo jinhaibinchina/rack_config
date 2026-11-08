@@ -10,7 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QPen
+from PySide6.QtGui import QBrush, QColor, QFont, QFontMetricsF, QPen
+
+# 文本图元：边框 / 背景在文字度量之外预留的视图像素
+TEXT_PAD_X = 8.0
+TEXT_PAD_Y = 4.0
 
 _CACHE_LIMIT = 512
 _pen_cache: dict[tuple, QPen] = {}
@@ -100,6 +104,24 @@ def font_for(family: str, size: float, bold: bool = False) -> QFont:
         _guard(_font_cache)
         _font_cache[key] = font
     return font
+
+
+def text_metrics(text: str, font_size: float) -> tuple[float, float]:
+    """量出文字在**视图像素**下的 (宽, 高)，供边框背景自适应使用。
+
+    必须与 ``TextItem.paint`` 用同一份 ``font_for`` 字体，否则字号改完边框会
+    和文字差一两像素。多行文本按行累加行高、取最宽的一行；空串按一个空格量，
+    避免得到 0 尺寸导致 ``set_page_size`` 直接拒绝。
+    ``QFontMetricsF`` 与 QPainter 共享 QGuiApplication 的逻辑 DPI，离屏回归和
+    真实窗口口径一致。
+    """
+    fm = QFontMetricsF(font_for("Arial", font_size, True))
+    lines = str(text if text else " ").split("\n")
+    width = max((fm.horizontalAdvance(line) for line in lines), default=0.0)
+    # QPainter.drawText 多行的行距是 lineSpacing，只有最后一行用 height：
+    # 实测 40pt 三行是 61*2 + 53 = 175，直接 height*n 会少 16px 把字裁掉。
+    height = fm.height() + fm.lineSpacing() * (len(lines) - 1)
+    return max(float(width), 1.0), max(float(height), 1.0)
 
 
 @dataclass

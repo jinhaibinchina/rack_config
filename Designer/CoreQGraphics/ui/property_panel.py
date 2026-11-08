@@ -28,6 +28,9 @@ from Designer.Core.property_widgets import (
 
 from ..g_scene import TYPE_LABELS
 from ..g_style import color_str, parse_color
+from ..g_widgets import (
+    WIDGET_DEFAULTS, WIDGET_VARIANTS, WIDGET_VARIANT_LABELS, normalize_variant,
+)
 
 PAGE_ROLE = Qt.UserRole
 
@@ -42,6 +45,8 @@ class PropertyPanel(QWidget):
         self._target = None
         self._updating = False
         self._geo_bindings: list[tuple[object, object]] = []
+        # 字号在「文本内容」页和「外观」页各有一个输入，跨页保持同步
+        self._font_boxes: list = []
         self._last_page: dict[str, str] = {}
 
         outer = QVBoxLayout(self)
@@ -83,6 +88,7 @@ class PropertyPanel(QWidget):
         self._target = target
         self._clear()
         self._geo_bindings.clear()
+        self._font_boxes.clear()
         if isinstance(target, (list, tuple)):
             self._build_multi(target)
             self.header.set_object("多", f"{len(target)} 个图元", "多选 · 只做汇总")
@@ -181,6 +187,16 @@ class PropertyPanel(QWidget):
                     widget.blockSignals(True)
                     widget.setValue(float(getter()))
                     widget.blockSignals(False)
+                # 改 W/H、拖角、组缩放会由 TextItem 反算字号；两处字号输入也要
+                # 跟着回显，否则面板显示的字号和图元里的 style.font_size 不一致。
+                if self._font_boxes and hasattr(self._target, "style_value"):
+                    fs = int(float(self._target.style_value("font_size", 10)))
+                    for box in self._font_boxes:
+                        if box.value() == fs:
+                            continue
+                        box.blockSignals(True)
+                        box.setValue(fs)
+                        box.blockSignals(False)
             finally:
                 self._updating = False
 
@@ -217,6 +233,29 @@ class PropertyPanel(QWidget):
 
         self._commit(apply)
         # 延后重建：此刻正在 combo 自己的信号里，立刻删控件会崩
+        QTimer.singleShot(0, lambda: self.update_for_selected(it))
+
+    def _font_size_box(self, it):
+        """字体大小输入：文本内容页与外观页各放一个，两处保持同步。"""
+        box = make_int(int(float(it.style_value("font_size", 10))), 4, 200, 1,
+                       tooltip="字体大小（pt）；改完边框背景按文字重新计算")
+        box.valueChanged.connect(
+            lambda v: self._set_font_size(it, box, int(v)))
+        self._font_boxes.append(box)
+        return box
+
+    def _set_font_size(self, it, source, value: int) -> None:
+        self._commit(lambda: it.set_style_value("font_size", value))
+        for box in self._font_boxes:
+            if box is source:
+                continue
+            box.blockSignals(True)
+            box.setValue(value)
+            box.blockSignals(False)
+
+    def _set_widget_type(self, it, key: str) -> None:
+        """切 widget 变体：写顶层 ``widgetType``，延后重建面板刷新提示。"""
+        self._commit(lambda: it.set_page_field("widgetType", normalize_variant(key)))
         QTimer.singleShot(0, lambda: self.update_for_selected(it))
 
     # ------------------------------------------------------------------
@@ -312,13 +351,10 @@ class PropertyPanel(QWidget):
                 lambda v: self._commit(lambda: it.set_style_value("cornerRadius", float(v)))
             )
             card.add_row(("圆角", radius))
-        if it.TYPE in ("text", "widget"):
-            size = make_int(int(float(it.style_value("font_size", 10))), 4, 200, 1,
-                            tooltip="字号（pt）")
-            size.valueChanged.connect(
-                lambda v: self._commit(lambda: it.set_style_value("font_size", int(v)))
-            )
-            card.add_row(("字号", size))
+        # widget 变体的字号是顶层 widgetFontSize（不是 style.font_size），
+        # 统一放到「控件」页编辑，这里只给 text 留 style.font_size 入口。
+        if it.TYPE == "text":
+            card.add_row(("字号", self._font_size_box(it)))
         card.add_hint("颜色控件里的不透明度会写进 style.opacity，与旧 Core 一致。")
         return page
 
@@ -375,6 +411,11 @@ class PropertyPanel(QWidget):
             (w_box, lambda: it.page_size()[0]),
             (h_box, lambda: it.page_size()[1]),
         ])
+        if it.TYPE == "text":
+            card.add_hint(
+                "文本图元字号会随 W/H 自动适配：缩小任一边框会同步缩小字号，"
+                "避免文字被裁；只放大一边时受另一边限制，字号可能不变。"
+                "直接改「字体大小」则反过来按文字重算边框。")
 
         # 旋转不被父对象锁：子图元可以自己转（绕自己的支点，带后代一起转）
         angle = make_double(it.page_local_angle(), -360.0, 360.0, 1.0, 3,
@@ -399,6 +440,8 @@ class PropertyPanel(QWidget):
             lambda v: self._commit(
                 lambda: it.set_page_local_origin(it.page_local_origin()[0], v))
         )
+        ox_box.setReadOnly(True)
+        oy_box.setReadOnly(True)
         card.add_row(("旋转中心 X", ox_box), ("旋转中心 Y", oy_box))
         self._geo_bindings.extend([
             (ox_box, lambda: it.page_local_origin()[0]),
@@ -438,6 +481,10 @@ class PropertyPanel(QWidget):
                 lambda: self._commit(lambda: it.set_page_field("context", edit.toPlainText()))
             )
             card.add_widget(edit)
+            card.add_row(("字体大小", self._font_size_box(it)))
+            card.add_hint("改字体大小或文字后，边框 / 背景会按文字实际尺寸自动重算，"
+                          "中心与旋转支点保持不动。想手动指定边框请在「布局」页改宽高"
+                          "（下次改字号会再次按文字重算）。")
             return "context", "文本内容", page
 
         if it.TYPE == "image":
@@ -468,13 +515,66 @@ class PropertyPanel(QWidget):
 
         if it.TYPE == "widget":
             page = PropertyPage()
-            card = self._card(page, "占位控件")
-            card.add_row(("类型", make_value_label(
-                str(it.page_record().get("widgetType", "label")))))
-            card.add_row(("文本", make_value_label(
-                str(it.page_record().get("widgetText", "")))))
-            card.add_hint("CoreQGraphics 的 widget 图元只画占位框，"
-                          "不创建 EmbeddedWidgetLayer 真实控件。")
+            card = self._card(page, "控件变体")
+            rec = it.page_record()
+            cur = normalize_variant(rec.get("widgetType"))
+            combo = QComboBox()
+            for key in WIDGET_VARIANTS:
+                combo.addItem(WIDGET_VARIANT_LABELS[key], key)
+            combo.setCurrentIndex(combo.findData(cur))
+            combo.currentIndexChanged.connect(
+                lambda _i: self._set_widget_type(it, str(combo.currentData()))
+            )
+            card.add_row(("控件类型", combo))
+
+            edit = make_textarea(
+                str(rec.get("widgetText", WIDGET_DEFAULTS["widgetText"]) or ""),
+                placeholder="显示在控件上的文本 / 选项 / 数值范围…",
+                min_height=72,
+            )
+            edit.textChanged.connect(
+                lambda: self._commit(
+                    lambda: it.set_page_field("widgetText", edit.toPlainText()))
+            )
+            card.add_widget(edit)
+
+            fs = make_int(
+                int(float(rec.get("widgetFontSize",
+                                  WIDGET_DEFAULTS["widgetFontSize"]))),
+                6, 200, 1, suffix=" pt", tooltip="控件字号（pt）")
+            fs.valueChanged.connect(
+                lambda v: self._commit(
+                    lambda: it.set_page_field("widgetFontSize", int(v)))
+            )
+            card.add_row(("字号", fs))
+
+            fg = ColorField(parse_color(str(rec.get(
+                "widgetColor", WIDGET_DEFAULTS["widgetColor"]))))
+            fg.colorChanged.connect(
+                lambda c: self._commit(
+                    lambda: it.set_page_field("widgetColor", color_str(c)))
+            )
+            bg = ColorField(parse_color(str(rec.get(
+                "widgetBackground", WIDGET_DEFAULTS["widgetBackground"]))))
+            bg.colorChanged.connect(
+                lambda c: self._commit(
+                    lambda: it.set_page_field("widgetBackground", color_str(c)))
+            )
+            card.add_row(("文字色", fg), ("背景色", bg))
+
+            hints = {
+                "textedit": "只读多行文本，可滚动、选中、复制。",
+                "lineedit": "单行输入框，文本即初始内容。",
+                "checkbox": "文本是勾选框标题，留空显示「选项」。",
+                "combobox": "每行一个下拉选项，空白行忽略；留空显示「选项 1」。",
+                "pushbutton": "文本是按钮标题，留空显示「按钮」。",
+                "label": "文本是标签文字，留空显示「标签」。",
+                "spinbox": "每行一个 key=value：min= / max= / value=；"
+                           "缺省 0 / 99 / min，超出范围自动收敛。",
+            }
+            card.add_hint(hints.get(cur, "") +
+                          " 这 5 个字段都在 page JSON 顶层，与旧 Core 完全同构；"
+                          "运行预览会挂载对应的真实 Qt 控件。")
             return "widget", "控件", page
 
         if it.TYPE == "group":

@@ -84,6 +84,9 @@ class BaseItem(QGraphicsItem):
         # 重建期（把 Qt 旋转烘焙进顶点）会 setRotation(0)，位姿差分看起来像
         # 「转了 -θ」；但这次重建几何一点没动，不能把后代再反向带一遍。
         self._suppress_propagate = False
+        # 文本图元「字号 -> 边框」与「边框 -> 字号」双向联动时抑制反向重算，
+        # 否则两个方向会互相触发形成递归（也避免拖角每帧把边框改回去）。
+        self._text_resizing = False
         # 已烘焙进几何的角度（只有顶点类会用；矩形类恒为 0，旋转由 Qt 承担）
         self._baked_angle = 0.0
         self._hover = False
@@ -520,6 +523,17 @@ class BaseItem(QGraphicsItem):
         self.update()
         self._dirty = True
         self._geo_dirty = True
+        # +/- 快捷键直接改视图矩形，不经过 set_page_size；同步写回 _page，
+        # 否则 page_size()（属性面板 / 后续 set_page_size 的基准）与实际几何
+        # 不一致。to_page_record 的 _geo_dirty 重建用同一组数值，存盘不变。
+        w, h = self._proj.inverse_size(self._w_view, self._h_view)
+        if "width" in self._page:
+            self._page["width"], self._page["height"] = float(w), float(h)
+        elif "radius_w" in self._page:
+            self._page["radius_w"] = float(w) / 2.0
+            self._page["radius_h"] = float(h) / 2.0
+        # 文本图元同样要反算字号，否则放大后文字相对变小、缩小后被裁。
+        self._on_size_changed(w, h)
 
     def rotate_by(self, delta_deg: float) -> None:
         """按**视图**角度增量旋转（[ / ] 快捷键用），绕自身支点转。
@@ -562,6 +576,13 @@ class BaseItem(QGraphicsItem):
         return self.item_name
 
     def set_name(self, name: str) -> None:
+        # 组改名要连成员的名字前缀一起换（旧 Core group_element.set_name）；
+        # 属性面板与 F2 都走这里，统一由场景层处理。
+        scene = self.scene()
+        if (self.TYPE == "group" and scene is not None
+                and hasattr(scene, "rename_group")):
+            scene.rename_group(self, str(name))
+            return
         self.set_page_field("name", str(name))
 
     def get_visibility(self) -> bool:
@@ -606,6 +627,22 @@ class BaseItem(QGraphicsItem):
         self._sync_field(key, value)
         self.update()
 
+    def _on_text_changed(self) -> None:
+        """文本 / 字号变化后的几何联动 hook。
+
+        ``TextItem`` 覆写它来按文字尺寸重算边框背景；其余类型保持无操作。
+        只在属性面板显式编辑时触发，加载 / 撤销重建走构造路径，不动存量几何
+        （否则 page_1 的 1618 图元对拍与 JSON round-trip 会失效）。
+        """
+
+    def _on_size_changed(self, w: float, h: float) -> None:
+        """显式改边框尺寸后的联动 hook（``TextItem`` 用来反算字号）。
+
+        只在 ``set_page_size`` / ``resize_by`` 的成功路径调用。加载与撤销重建
+        走 ``_setup_rect`` 构造路径，不经过这里，所以存量 page 的 style 保持
+        原样——这是 page_1 对拍与 JSON round-trip 零改动的前提。
+        """
+
     def _sync_field(self, key: str, value) -> None:
         if key == "name":
             self.item_name = str(value)
@@ -613,9 +650,16 @@ class BaseItem(QGraphicsItem):
             self._visible = bool(value)
             self.setVisible(self._visible)
         elif key == "style":
+            old_font_size = self._style.font_size
             self._style = Style.from_dict(value)
+            # 只有字号真的变了才联动几何：改颜色 / 线宽不该把文本边框撑大。
+            # 由尺寸反算字号时（_text_resizing）只更新样式，不再重算边框。
+            if (abs(self._style.font_size - old_font_size) > 1e-9
+                    and not self._text_resizing):
+                self._on_text_changed()
         elif key == "context":
             self.context = value
+            self._on_text_changed()
         elif key == "checked":
             self.checked = bool(value)
         elif key == "image_path":
@@ -705,7 +749,12 @@ class BaseItem(QGraphicsItem):
         # 但仍然保留 on_item_moved 的父级联动。
         self._suppress_geo = True
         try:
-            self.setPos(self.scenePos() + delta)
+            # 必须用 pos() 而不是 scenePos()：有自定义支点（origin_pos ≠ 中心）
+            # 且旋转非 0 时 Qt 的 scenePos 是按支点旋转后的局部原点映射，
+            # 与 pos 差着「绕支点那一转」的位移。拿 scenePos 做基准再把结果
+            # 塞回 setPos，等于每次平移都多走一段，斜着的图元会越挪越偏
+            # （正放时旋转为 0、两者相等，所以只有旋转过的图元暴露）。
+            self.setPos(self.pos() + delta)
         finally:
             self._suppress_geo = False
         # 支点随中心刚性平移（局部偏移不变）
@@ -790,6 +839,34 @@ class BaseItem(QGraphicsItem):
             self._page["radius_h"] = float(h) / 2.0
         self._dirty = True
         self.update()
+        self._on_size_changed(float(w), float(h))
+
+    def apply_scale_about(self, anchor, sx: float, sy: float) -> None:
+        """组尺寸变化时，把本矩形类图元的全部几何点绕 ``anchor`` 缩放。
+
+        对照旧 Core ``rect_element.change_size``：组改宽高时，组内每个成员的
+        尺寸、中心、支点都要按同一组比例搬走。新场景是平铺结构（没有 Qt 父子
+        链），所以直接改 page 绝对坐标；用 ``_apply_pose`` 绕过
+        ``translate_locked``——子图元平时不允许自行平移，但父组缩放必须带动它。
+        """
+        ax, ay = float(anchor[0]), float(anchor[1])
+
+        def f(x, y):
+            return ax + (float(x) - ax) * sx, ay + (float(y) - ay) * sy
+
+        cx, cy = self.page_center()
+        ox, oy = self.page_origin()
+        angle = self.page_angle()
+        w, h = self.page_size()
+        prev = self._suppress_propagate
+        self._suppress_propagate = True
+        try:
+            self.set_page_size(w * sx, h * sy)
+            ncx, ncy = f(cx, cy)
+            nox, noy = f(ox, oy)
+            self._apply_pose(ncx, ncy, angle, nox, noy)
+        finally:
+            self._suppress_propagate = prev
 
     def set_page_angle(self, angle: float) -> None:
         """设置绝对角度（绕自身支点转）。有父对象时仍可调——只锁平移不锁旋转。

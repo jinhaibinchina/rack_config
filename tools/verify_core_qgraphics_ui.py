@@ -28,10 +28,13 @@ from PySide6.QtGui import QImage, QMouseEvent, QPainter  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
+    QComboBox,
     QDoubleSpinBox,
     QGraphicsItem,
     QGraphicsView,
     QLineEdit,
+    QPlainTextEdit,
+    QSpinBox,
 )
 
 SOURCE_PAGE = "Designer/Core/data.json/datas/design/pages/page_1.json"
@@ -154,8 +157,13 @@ def main() -> int:
     check("初始图元数 >= 11", len(scene.all_items()) >= 11,
           f"n={len(scene.all_items())}")
     check("菜单齐备", window.menuBar().actions().__len__() >= 5)
-    check("工具箱 11 类按钮", len(window.toolbox.buttons) == 11,
+    check("工具箱 11 类 + 7 种 widget 变体按钮",
+          len(window.toolbox.buttons) == 18,
           f"buttons={len(window.toolbox.buttons)}")
+    variant_buttons = [b.key for b in window.toolbox.buttons
+                       if b.key.startswith("widget:")]
+    check("工具箱含 7 种 widget 变体", len(variant_buttons) == 7,
+          str(variant_buttons))
     check("撤销栈初始不可撤销", not window.history.can_undo())
     check("图层树初始已填充", window.layers.tree.topLevelItemCount() ==
           len(scene.all_items()),
@@ -569,8 +577,8 @@ def main() -> int:
     scene.delete_items([par, kid])
     app.processEvents()
 
-    print("\n=== 8.9 选中图元显示中心点与 ID ===")
-    # 用像素级断言：红点 = 中心点，白色圆角框 = ID 标签
+    print("\n=== 8.9 选中图元显示旋转中心红点（无 ID 标签） ===")
+    # 用像素级断言：红点 = 旋转中心；右上方的白色圆角框 = 已移除的 ID 标签
     tag = scene.create_item("rect", center=(900.0, 700.0))
     tag.set_page_size(300.0, 200.0)
     scene.clearSelection()
@@ -596,15 +604,16 @@ def main() -> int:
         return False
 
     def _has_label(img, x, y) -> bool:
-        # 标签画在中心点右上方（x+6, y-21 起），取一块不含红点描边的区域
+        # 旧版 ID 标签画在中心点右上方（x+6, y-21 起）；这块区域若还出现
+        # 白底框，说明标签没去掉。避开中心红点自带的白色描边。
         return _scan_rect(img, x + 7, y - 30, x + 44, y - 8, _is_white)
 
     def _is_dot(c) -> bool:
         return c.red() > 150 and c.green() < 120 and c.blue() < 120
 
     def _is_white(c) -> bool:
-        # 标签是半透明白底（alpha 225），叠在灰色图元上约 240；纯白/浅绿背景
-        # 会被下面的近中性判定或蓝通道阈值排除。
+        # 旧版标签是半透明白底（alpha 225），叠在灰色图元上约 240；纯白/
+        # 浅绿背景会被下面的近中性判定或蓝通道阈值排除。
         return (c.red() > 215 and c.green() > 215 and c.blue() > 215
                 and abs(c.red() - c.blue()) < 20)
 
@@ -613,7 +622,7 @@ def main() -> int:
         app.processEvents()
         return window.view.viewport().grab().toImage()
 
-    check("默认开启 ID 标注", window.view.show_ids is True)
+    check("默认开启中心点标记", window.view.show_ids is True)
     cpt = tag.center_scene_point()
     lp = tag.mapToScene(tag._local_rect.center())
     check("center_scene_point 等于局部中心映射",
@@ -625,9 +634,9 @@ def main() -> int:
           f"pivot=({pvt.x():.2f},{pvt.y():.2f})")
     vp = window.view.mapFromScene(cpt)
     img = _shot()
-    check("选中项中心画有红色小圆点", _scan(img, vp.x(), vp.y(), 5, _is_dot),
+    check("选中项旋转中心画有红色小圆点", _scan(img, vp.x(), vp.y(), 5, _is_dot),
           f"vp=({vp.x():.1f},{vp.y():.1f})")
-    check("选中项旁画有白色 ID 标签", _has_label(img, vp.x(), vp.y()))
+    check("旋转中心旁不再画白色 ID 标签", not _has_label(img, vp.x(), vp.y()))
 
     # 关闭开关后不再绘制。属性面板的分页内容会让底部 Dock 重新布局，视口高度
     # 会变一次（AnchorViewCenter 因此平移画面），断言前重取中心点的屏幕位置。
@@ -636,20 +645,18 @@ def main() -> int:
     window.actions["toggle_ids"].setChecked(False)
     window._do("toggle_ids")
     img_off = _shot()
-    check("关闭『显示图元ID』后不再画标注",
-          not _scan(img_off, vp.x(), vp.y(), 5, _is_dot)
-          and not _has_label(img_off, vp.x(), vp.y()))
+    check("关闭『显示中心点标记』后不再画红点",
+          not _scan(img_off, vp.x(), vp.y(), 5, _is_dot))
     window.actions["toggle_ids"].setChecked(True)
     window._do("toggle_ids")
-    check("重新开启后标注恢复", _scan(_shot(), vp.x(), vp.y(), 5, _is_dot))
+    check("重新开启后红点恢复", _scan(_shot(), vp.x(), vp.y(), 5, _is_dot))
 
     # 运行模式不标注（选中被清空，且 drawForeground 直接跳过）
     scene.set_scene_mode(True)
     app.processEvents()
     img_run = _shot()
-    check("运行模式下不画 ID 标注",
-          not _scan(img_run, vp.x(), vp.y(), 5, _is_dot)
-          and not _has_label(img_run, vp.x(), vp.y()))
+    check("运行模式下不画中心点标记",
+          not _scan(img_run, vp.x(), vp.y(), 5, _is_dot))
     scene.set_scene_mode(False)
     scene.delete_items([tag])
     app.processEvents()
@@ -849,6 +856,53 @@ def main() -> int:
     check("子图元跟着父对象一起动",
           not _close_pt(kid.page_center(), kid_before, 1e-3),
           f"{kid_before} -> {kid.page_center()}")
+
+    # 斜图元拖动：位移必须等于鼠标位移。有自定义支点且旋转非 0 时 Qt 的
+    # scenePos() 与 pos() 差着「绕支点那一转」的定长偏移；若拖动拿 scenePos
+    # 当基准再 setPos，每帧都会白走这一段 —— 即使鼠标原地不动，图元也持续
+    # 漂移，真正拖动时几帧就飞出画布。正放时两者相等，只有斜图元暴露，
+    # 所以这里必须专门造一个「自定义支点 + 旋转 29°」的根父对象。
+    par.set_page_size(300.0, 200.0)
+    _pc = par.page_center()
+    par.set_page_origin(_pc[0] + 100.0, _pc[1] - 80.0)
+    par.set_page_angle(29.0)
+    app.processEvents()
+    view.snap.enabled = False
+    scene.clearSelection()
+    kid.setSelected(True)
+    window.view.resetTransform()
+    window.view.centerOn(kid.center_scene_point())
+    app.processEvents()
+    _q = window.view.mapFromScene(kid.center_scene_point())
+    _q = QPoint(int(_q.x()), int(_q.y()))
+    QTest.keyPress(view, Qt.Key_Control)
+    QTest.mousePress(view.viewport(), Qt.LeftButton, pos=_q)
+    app.processEvents()
+    check("斜图元上按下走「拖根父对象」代理分支",
+          view._proxy_drag is not None and view._proxy_drag[0] is par,
+          "proxy_drag=None" if view._proxy_drag is None
+          else type(view._proxy_drag[0]).__name__)
+
+    def _parent_center() -> QPointF:
+        return QPointF(par.mapToScene(QPointF(0.0, 0.0)))
+
+    for _i in range(2):                     # 先让吸附偏移收敛到稳定值
+        QTest.mouseMove(view.viewport(), pos=_q)
+        app.processEvents()
+    _steady = _parent_center()
+    for _i in range(6):                     # 鼠标原地不动：图元不许再挪
+        QTest.mouseMove(view.viewport(), pos=_q)
+        app.processEvents()
+    _drift = _parent_center() - _steady
+    QTest.mouseRelease(view.viewport(), Qt.LeftButton, pos=_q)
+    QTest.keyRelease(view, Qt.Key_Control)
+    app.processEvents()
+    check("斜图元拖动：鼠标不动时图元不漂移（pos/scenePos 基准正确）",
+          abs(_drift.x()) < 0.5 and abs(_drift.y()) < 0.5,
+          f"drift=({_drift.x():.2f},{_drift.y():.2f})")
+    par.set_page_angle(0.0)
+    par.set_page_origin(_pc[0], _pc[1])
+    app.processEvents()
     view.snap.enabled = prev_snap2
 
     print("\n=== 8.13 右键指定旋转中心 ===")
@@ -893,7 +947,7 @@ def main() -> int:
           _scan(_shot(), blue_vp.x(), blue_vp.y(), 8, _is_blue),
           f"vp=({blue_vp.x():.0f},{blue_vp.y():.0f})")
 
-    # 中心点标识（红点 + ID 标签）必须跟着支点走，不再钉在几何中心
+    # 旋转中心红点必须跟着支点走，不再钉在几何中心
     dot_vp = window.view.mapFromScene(rot2.pivot_scene_point())
     center_vp = window.view.mapFromScene(rot2.center_scene_point())
     check("中心点标识画在旋转中心处",
@@ -1332,6 +1386,413 @@ def main() -> int:
           f"{tri_c} -> {tri.page_center()}")
     scene.delete_items([tri.item_id])
     scene.clearSelection()
+    app.processEvents()
+
+    print("\n=== 8.18 组尺寸属性入口 + 剪贴板动作 ===")
+    from PySide6.QtGui import QKeyEvent
+
+    grp = scene.create_item("group", center=(9200.0, 7600.0))
+    rect = scene.create_item("rect", center=(9150.0, 7550.0),
+                             size=(100.0, 60.0))
+    tri2 = scene.create_item("triangle", center=(9300.0, 7700.0))
+    rect.set_page_parent(grp.item_id)
+    tri2.set_page_parent(grp.item_id)
+    grp.set_page_field("children_ids", [rect.item_id, tri2.item_id])
+    scene.index.rebuild_links()
+    scene.clearSelection()
+    grp.setSelected(True)
+    app.processEvents()
+    gw0, _gh0 = grp.page_size()
+    w_rect0 = rect.page_size()[0]
+    c_rect0 = rect.page_center()
+    anchor = grp.page_origin()
+    gboxes = _layout_boxes(grp)
+    check("组布局页与矩形同构（7 个输入框）", len(gboxes) == 7,
+          f"n={len(gboxes)}")
+    if len(gboxes) == 7:
+        gboxes[2].setValue(gw0 * 2.0)      # 「宽 W」是第 3 个框
+    app.processEvents()
+    check("属性面板改组宽递归放大成员宽",
+          abs(rect.page_size()[0] - w_rect0 * 2.0) < 1e-3,
+          f"{w_rect0} -> {rect.page_size()[0]}")
+    check("属性面板改组宽后成员中心按锚点搬走",
+          abs(rect.page_center()[0]
+              - (anchor[0] + (c_rect0[0] - anchor[0]) * 2.0)) < 1e-3,
+          f"{c_rect0} -> {rect.page_center()}")
+
+    n_before = len(scene.all_items())
+    scene.clearSelection()
+    grp.setSelected(True)
+    window._do("copy")
+    window._do("paste")
+    app.processEvents()
+    check("菜单复制 / 粘贴递归带上组成员",
+          len(scene.all_items()) == n_before + 3,
+          f"{n_before} -> {len(scene.all_items())}")
+
+    n_before2 = len(scene.all_items())
+    window.view.keyPressEvent(
+        QKeyEvent(QEvent.Type.KeyPress, Qt.Key_C, Qt.ControlModifier))
+    window.view.keyPressEvent(
+        QKeyEvent(QEvent.Type.KeyPress, Qt.Key_V, Qt.ControlModifier))
+    app.processEvents()
+    check("画布 Ctrl+C / Ctrl+V 走场景剪贴板",
+          len(scene.all_items()) == n_before2 + 3,
+          f"{n_before2} -> {len(scene.all_items())}")
+
+    for it in list(scene.all_items()):
+        if it.item_id >= grp.item_id:
+            scene.delete_items([it.item_id])
+    scene.clearSelection()
+    app.processEvents()
+
+    print("\n=== 8.19 拖角改尺寸手柄（真实鼠标交互） ===")
+    window.view.resetTransform()          # 1:1，保证四角屏幕跨度足够
+    h_item = scene.create_item("rect", center=(9600.0, 8200.0),
+                               size=(600.0, 400.0))
+    window.view.centerOn(h_item.center_scene_point())
+    scene.clearSelection()
+    h_item.setSelected(True)
+    app.processEvents()
+    hpts = window.view._handle_points(h_item)
+    check("单选图元显示 4 个角手柄", len(hpts) == 4, str(sorted(hpts)))
+
+    def _is_blue(c) -> bool:
+        return c.blue() > 150 and c.red() < 110 and c.green() < 170
+
+    hp = hpts.get("se")
+    img_h = window.view.viewport().grab().toImage()
+    check("角上画出蓝色手柄方块",
+          hp is not None and _scan(img_h, hp.x(), hp.y(), 5, _is_blue),
+          f"hp={hp}")
+    check("角手柄命中测试有效",
+          hp is not None
+          and window.view._handle_at(QPoint(int(hp.x()), int(hp.y()))) == "se")
+
+    w0, h0 = h_item.page_size()
+    ends0, _ = h_item.snap_points()
+    ax0, ay0 = scene.projection.inverse_point(ends0[0].x(), ends0[0].y())
+    p0 = QPoint(int(hp.x()), int(hp.y()))
+    p1 = QPoint(p0.x() + 60, p0.y() + 40)
+    QTest.mousePress(window.view.viewport(), Qt.LeftButton, pos=p0)
+    check("按下手柄进入缩放状态（不转成拖动图元）",
+          window.view._resize_state is not None)
+    QApplication.sendEvent(window.view.viewport(), QMouseEvent(
+        QEvent.MouseMove, QPointF(p1),
+        QPointF(window.view.viewport().mapToGlobal(p1)),
+        Qt.NoButton, Qt.LeftButton, Qt.NoModifier))
+    app.processEvents()
+    QTest.mouseRelease(window.view.viewport(), Qt.LeftButton, pos=p1)
+    app.processEvents()
+    check("松手后退出缩放状态", window.view._resize_state is None)
+    check("拖角后宽 / 高都变大",
+          h_item.page_size()[0] > w0 * 1.02
+          and h_item.page_size()[1] > h0 * 1.02,
+          f"{w0}x{h0} -> {h_item.page_size()}")
+    ends1, _ = h_item.snap_points()
+    ax1, ay1 = scene.projection.inverse_point(ends1[0].x(), ends1[0].y())
+    check("拖角时对面的角保持不动",
+          abs(ax1 - ax0) < 1e-2 and abs(ay1 - ay0) < 1e-2,
+          f"({ax0},{ay0}) -> ({ax1},{ay1})")
+
+    scene.set_scene_mode(True)
+    app.processEvents()
+    check("运行模式不显示 / 不命中拖角手柄",
+          window.view._resize_item() is None
+          and window.view._handle_at(p0) is None)
+    scene.set_scene_mode(False)
+    scene.clearSelection()
+    scene.delete_items([h_item])
+    app.processEvents()
+
+    print("\n=== 8.20 文本图元：属性面板字体大小 + 边框自适应 ===")
+    tx = scene.create_item("text", center=(10400.0, 8600.0), context="测试文本")
+    scene.clearSelection()
+    tx.setSelected(True)
+    app.processEvents()
+    panel = window.property_panel
+
+    def _page_by_key(key):
+        for i in range(panel.stack.count()):
+            wdg = panel.stack.widget(i)
+            if wdg.objectName() == key:
+                return wdg
+        return None
+
+    def _font_box(page):
+        if page is None:
+            return []
+        return [b for b in page.findChildren(QSpinBox)
+                if b.minimum() == 4 and b.maximum() == 200]
+
+    ctx_page = _page_by_key("context")
+    app_page = _page_by_key("appearance")
+    lay_page = _page_by_key("layout")
+    check("文本内容页提供字体大小输入", len(_font_box(ctx_page)) == 1,
+          str(len(_font_box(ctx_page))))
+    check("外观页字号输入仍在", len(_font_box(app_page)) == 1,
+          str(len(_font_box(app_page))))
+
+    fs_boxes = _font_box(ctx_page) + _font_box(app_page)
+    c0 = tx.page_center()
+    size0 = tx.page_size()
+    fs_boxes[0].setValue(48)
+    app.processEvents()
+    check("面板改字体大小写回 style.font_size",
+          int(float(tx.style_value("font_size", 10))) == 48,
+          str(tx.style_value("font_size")))
+    check("改字号后边框背景随之重算", tx.page_size() != size0,
+          f"{size0} -> {tx.page_size()}")
+    check("两处字号输入跨页同步",
+          all(b.value() == 48 for b in fs_boxes),
+          str([b.value() for b in fs_boxes]))
+    check("改字号后中心不动", tx.page_center() == c0, str(tx.page_center()))
+    check("布局页宽高显示随边框刷新",
+          lay_page is not None
+          and any(abs(b.value() - tx.page_size()[0]) < 1e-3
+                  for b in lay_page.findChildren(QDoubleSpinBox)),
+          str(tx.page_size()))
+
+    size1 = tx.page_size()
+    text_edit = ctx_page.findChild(QPlainTextEdit) if ctx_page else None
+    check("文本内容页有文本编辑框", text_edit is not None)
+    if text_edit is not None:
+        text_edit.setPlainText("更长的一串文字ABCDEFG")
+        app.processEvents()
+        check("改文本后边框长度方向随文字变化",
+              tx.page_size()[1] > size1[1] * 1.05,
+              f"{size1} -> {tx.page_size()}")
+
+    size2 = tx.page_size()
+    line_boxes = [b for b in app_page.findChildren(QSpinBox)
+                  if b.minimum() == 0 and b.maximum() == 64] if app_page else []
+    check("外观页线宽输入存在", len(line_boxes) == 1, str(len(line_boxes)))
+    if line_boxes:
+        line_boxes[0].setValue(5)
+        app.processEvents()
+        check("改线宽不误触发边框重算", tx.page_size() == size2,
+              f"{size2} -> {tx.page_size()}")
+
+    scene.clearSelection()
+    scene.delete_items([tx])
+    app.processEvents()
+
+    print("\n=== 8.21 文本图元：改 W/H 与拖角反算字号 + 面板回显 ===")
+    window.view.resetTransform()
+    tb = scene.create_item("text", center=(10800.0, 8600.0), context="联动测试")
+    tb.set_style_value("font_size", 30)
+    scene.clearSelection()
+    tb.setSelected(True)
+    app.processEvents()
+    panel = window.property_panel
+    lay2 = _page_by_key("layout")
+    fb2 = (_font_box(_page_by_key("context"))
+           + _font_box(_page_by_key("appearance")))
+    boxes2 = lay2.findChildren(QDoubleSpinBox) if lay2 else []
+    size0 = tb.page_size()
+    fs0 = int(float(tb.style_value("font_size", 10)))
+    check("初始字号 30 且两处输入同步", fs0 == 30
+          and all(b.value() == 30 for b in fb2),
+          f"fs={fs0} boxes={[b.value() for b in fb2]}")
+
+    # AGV 轴交换：page W 决定 view 高（行高方向）、page H 决定 view 宽（文字
+    # 长度方向）。反算取「两轴都装得下」的最大字号，所以单独缩小任一轴都会
+    # 收紧约束让字号变小（正是防裁字），单独放大一个轴则受另一轴限制不变。
+    h_box2 = next((b for b in boxes2
+                   if abs(b.value() - size0[1]) < 1e-3), None)
+    w_box2 = next((b for b in boxes2
+                   if abs(b.value() - size0[0]) < 1e-3), None)
+    check("布局页找到宽 W / 高 H 输入",
+          h_box2 is not None and w_box2 is not None,
+          str([b.value() for b in boxes2]))
+    if h_box2 is not None:
+        h_box2.setValue(size0[1] * 0.5)
+        app.processEvents()
+        fs1 = int(float(tb.style_value("font_size", 10)))
+        check("布局页缩小 H 反算减小字号（防裁字）", fs1 < fs0,
+              f"{fs0} -> {fs1}")
+        check("缩小 H 后边框保留用户输入值",
+              abs(tb.page_size()[1] - size0[1] * 0.5) < 1e-3,
+              str(tb.page_size()))
+        check("两处字号输入回显反算结果",
+              all(b.value() == fs1 for b in fb2),
+              str([b.value() for b in fb2]))
+
+        size1 = tb.page_size()
+        if w_box2 is not None:
+            w_box2.setValue(size1[0] * 2.0)
+            h_box2.setValue(size1[1] * 2.0)
+            app.processEvents()
+            fs2 = int(float(tb.style_value("font_size", 10)))
+            check("W/H 同时放大反算放大字号", fs2 > fs1 * 1.7,
+                  f"{fs1} -> {fs2}")
+            check("两处字号输入回显放大结果",
+                  all(b.value() == fs2 for b in fb2),
+                  str([b.value() for b in fb2]))
+
+    # 真实拖角：按下手柄 -> 拖动 -> 松手，字号与面板都要跟着变。
+    # 这里不要再 clearSelection + setSelected：那会重建属性面板，让上面取到的
+    # 控件引用失效。
+    window.view.centerOn(tb.center_scene_point())
+    app.processEvents()
+    hp2 = window.view._handle_points(tb).get("se")
+    check("文本图元显示拖角手柄", hp2 is not None, str(hp2))
+    if hp2 is not None:
+        fs_pre = int(float(tb.style_value("font_size", 10)))
+        q0 = QPoint(int(hp2.x()), int(hp2.y()))
+        q1 = QPoint(q0.x() + 60, q0.y() + 40)
+        QTest.mousePress(window.view.viewport(), Qt.LeftButton, pos=q0)
+        QApplication.sendEvent(window.view.viewport(), QMouseEvent(
+            QEvent.MouseMove, QPointF(q1),
+            QPointF(window.view.viewport().mapToGlobal(q1)),
+            Qt.NoButton, Qt.LeftButton, Qt.NoModifier))
+        app.processEvents()
+        QTest.mouseRelease(window.view.viewport(), Qt.LeftButton, pos=q1)
+        app.processEvents()
+        fs_post = int(float(tb.style_value("font_size", 10)))
+        check("拖角放大后字号同步变大", fs_post > fs_pre,
+              f"{fs_pre} -> {fs_post}")
+        check("拖角后两处字号输入回显",
+              all(b.value() == fs_post for b in
+                  (_font_box(_page_by_key("context"))
+                   + _font_box(_page_by_key("appearance")))),
+              str([b.value() for b in fb2]))
+        check("拖角后文字仍装得进边框",
+              tb._fit_font_size(*scene.projection.size(*tb.page_size())) == fs_post,
+              f"fs={fs_post}")
+
+    scene.clearSelection()
+    scene.delete_items([tb])
+    app.processEvents()
+
+    print("\n=== 8.22 widget 控件变体：属性面板 / 工具箱 / 运行预览 ===")
+    from PySide6.QtWidgets import QLabel as _QLabel, QSpinBox as _QSpinBox  # noqa: E402
+
+    wg = scene.create_item("widget:combobox", center=(11200.0, 8600.0))
+    scene.clearSelection()
+    wg.setSelected(True)
+    app.processEvents()
+    wpage = _page_by_key("widget")
+    check("widget 图元有「控件」页", wpage is not None)
+    variants = wpage.findChildren(QComboBox) if wpage else []
+    check("控件页提供变体下拉", len(variants) == 1, str(len(variants)))
+    if variants:
+        check("变体下拉含 7 项且当前为 combobox",
+              variants[0].count() == 7
+              and str(variants[0].currentData()) == "combobox",
+              f"n={variants[0].count()} cur={variants[0].currentData()}")
+        variants[0].setCurrentIndex(variants[0].findData("spinbox"))
+        app.processEvents()
+        check("切换变体写回顶层 widgetType",
+              wg.page_record()["widgetType"] == "spinbox",
+              str(wg.page_record()["widgetType"]))
+
+    wpage = _page_by_key("widget")
+    areas = wpage.findChildren(QPlainTextEdit) if wpage else []
+    spins = wpage.findChildren(QSpinBox) if wpage else []
+    check("控件页提供文本编辑与字号输入",
+          len(areas) == 1 and len(spins) == 1,
+          f"areas={len(areas)} spins={len(spins)}")
+    check("切变体后提示同步到 spinbox 语法",
+          wpage is not None and any("min=" in lab.text()
+                                    for lab in wpage.findChildren(_QLabel)),
+          "hint")
+    if areas:
+        areas[0].setPlainText("min=2\nmax=8\nvalue=5")
+        app.processEvents()
+        check("文本编辑写回 widgetText",
+              wg.page_record()["widgetText"] == "min=2\nmax=8\nvalue=5",
+              repr(wg.page_record()["widgetText"]))
+    if spins:
+        style_fs_before = wg.style_value("font_size", None)
+        spins[0].setValue(28)
+        app.processEvents()
+        check("字号输入写回 widgetFontSize（不动 style.font_size）",
+              wg.page_record()["widgetFontSize"] == 28
+              and wg.style_value("font_size", None) == style_fs_before,
+              str(wg.page_record()["widgetFontSize"]))
+
+    check("设计态不挂真实控件", len(scene.widget_proxies) == 0)
+    scene.set_scene_mode(True)
+    proxy = scene.widget_proxies.get(wg.item_id)
+    check("运行预览挂载 QSpinBox 并灌入 min/max/value",
+          isinstance(proxy.widget() if proxy else None, _QSpinBox)
+          and (proxy.widget().minimum(), proxy.widget().maximum(),
+               proxy.widget().value()) == (2, 8, 5),
+          str(type(proxy.widget()).__name__ if proxy else None))
+    scene.set_scene_mode(False)
+    check("退出运行预览销毁 proxy", len(scene.widget_proxies) == 0)
+
+    vbtn = next((b for b in window.toolbox.buttons
+                 if b.key == "widget:lineedit"), None)
+    check("工具箱有 lineedit 变体按钮", vbtn is not None)
+    if vbtn is not None:
+        vbtn.click()
+        check("点击变体按钮进入绘制模式",
+              window.view._draw_type == "widget:lineedit",
+              str(window.view._draw_type))
+        window.view.set_draw_tool(None)
+    before = len(scene.all_items())
+    window._spawn("widget:lineedit", (11400.0, 8600.0))
+    dropped = scene.all_items()[-1]
+    check("变体拖放落点创建 widget:lineedit",
+          len(scene.all_items()) == before + 1
+          and dropped.TYPE == "widget"
+          and dropped.page_record()["widgetType"] == "lineedit",
+          str(dropped.page_record().get("widgetType")))
+
+    scene.clearSelection()
+    scene.delete_items([wg, dropped])
+    app.processEvents()
+
+    print("\n=== 8.23 运行预览真实控件与图元矩形逐点对齐 ===")
+
+    def _corner_gap(it, proxy):
+        """图元局部四角 vs 控件本地 (0,0,w,h) 四角的最大场景坐标差。"""
+        w, h = it._w_view, it._h_view
+        a = [it.mapToScene(QPointF(x, y)) for x, y in
+             ((-w / 2, -h / 2), (w / 2, -h / 2),
+              (w / 2, h / 2), (-w / 2, h / 2))]
+        b = [proxy.mapToScene(QPointF(x, y)) for x, y in
+             ((0, 0), (w, 0), (w, h), (0, h))]
+        return max(max(abs(p.x() - q.x()), abs(p.y() - q.y()))
+                   for p, q in zip(a, b))
+
+    # 小尺寸 + 旋转 + 自定义支点 + AGV 轴交换，三个坑一次覆盖：
+    # 旧写法 setGeometry(-w/2,...) 后 setPos(center) 会整体偏 +w/2,+h/2；
+    # 旋转默认绕控件左上角；QComboBox 的 minimumSizeHint 会把 resize 撑大。
+    pw = scene.create_item("widget:combobox", center=(11600.0, 8600.0),
+                           size=(24.0, 12.0))
+    pw.set_page_angle(32.0)
+    pcx, pcy = pw.live_page_pose()[:2]
+    pw.set_page_origin(pcx + 12.0, pcy + 8.0)
+    scene.set_scene_mode(True)
+    px = scene.widget_proxies.get(pw.item_id)
+    check("小尺寸 combobox 不被 minimumSizeHint 撑大",
+          px is not None
+          and abs(px.geometry().width() - pw._w_view) < 1e-6
+          and abs(px.geometry().height() - pw._h_view) < 1e-6,
+          f"geometry={px.geometry() if px else None} "
+          f"want={pw._w_view}×{pw._h_view}")
+    gap = _corner_gap(pw, px) if px is not None else float("inf")
+    check("运行预览控件四角与图元逐点重合（旋转+自定义支点+AGV）",
+          gap < 1e-6, f"gap={gap:.6f}")
+    pbr = px.sceneBoundingRect() if px is not None else None
+    ibr = pw.sceneBoundingRect()
+    check("proxy.sceneBoundingRect 与图元一致",
+          pbr is not None and abs(pbr.x() - ibr.x()) < 1e-6
+          and abs(pbr.y() - ibr.y()) < 1e-6
+          and abs(pbr.width() - ibr.width()) < 1e-6
+          and abs(pbr.height() - ibr.height()) < 1e-6,
+          f"proxy={pbr} item={ibr}")
+    pw.set_page_center(pcx + 300.0, pcy - 200.0)
+    scene.notify_edit(pw)
+    gap2 = _corner_gap(pw, px) if px is not None else float("inf")
+    check("改位姿后运行预览自动重对齐", gap2 < 1e-6, f"gap={gap2:.6f}")
+    scene.set_scene_mode(False)
+    check("退出运行预览后 proxy 清空", len(scene.widget_proxies) == 0,
+          str(len(scene.widget_proxies)))
+    scene.delete_items([pw])
     app.processEvents()
 
     print("\n=== 9. 关窗不重写页面文件 ===")

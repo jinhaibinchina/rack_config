@@ -4,8 +4,10 @@
 ``sceneToView`` / ``painter.translate`` / ``painter.rotate(-angle)``：
 旋转由 ``QGraphicsItem.setRotation`` 承担，paint 只画局部几何。
 
-与旧实现的两处有意差异（均不影响未选中时的像素）：
-* widget 只画占位框 + "Widget"，不创建 ``EmbeddedWidgetLayer`` 真实控件。
+与旧实现的两处差异：
+* 旧 Core ``widget_element.paint`` 不区分变体（只画矩形 + "Widget"），变体
+  外观来自 ``EmbeddedWidgetLayer`` 挂载的真实 QWidget；重写版设计态按
+  ``g_widgets.paint_variant`` 自绘 7 种占位外观，运行态另挂真实控件。
 * 选中时统一补一层青色虚线框；旧实现只有 group/image 画选中框。
   验证脚本在「无选中」状态下对拍，因此该差异不进入 diff。
 """
@@ -19,7 +21,11 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QPainter, QPainterPath, QPixmap
 
 from .g_element import BaseItem, _page_xy, norm_deg, rotate_xy
-from .g_style import HOVER_COLOR, dashed_pen_for, font_for, parse_color
+from .g_style import (
+    HOVER_COLOR, TEXT_PAD_X, TEXT_PAD_Y, dashed_pen_for, font_for, parse_color,
+    text_metrics,
+)
+from .g_widgets import paint_variant
 
 
 def _selection_overlay(painter: QPainter, item: BaseItem) -> None:
@@ -130,6 +136,92 @@ class CircleItem(RectItem):
 
 class TextItem(BaseItem):
     TYPE = "text"
+    # 与属性面板 make_int(..., 4, 200) 对齐，反算结果一定能回显
+    _MIN_FONT = 4
+    _MAX_FONT = 200
+
+    def _on_text_changed(self) -> None:
+        """改字号 / 改文本后，边框背景按文字实际尺寸重算（中心与支点不动）。
+
+        对照旧 Core ``text_element``：那边是**由宽度反算字号**
+        （``calc_font_size`` 逐步试到 boundingRect 高度达标，再由文字宽度反算
+        高度）。新场景反过来——``style.font_size`` 是用户直接给的真值，边框
+        只是文字的容器，所以这里按同一份 ``font_for`` 字体量出文字像素尺寸、
+        外扩 ``TEXT_PAD_X/Y``，再反投影成 page 的 width / height。
+
+        AGV 投影交换了轴：view 宽对应 page 的 ``height``、view 高对应 page 的
+        ``width``，因此用 ``SceneProjection.inverse_size`` 反算，不要手工除 kx。
+        另外只在显式编辑时触发，加载 / round-trip 完全不碰存量几何。
+        """
+        wpx, hpx = text_metrics(self.context or "", self._style.font_size)
+        w_view = wpx + 2.0 * TEXT_PAD_X
+        h_view = hpx + 2.0 * TEXT_PAD_Y
+        w, h = self._proj.inverse_size(w_view, h_view)
+        if "width" not in self._page and "radius_w" not in self._page:
+            # 极老的存量记录可能没有尺寸字段，补上矩形口径再让 set_page_size 写
+            self._page["width"], self._page["height"] = 0.0, 0.0
+        # 抑制反向联动：这次是「字号 / 文字 -> 边框」，别再让 set_page_size
+        # 把刚设的字号按新边框反算回去。
+        prev = self._text_resizing
+        self._text_resizing = True
+        try:
+            self.set_page_size(w, h)
+        finally:
+            self._text_resizing = prev
+
+    def _on_size_changed(self, w: float, h: float) -> None:
+        """手动改边框 / 拖角 / 组缩放时**反算字号**，让文字始终装得进边框。
+
+        对照旧 Core ``text_element.change_size``：那边先按用户给的 width 换算
+        出视图像素高度，再用 ``calc_font_size`` 从 1 逐步试到文字
+        ``boundingRect`` 高度达标，最后由文字宽度派生 height。新场景保留用户
+        给定的 w/h（拖角与组缩放都靠它做仿射变换，派生高度会让每帧比例抖动、
+        整棵子树几何失真），只把 ``style.font_size`` 调整到「文字 + 内边距
+        装得进新框」的最大整数值。
+
+        由 ``_on_text_changed`` 触发的 set_page_size 已经置了
+        ``_text_resizing``，这里直接跳过，两个方向不会互相递归。
+        """
+        if self._text_resizing or w <= 0 or h <= 0:
+            return
+        w_view, h_view = self._proj.size(float(w), float(h))
+        fs = self._fit_font_size(w_view, h_view)
+        if fs == int(round(self._style.font_size)):
+            return
+        prev = self._text_resizing
+        self._text_resizing = True
+        try:
+            self.set_style_value("font_size", fs)
+        finally:
+            self._text_resizing = prev
+
+    def _fit_font_size(self, w_view: float, h_view: float) -> int:
+        """二分找能装进 ``(w_view, h_view)`` 的最大整数字号。
+
+        与旧 Core ``calc_font_size`` 的「从 1 逐步试到刚好装得下」同口径，
+        但用二分代替 1..500 的线性扫描（拖角每帧都要算，组里可能有多个文本）。
+        字号上界与属性面板 ``make_int(..., 4, 200)`` 对齐。
+        """
+        text = self.context or ""
+        target_w = max(float(w_view) - 2.0 * TEXT_PAD_X, 1.0)
+        target_h = max(float(h_view) - 2.0 * TEXT_PAD_Y, 1.0)
+
+        def fits(fs: int) -> bool:
+            tw, th = text_metrics(text, fs)
+            return tw <= target_w + 1e-6 and th <= target_h + 1e-6
+
+        lo, hi = self._MIN_FONT, self._MAX_FONT
+        if not fits(lo):
+            return lo
+        if fits(hi):
+            return hi
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if fits(mid):
+                lo = mid
+            else:
+                hi = mid - 1
+        return lo
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         s = self._style
@@ -205,23 +297,18 @@ class CheckboxItem(RectItem):
 
 
 class WidgetItem(RectItem):
-    """占位实现：不创建 EmbeddedWidgetLayer，只画框与固定字样。"""
+    """``widget`` 控件图元：7 种变体共用一套 5 字段顶层序列化口径。
+
+    字段与默认值逐字对齐旧 Core ``widget_element``（见 ``g_widgets``），
+    缺字段的老页面只按默认值显示、绝不回写，保证 round-trip 零改动。
+    """
 
     TYPE = "widget"
     DRAW_KIND = "place"
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         super().paint(painter, option, widget)
-        r = self._local_rect
-        if r.width() <= 30 or r.height() <= 20:
-            return
-        painter.save()
-        painter.setPen(self._style.pen(self.stroke_color(), 1.0))
-        font = painter.font()
-        font.setPointSizeF(max(7.0, min(r.width(), r.height()) * 0.16))
-        painter.setFont(font)
-        painter.drawText(r, Qt.AlignCenter, "Widget")
-        painter.restore()
+        paint_variant(painter, self._local_rect, self._page)
 
     def draw_step(self, points: list[QPointF], preview: QPointF | None) -> bool:
         if points:
@@ -231,6 +318,32 @@ class WidgetItem(RectItem):
 
 class GroupItem(BaseItem):
     TYPE = "group"
+    _scaling = False
+
+    def set_page_size(self, w: float, h: float) -> None:
+        """改组宽高 = 递归改变组内成员的尺寸与位置（对照旧 Core change_size）。
+
+        属性面板布局页、``+`` / ``-`` 快捷键都走这里。委托给场景统一处理，
+        因为成员是平铺图元，必须由场景拿到 ``index.descendants()`` 才能覆盖
+        整棵子树（含嵌套组）。
+        """
+        scene = self.scene()
+        if (not self._scaling and scene is not None
+                and hasattr(scene, "resize_group")):
+            self._scaling = True
+            try:
+                if scene.resize_group(self, float(w), float(h)):
+                    return
+            finally:
+                self._scaling = False
+        BaseItem.set_page_size(self, w, h)
+
+    def resize_by(self, factor: float) -> None:
+        """``+`` / ``-``：组整体缩放，必须连成员一起缩放。"""
+        if factor <= 0:
+            return
+        w, h = self.page_size()
+        self.set_page_size(w * factor, h * factor)
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         scene = self.scene()
@@ -368,6 +481,30 @@ class _PointBasedItem(BaseItem):
             return
         w, h = self.page_size()
         self.set_page_size(w * factor, h * factor)
+
+    def apply_scale_about(self, anchor, sx: float, sy: float) -> None:
+        """组尺寸变化时，按同一仿射变换搬走顶点类的全部顶点 / 端点。
+
+        顶点类没有「宽高矩形」可改，几何全在 ``vertices`` / ``head_pos`` 里；
+        中心与支点必须一起按 ``F(p)`` 变换后显式传下去，否则重建会按新包围盒
+        重找中心（三角形转过之后旋转中心会跳）。
+        """
+        ax, ay = float(anchor[0]), float(anchor[1])
+
+        def f(x, y):
+            return ax + (float(x) - ax) * sx, ay + (float(y) - ay) * sy
+
+        cx, cy = self.page_center()
+        ox, oy = self.page_origin()
+        pts = [QPointF(*f(x, y)) for x, y in self._live_page_points()]
+        if len(pts) < 2:
+            return
+        prev = self._suppress_propagate
+        self._suppress_propagate = True
+        try:
+            self._apply_scaled_points(pts, center=f(cx, cy), pivot=f(ox, oy))
+        finally:
+            self._suppress_propagate = prev
 
     def _apply_scaled_points(self, points: list[QPointF], center=None,
                              pivot=None) -> None:

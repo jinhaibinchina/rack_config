@@ -1,9 +1,14 @@
 """PopPick 运行态窗口：加载设计页，点左侧页签与右侧当前页互换。
 
 场景来自设计器的页面文件（默认 ``page_9``）：左侧几张卡扇形堆叠，右侧一张
-是「当前页」。运行态把场景切到 ``SceneMode.Run`` 只读显示，卡片上的真实控件
-设为鼠标穿透，点击事件落到场景上，再由 :class:`PageDeck` 做命中测试与交换
-动画。
+是「当前页」。运行态把场景切到只读显示，卡片上的真实控件设为鼠标穿透，点击
+事件落到场景上，再由 :class:`PageDeck` 做命中测试与交换动画。
+
+场景后端是 ``Designer/CoreQGraphics``（标准 QGraphicsScene / QGraphicsView），
+运行态承载由 :class:`App_PopPick.qgraphics_runtime` 补齐：同一份 page JSON、
+同一套 AGV 投影，7 个 HMI 页面照旧由 ``set_widget_factory`` 挂到卡片上。
+本模块不再 import ``Designer.Core`` 的运行时代码；``page_deck.py`` 与
+``hmi/binding.py`` 通过适配层给出的旧接口工作，因此无需改动。
 
 例外是「最大窗口」视图与「左侧已收起」这两种状态：那时画面上只剩两页正对着
 看（右侧当前页 + 左侧堆叠最上层），它们会放开交互，页内按钮可以正常操作；
@@ -30,13 +35,9 @@
 设计器改完直接生效）→ ``res/myDesigner/scene/pop_pick_scene.json``（打包后的
 运行态快照，需要同步更新时直接从 page_9 拷一份覆盖）。
 
-为什么不用 ``load_element_info_run_mode``
------------------------------------------
-那个入口（``SceneSerializer.deserialize_scene(mode=Run)``）只认
-``res/myDesigner/scene`` 下的场景名，而这里要读的是**设计工程里正在编辑的
-页面文件**（设计器改完立刻能看效果，不用先导出一份运行态场景）。
-``deserialize_scene`` 的 ``mode`` 只用来选路径解析器（Design 分支支持绝对
-路径），场景模式随后由 :meth:`set_scene_mode` 显式切换，不影响语义。
+页面加载走 ``GraphicsScene.load_page(path)``：它直接读绝对路径、认旧设计器的
+``page_*.json`` 格式（``sceneRect / backgroundColor / items``），字段零改动；
+不再需要旧 ``SceneSerializer.deserialize_scene`` 的 Design/Run 双路径解析器。
 """
 
 from __future__ import annotations
@@ -61,8 +62,10 @@ from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
 
-from Designer.Core.myQuadTreeScene import QuadTreeScene, SceneManager, SceneSerializer
-from Designer.Core.my_common import SceneMode
+# 场景后端：CoreQGraphics + App_PopPick 内的运行态适配层。
+# 主链路不再 import Designer.Core 的任何运行时代码（页面 JSON 仍放在旧设计
+# 工程目录里，那只是数据源，不是代码依赖）。
+from App_PopPick.qgraphics_runtime import create_runtime_scene
 # 一律用绝对导入而不是 ``from .xxx``：本文件也支持被直接当脚本跑
 # （``python App_PopPick/pop_pick_entry.py``），那时没有包上下文；
 # 相对导入会在这一行就抛 "attempted relative import with no known parent
@@ -265,27 +268,24 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
     # 场景
     # ------------------------------------------------------------------
     def _build_scene(self) -> None:
-        self.scene = QuadTreeScene(parent=self)
+        self.scene, self.scene_manager = create_runtime_scene(parent=self)
         self.scene.setObjectName("popPickScene")
-        self.scene_manager = SceneManager(self.scene, parent=self)
-        self.scene.set_scene_manager(self.scene_manager)
         # 运行态没有 PLC 渲染回调，显式清空避免访问空对象
         self.scene.update_callback = None
         self.setCentralWidget(self.scene)
-        self.scene.installEventFilter(self)
+        # QGraphicsView 的鼠标事件先进 viewport，事件过滤必须装在那里；
+        # 装在 view 上收不到 MouseButtonPress / Wheel 这些视口事件。
+        self.scene.viewport().installEventFilter(self)
 
     def _load_scene(self, path: str) -> None:
         if not os.path.isfile(path):
             raise FileNotFoundError(f"场景文件不存在: {path}")
         self.scene_path = path
 
-        self.scene.delete_all_elements()
-        # mode 只决定路径解析器（Design 分支支持绝对路径），见模块头说明
-        SceneSerializer.deserialize_scene(self.scene, path, mode=SceneMode.Design)
-        # 先加载再切模式：set_scene_mode 里那轮 embedded widget 同步只有在
-        # 图元已入库时才有效，反过来做运行态一个控件都不会挂载。
-        self.scene.set_scene_mode(SceneMode.Run)
-
+        self.scene.load_scene_file(path)
+        # 先加载再切模式：卡片包装对象只有在图元入库后才存在，
+        # 反过来做运行态一个页面控件都挂不上。
+        self.scene.set_scene_mode(True)
         self.scene.set_canvas_navigation_enabled(False)
 
     # ------------------------------------------------------------------
@@ -564,8 +564,8 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
     def _show_scene_rect(self, rect: QRectF, margin_ratio: float) -> bool:
         """把一段场景矩形铺满视口。
 
-        ``set_view_scene_rect`` 走的是和「适应窗口」相同的反算路径（内含
-        ``clamp(0.01, 10.0)`` 的缩放保护），不用另写一套几何。
+        运行态后端的 ``set_view_scene_rect`` 把 page 矩形投影成视图矩形后走
+        ``fitInView``，与「适应窗口」共用一套取景口径。
         返回 False 表示矩形不可用、什么都没改。
         """
         if rect.isNull() or rect.width() <= 0 or rect.height() <= 0:
@@ -574,10 +574,8 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
         self.scene.set_view_scene_rect(
             rect.adjusted(-margin, -margin, margin, margin)
         )
-        # 改的是场景的 offset / scale，卡片实体（承载视图）必须跟着重排。
-        # 滚轮缩放和拖拽平移都在 myQuadTreeScene 里各自补了这一步，走
-        # ``set_view_scene_rect`` 这条程序化路径不会自动触发；漏了就会出现
-        # "黑边框缩放了、白卡片没动"的错位画面。
+        # proxy 是场景里的 QGraphicsItem，视图缩放由 Qt 自动跟随；这里补一次
+        # 对齐，确保同一帧里位姿刚变过的卡片不会晚一帧才跟上。
         self.scene.refresh_embedded_widgets()
         return True
 
@@ -649,7 +647,7 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
     # 鼠标：把"点一下卡片"翻译成一次交换
     # ------------------------------------------------------------------
     def eventFilter(self, obj, event):  # noqa: N802 - Qt 命名
-        if obj is not self.scene:
+        if obj is not self.scene.viewport():
             return super().eventFilter(obj, event)
 
         kind = event.type()
@@ -720,15 +718,12 @@ class PopPickWindow(_DeferredNativeClose, QMainWindow):
         return card is not None and card is self._unswappable_card()
 
     def _window_to_scene(self, window_pos: QPointF) -> QPointF:
-        """窗口像素 → 场景坐标。
+        """窗口像素 → page 场景坐标。
 
-        绘制链是 ``painter.translate(offset); painter.scale(scale_factor)`` 后
-        再按 ``sceneToView`` 映射，因此逆运算先去掉 offset 与缩放，再走
-        ``viewToScene``（那里已经带 AGV 的轴交换）。
+        新场景由 ``QGraphicsView.mapToScene`` 承担视图缩放 / 平移，再由
+        ``SceneProjection.inverse_point`` 反投影（那里带 AGV 的轴交换）。
         """
-        scale = self.scene.scale_factor or 1.0
-        view_pos = (window_pos - self.scene.offset) / scale
-        return self.scene.viewToScene(view_pos)
+        return self.scene.window_to_page(window_pos)
 
     # ------------------------------------------------------------------
     def closeEvent(self, event):  # noqa: N802 - Qt 命名

@@ -189,13 +189,14 @@ def run_shots(args) -> int:
 
 
 def run_attach(args) -> int:
-    """真实场景挂载自检：只加载 JSON，不启动设计器。"""
-    from Designer.Core.my_common import SceneMode  # noqa: E402
-    from Designer.Core.myQuadTreeScene import (  # noqa: E402
-        QuadTreeScene, SceneManager, SceneSerializer,
-    )
+    """真实场景挂载自检：只加载 JSON，不启动设计器。
+
+    走与主窗口同一套 CoreQGraphics 运行态后端（``create_runtime_scene``），
+    不再复刻旧 ``QuadTreeScene`` + ``SceneSerializer`` 那条链路。
+    """
     from App_PopPick.hmi import attach_hmi_pages  # noqa: E402
     from App_PopPick.page_deck import PageDeck, find_page_cards  # noqa: E402
+    from App_PopPick.qgraphics_runtime import create_runtime_scene  # noqa: E402
 
     app = make_app()
     scene_path = Path(args.scene)
@@ -206,14 +207,12 @@ def run_attach(args) -> int:
 
     window = QMainWindow()
     window.resize(1280, 820)
-    scene = QuadTreeScene(parent=window)
-    manager = SceneManager(scene, parent=window)
-    scene.set_scene_manager(manager)
+    scene, manager = create_runtime_scene(parent=window)
     scene.update_callback = None
     window.setCentralWidget(scene)
-    scene.delete_all_elements()
-    SceneSerializer.deserialize_scene(scene, str(scene_path), mode=SceneMode.Design)
-    scene.set_scene_mode(SceneMode.Run)
+    scene.load_scene_file(str(scene_path))
+    scene.set_scene_mode(True)
+    scene.set_canvas_navigation_enabled(False)
     window.show()
     app.processEvents()
 
@@ -257,6 +256,8 @@ def run_attach(args) -> int:
     ok = not host._missing and all(created.values()) and not size_bad
     host.shutdown()
     if not args.keep_open:
+        # proxy 承载的页面 QWidget 不回收会变成无父顶层窗口残留
+        scene.release_embedded_widgets()
         return 0 if ok else 1
     return app.exec()
 

@@ -93,6 +93,16 @@ def _hit_point(deck, card):
 def run() -> int:
     app = QApplication.instance() or QApplication(sys.argv[:1])
 
+    # 后端守卫：本脚本断言的是旧 Designer/Core 的实现细节
+    # （card._layer.view、pos_viewToWindow、把自绘 scene 当 QWidget 点击）以及
+    # 旧的 6 卡布局，迁到 CoreQGraphics 后这些前提都不成立。保留作旧场景基线，
+    # 新后端回归请跑 tools/verify_pop_pick_qgraphics.py。
+    import App_PopPick.pop_pick_entry as _entry
+    if not hasattr(_entry, "QuadTreeScene"):
+        print("[SKIP] 当前是 CoreQGraphics 后端；本脚本仅适用于 Designer/Core 基线。")
+        print("[SKIP] 请改跑：.venv/Scripts/python.exe tools/verify_pop_pick_qgraphics.py")
+        return 0
+
     from App_PopPick import PopPickWindow
     from App_PopPick.pop_pick_entry import resolve_page_file
 

@@ -22,11 +22,17 @@ import os
 
 from PySide6.QtCore import QPointF, QRectF, Signal
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import QGraphicsItem, QGraphicsScene
+from PySide6.QtWidgets import (
+    QGraphicsItem, QGraphicsProxyWidget, QGraphicsScene,
+)
 
-from .g_element import BaseItem
+from .g_element import BaseItem, rotate_xy
 from .g_elements import ITEM_TYPES
 from .g_projection import SceneProjection
+from .g_widgets import (
+    WIDGET_DEFAULTS, WIDGET_VARIANT_LABELS, create_control, normalize_variant,
+    widget_style_sheet, widget_text, widget_variant,
+)
 
 WORLD_RECT = QRectF(-100000, -100000, 200000, 200000)
 DEFAULT_BACKGROUND = "#bee1f59b"
@@ -49,6 +55,15 @@ TYPE_LABELS: dict[str, str] = {
     "rect": "矩形", "circle": "圆", "text": "文本", "image": "图片",
     "checkbox": "复选框", "widget": "控件", "group": "组", "line": "直线",
     "triangle": "三角形", "polygon": "多边形", "path": "路径",
+}
+# 工具箱里 7 个 widget 变体共用 ``widget:<key>`` 形式的伪类型；真正的
+# ``type`` 仍写 ``widget``，变体只落在顶层 ``widgetType`` 字段（旧 Core 口径）。
+WIDGET_TOOL_KEYS: tuple[str, ...] = tuple(
+    f"widget:{key}" for key in WIDGET_VARIANT_LABELS
+)
+WIDGET_TOOL_LABELS: dict[str, str] = {
+    f"widget:{key}": f"控件·{label}"
+    for key, label in WIDGET_VARIANT_LABELS.items()
 }
 
 
@@ -122,6 +137,16 @@ class GraphicsScene(QGraphicsScene):
         self._last_pose: dict[int, tuple[float, float, float]] = {}
         self._syncing = False
         self._modified = False
+        # 剪贴板存的是「(原 id, page 记录)」快照，粘贴时统一重发 id 与父子关系
+        self._clipboard: list[tuple[int, dict]] = []
+        self._paste_count = 0
+        # 组缩放链路重入保护：apply_scale_about 会回到 GroupItem.set_page_size，
+        # 不能再委托一次「默认锚点」的 resize_group，否则整棵子树被缩放两遍。
+        self._resizing_group = False
+        # 运行预览：为 widget 变体挂真实 Qt 控件（独立顶层 proxy，不进索引、
+        # 不参与 page JSON，也不影响设计态的对拍 / round-trip）。
+        self._widget_layer_on = False
+        self._widget_proxies: dict[int, QGraphicsProxyWidget] = {}
         # 手动绘制控制器（CAD 式分点落点）
         self._draw_item: BaseItem | None = None
         self._draw_type = ""
@@ -131,6 +156,9 @@ class GraphicsScene(QGraphicsScene):
         self.setSceneRect(WORLD_RECT)
         self.setItemIndexMethod(QGraphicsScene.BspTreeIndex)
         self.setBackgroundBrush(QBrush(QColor(DEFAULT_BACKGROUND)))
+        # 运行预览下，属性面板 / 批量变换改了图元的位姿或尺寸后要立刻重排
+        # 真实控件；控件内容本身是否重建仍由 _sync_widget_proxies 按签名判断。
+        self.geometryChanged.connect(self._on_geometry_changed)
 
     # ------------------------------------------------------------------
     # 加载 / 保存
@@ -199,6 +227,10 @@ class GraphicsScene(QGraphicsScene):
         return header
 
     def clear_page(self) -> None:
+        # proxy 与其承载的 QWidget 由 scene.clear() 一并销毁；先断掉 Python 侧
+        # 引用，避免留下指向已析构 C++ 对象的 wrapper。
+        self._widget_proxies.clear()
+        self._widget_layer_on = False
         self.clear()
         self.index = SceneIndex()
         self._last_pose.clear()
@@ -266,6 +298,10 @@ class GraphicsScene(QGraphicsScene):
                 child.apply_rigid_pose(last[0], last[1], da, dx, dy)
         finally:
             self._syncing = False
+        # 运行预览里父对象刚体带动子图元时，控件也要跟着走（拖动被运行门控
+        # 禁用，这里主要覆盖脚本 / 外部位姿绑定）。
+        if self._widget_layer_on:
+            self.align_widget_proxies()
 
     def group_selected(self) -> BaseItem | None:
         """建立逻辑分组，并创建一个 group 类型图元作为组框。"""
@@ -297,25 +333,49 @@ class GraphicsScene(QGraphicsScene):
         self.index.register(group)
         self._last_pose[iid] = group.live_page_pose()[:3]
         for it in selected:
-            it.parent_id = iid
-            it.group_id = iid
+            # 必须写回 _page：复制快照与存盘都读 page 记录，只改运行时属性
+            # 会让成组关系在复制 / 重新打开后丢失。
+            it.set_page_field("parent_id", iid)
+            it.set_page_field("group_id", iid)
         self.index.rebuild_links()
+        # 旧 Core group_element.initialize() -> apply_member_name_prefix()：
+        # 成员名带上 <组名>_ 前缀，嵌套组逐层累加，图层树才能看出层级。
+        self.replace_name_prefix(
+            [c.item_id for c in self.index.descendants(iid)],
+            "", f"{group.get_name()}_", self.names_in_use())
         self.refresh_movable()   # 成员挂上父对象后不再可单独拖动
         return group
 
     def ungroup_selected(self) -> int:
         count = 0
+        removed: list[int] = []
         for group in [it for it in self.selected_items() if it.TYPE == "group"]:
-            for child in self.index.descendants(group.item_id):
-                child.parent_id = 0
-                child.group_id = 0
+            children = self.index.descendants(group.item_id)
+            # 解组前剥掉一层组名前缀（旧 Core free_group 的语义），
+            # 名字冲突时 replace_name_prefix 会自动退回默认命名。
+            used = self.names_in_use()
+            used.discard(group.get_name())
+            self.replace_name_prefix(
+                [c.item_id for c in children],
+                f"{group.get_name()}_", "", used)
+            for child in children:
+                child.set_page_field("parent_id", 0)
+                child.set_page_field("group_id", 0)
                 count += 1
+            removed.append(group.item_id)
             self.removeItem(group)
             self.index.by_id.pop(group.item_id, None)
             if group.item_id in self.index.order:
                 self.index.order.remove(group.item_id)
+        for it in self.all_items():
+            cids = it.page_record().get("children_ids") or []
+            if any(cid in removed for cid in cids):
+                it.set_page_field("children_ids",
+                                  [c for c in cids if c not in removed])
         self.index.rebuild_links()
         self.refresh_movable()   # 解组后成员重新可独立拖动
+        if removed:
+            self.mark_modified()
         return count
 
     # ------------------------------------------------------------------
@@ -361,6 +421,9 @@ class GraphicsScene(QGraphicsScene):
         self.mark_modified()
         self.geometryChanged.emit(item)
         self.contentChanged.emit()
+        # 改了 widgetType / widgetText / 样式时，运行预览里的真实控件要重建
+        if self._widget_layer_on:
+            self._sync_widget_proxies()
 
     def snapshot(self) -> dict:
         return self.page_data()
@@ -368,18 +431,109 @@ class GraphicsScene(QGraphicsScene):
     def restore(self, data: dict) -> None:
         """从快照重建（撤销/重做）。保留当前文件路径与脏状态。"""
         was_modified = self._modified
+        run = self._widget_layer_on
         self.load_data(data)
         self._modified = was_modified
+        self._widget_layer_on = run
+        if run:
+            self._sync_widget_proxies()
         self.contentChanged.emit()
 
     def set_scene_mode(self, run: bool) -> None:
         self.is_run_mode = bool(run)
+        self._widget_layer_on = bool(run)
         self.clearSelection()
         for it in self.all_items():
             it.set_selectable(not run)
             it.setFlag(QGraphicsItem.ItemIsMovable,
                        (not run) and self._movable_gate and not it.parent_id)
+        self._sync_widget_proxies()
         self.update()
+
+    # ------------------------------------------------------------------
+    # 运行预览：widget 变体的真实 Qt 控件（对照旧 Core EmbeddedWidgetLayer）
+    # ------------------------------------------------------------------
+    def _sync_widget_proxies(self) -> None:
+        """运行态为每个可见 widget 挂一个独立顶层的 ``QGraphicsProxyWidget``。
+
+        关键取舍：proxy **不做图元的 Qt 子项**（``setParentItem`` 会把
+        ``sceneBoundingRect`` 撑大，破坏 page_1 逐图元对拍），也不注册进
+        ``SceneIndex``（``all_items`` / ``page_data`` 都不受影响）。它按图元
+        的局部原点 + 旋转 + view 尺寸手工对齐，设计态完全不创建。
+        """
+        wanted: dict[int, BaseItem] = {}
+        if self._widget_layer_on:
+            for it in self.all_items():
+                if it.TYPE == "widget" and it.get_visibility():
+                    wanted[it.item_id] = it
+        for iid, proxy in list(self._widget_proxies.items()):
+            if iid in wanted:
+                continue
+            self.removeItem(proxy)
+            old = proxy.widget()
+            proxy.setWidget(None)
+            if old is not None:
+                old.deleteLater()
+            del self._widget_proxies[iid]
+        for iid, it in wanted.items():
+            proxy = self._widget_proxies.get(iid)
+            if proxy is None:
+                proxy = QGraphicsProxyWidget()
+                proxy.setFlag(QGraphicsItem.ItemIsSelectable, False)
+                proxy.setFlag(QGraphicsItem.ItemIsMovable, False)
+                self.addItem(proxy)
+                self._widget_proxies[iid] = proxy
+            sig = (widget_variant(it._page), widget_text(it._page),
+                   widget_style_sheet(it._page))
+            if getattr(proxy, "_wg_sig", None) != sig:
+                old = proxy.widget()
+                proxy.setWidget(create_control(it._page))
+                if old is not None:
+                    old.deleteLater()
+                proxy._wg_sig = sig
+            self._align_widget_proxy(proxy, it)
+
+    @staticmethod
+    def _align_widget_proxy(proxy: QGraphicsProxyWidget, it: BaseItem) -> None:
+        """把真实控件精确盖到图元矩形上（含旋转 / 自定义支点 / AGV）。
+
+        ``QGraphicsWidget.setGeometry()`` 会**同步改写 pos**：旧写法先
+        ``setGeometry(-w/2,-h/2,w,h)`` 再 ``setPos(center)``，实际把控件
+        左上角挪到了图元中心（整体偏 +w/2,+h/2），而且 rotation 默认绕
+        本地 (0,0)（控件左上角）转，与图元绕可视中心转又差一次。
+
+        正确口径：控件本地矩形恒为 (0,0,w,h)，用 ``resize`` 只改尺寸，
+        把变换原点钉到控件中心 (w/2,h/2)，令 ``pos = C - (w/2,h/2)``——
+        此时 ``scene(center) = pos + o = C``（o 为变换原点），四角与图元
+        的 ``(-w/2,-h/2,w,h)`` 经 R(θ) 后逐点重合。
+        """
+        w, h = it._w_view, it._h_view
+        geo = proxy.geometry()
+        if abs(geo.width() - w) > 1e-6 or abs(geo.height() - h) > 1e-6:
+            proxy.resize(w, h)
+        proxy.setTransformOriginPoint(QPointF(w / 2.0, h / 2.0))
+        center = it.mapToScene(QPointF(0.0, 0.0))
+        proxy.setPos(center - QPointF(w / 2.0, h / 2.0))
+        proxy.setRotation(it.rotation())
+        proxy.setZValue(it.zValue() + 0.5)
+        proxy.setVisible(True)
+
+    def align_widget_proxies(self) -> None:
+        """图元几何变化后只重排已有 proxy，不重建 / 不销毁 QWidget。"""
+        if not self._widget_layer_on:
+            return
+        for iid, proxy in self._widget_proxies.items():
+            it = self.index.by_id.get(iid)
+            if it is not None:
+                self._align_widget_proxy(proxy, it)
+
+    def _on_geometry_changed(self, _item) -> None:
+        self.align_widget_proxies()
+
+    @property
+    def widget_proxies(self) -> dict[int, QGraphicsProxyWidget]:
+        """只读：运行预览下已挂载的真实控件代理（供回归 / 外部绑定使用）。"""
+        return dict(self._widget_proxies)
 
     def set_movable_gate(self, enabled: bool) -> None:
         """CTRL 门控：为 True 时图元可拖动，否则仅可选中、不可拖动。
@@ -420,7 +574,14 @@ class GraphicsScene(QGraphicsScene):
 
         ``commit=False`` 用于手动绘制：先创建但不标脏/不广播，待绘制完成
         （``_finish_draw``）再统一标脏并通知历史，取消时可直接删除不留痕。
+
+        工具箱的 7 个控件变体用 ``widget:<key>`` 伪类型传入；真正的 ``type``
+        仍是 ``widget``，变体只写进顶层 ``widgetType``（与旧 Core 完全一致）。
         """
+        variant = ""
+        if type_key.startswith("widget:"):
+            variant = normalize_variant(type_key.split(":", 1)[1])
+            type_key = "widget"
         if type_key not in ITEM_TYPES:
             return None
         w, h = size or DEFAULT_SIZES.get(type_key, (400.0, 240.0))
@@ -465,11 +626,11 @@ class GraphicsScene(QGraphicsScene):
             record["checked"] = False
             record["toggleEnabled"] = True
         elif type_key == "widget":
-            record.update({
-                "widgetText": "Widget", "widgetType": "label",
-                "widgetFontSize": 12, "widgetColor": "#000000",
-                "widgetBackground": "#ffffff",
-            })
+            # 5 个顶层字段与默认值逐字对齐旧 Core widget_element.to_dict，
+            # 老页面缺字段时也只在读取侧兜底、绝不回写。
+            record.update(dict(WIDGET_DEFAULTS))
+            if variant:
+                record["widgetType"] = variant
         record.update(fields)
         item = self._spawn(record)
         if item is not None:
@@ -632,32 +793,309 @@ class GraphicsScene(QGraphicsScene):
         self.contentChanged.emit()
         return len(ids)
 
-    def duplicate_selected(self, offset: tuple[float, float] = (100.0, 100.0)) -> list[BaseItem]:
+    # ------------------------------------------------------------------
+    # 组名前缀体系（对照旧 Core group_element._prefix_name_subtree 与
+    # myQuadTreeScene.paste 的 free_name / rename_members）
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _free_from(candidate: str, used: set[str]) -> str:
+        """原名 + ``_2`` / ``_3``…，跳过 ``used``；结果登记回 ``used``。"""
+        base = str(candidate or "").strip() or "图元"
+        name, i = base, 2
+        while name in used:
+            name = f"{base}_{i}"
+            i += 1
+        used.add(name)
+        return name
+
+    def names_in_use(self) -> set[str]:
+        return {it.get_name() for it in self.all_items()}
+
+    def default_name(self, type_key: str, iid: int, used: set[str]) -> str:
+        """``类型_序号`` 命名（旧 Core createItem / next_default_name 口径）。"""
+        return self._free_from(
+            f"{TYPE_LABELS.get(type_key, type_key)}_{iid}", used)
+
+    def replace_name_prefix(self, ids, old_prefix: str, new_prefix: str,
+                            used: set[str]) -> None:
+        """替换整棵子树名字里的组名前缀；冲突 / 前缀不匹配则退回默认命名。
+
+        ``old_prefix=""`` 表示成组时给整棵子树加前缀；``new_prefix=""`` 表示
+        解组时剥掉一层。这里不沿用旧 Core「前缀不匹配仍强行拼整名」的行为，
+        避免嵌套组复制后名字越拼越长；查重同时覆盖场景已有名字与本次批次。
+        """
+        for iid in ids:
+            it = self.index.by_id.get(iid)
+            if it is None:
+                continue
+            name = str(it.get_name() or "")
+            if old_prefix and name.startswith(old_prefix):
+                cand = f"{new_prefix}{name[len(old_prefix):]}"
+            elif not old_prefix:
+                cand = f"{new_prefix}{name}"
+            else:
+                cand = ""
+            if cand and cand not in used:
+                used.add(cand)
+                it.set_page_field("name", cand)
+            else:
+                it.set_page_field(
+                    "name", self.default_name(it.TYPE, it.item_id, used))
+
+    def rename_group(self, group, new_name: str) -> None:
+        """改组名并把成员前缀一起换掉（旧 Core ``group_element.set_name``）。"""
+        old = str(group.get_name() or "")
+        new = str(new_name or "").strip()
+        if not new or new == old:
+            return
+        used = self.names_in_use()
+        used.discard(old)
+        used.add(new)
+        group.set_page_field("name", new)
+        if old:
+            self.replace_name_prefix(
+                [it.item_id for it in self.index.descendants(group.item_id)],
+                f"{old}_", f"{new}_", used)
+
+    # ------------------------------------------------------------------
+    # 组尺寸：递归改变组内成员（对照旧 Core rect_element.change_size）
+    # ------------------------------------------------------------------
+    def resize_group(self, group, w: float, h: float,
+                     anchor=None) -> bool:
+        """把组及其整棵子树按同一仿射变换 ``F(p)=A+(p-A)·(sx,sy)`` 缩放。
+
+        旧 Core 是「三个角点缩放后求新宽高 + 显式 ``child.change_size``」逐层
+        递归；新场景是平铺结构，直接对整棵子树的**全部 page 绝对几何点**做同一
+        变换，天然覆盖嵌套组、顶点类、自定义支点，也不会重复传播刚体变换。
+        锚点沿用旧规则：无父取旋转中心（支点），有父取旋转后的左上角。
+        ``anchor`` 供拖角手柄覆盖：固定的是用户按住的那个对角，而不是支点。
+        """
+        if self._resizing_group:
+            # 已在缩放链路里（apply_scale_about 回到了 GroupItem.set_page_size）
+            return False
+        old_w, old_h = group.page_size()
+        w, h = float(w), float(h)
+        if old_w <= 0 or old_h <= 0 or w <= 0 or h <= 0:
+            return False
+        sx, sy = w / old_w, h / old_h
+        if abs(sx - 1.0) < 1e-12 and abs(sy - 1.0) < 1e-12:
+            return False
+        if anchor is None:
+            cx, cy = group.page_center()
+            if group.parent_id:
+                dx, dy = rotate_xy(-old_w / 2.0, -old_h / 2.0,
+                                   0.0, 0.0, group.page_angle())
+                ax, ay = cx + dx, cy + dy
+            else:
+                ax, ay = group.page_origin()
+        else:
+            ax, ay = float(anchor[0]), float(anchor[1])
+        targets = [group] + self.index.descendants(group.item_id)
+        self._resizing_group = True
+        try:
+            self._scale_subtree(targets, (ax, ay), sx, sy)
+        finally:
+            self._resizing_group = False
+        return True
+
+    def _scale_subtree(self, targets, anchor, sx: float, sy: float) -> None:
+        """整棵子树绕同一锚点按 ``(sx, sy)`` 缩放，抑制双重刚体传播。"""
+        saved = [(it, bool(getattr(it, "_suppress_propagate", False)))
+                 for it in targets]
+        try:
+            # 缩放期间 setRotation / setPos 会产生位姿差分，别再刚体传播一次
+            for it, _ in saved:
+                it._suppress_propagate = True
+            for it, _ in saved:
+                it.apply_scale_about(anchor, sx, sy)
+        finally:
+            for it, flag in saved:
+                it._suppress_propagate = flag
+        for it, _ in saved:
+            self._last_pose[it.item_id] = it.live_page_pose()[:3]
+        self.mark_modified()
+
+    def resize_item_about(self, item, anchor, sx: float,
+                          sy: float) -> bool:
+        """拖角手柄入口：按**增量**比例绕 ``anchor`` 缩放图元及其子树。
+
+        ``anchor`` 是 page 坐标下保持不动的那个对角。组走
+        ``resize_group``（与属性面板同一条链路，成员会递归跟随）；其余图元
+        直接走 ``_scale_subtree``，父对象带后代时后代也一起缩放。
+        每帧传的是 ``本次总比例 / 上次总比例``，仿射变换可复合，不会累积漂移。
+        """
+        if sx <= 0 or sy <= 0:
+            return False
+        if item.TYPE == "group":
+            w, h = item.page_size()
+            return self.resize_group(item, w * sx, h * sy, anchor=anchor)
+        targets = [item] + self.index.descendants(item.item_id)
+        # 子树里若有嵌套组，挡住它委托回默认锚点的 resize_group
+        self._resizing_group = True
+        try:
+            self._scale_subtree(targets, anchor, sx, sy)
+        finally:
+            self._resizing_group = False
+        return True
+
+    # ------------------------------------------------------------------
+    # 递归复制 / 剪贴板（对照旧 Core copy_selected + paste）
+    # ------------------------------------------------------------------
+    def top_level_items(self, items=None) -> list[BaseItem]:
+        """过滤掉「祖先也在集合里」的图元，只留顶层。"""
+        src = list(self.selected_items() if items is None else items)
+        ids = {it.item_id for it in src}
         out: list[BaseItem] = []
-        for src in self.selected_items():
-            rec = copy.deepcopy(src.page_record())
-            iid = self.index.allocate_id()
-            rec["id"] = iid
-            rec["name"] = f"{rec.get('name', 'item')}_copy{iid}"
-            rec["parent_id"], rec["group_id"], rec["children_ids"] = 0, 0, []
-            rec["zValue"] = src.zValue() + 0.5
-            for key in ("center_pos", "origin_pos", "head_pos", "end_pos"):
-                if key in rec and isinstance(rec[key], dict):
-                    rec[key] = {
-                        "x": float(rec[key].get("x", 0.0)) + offset[0],
-                        "y": float(rec[key].get("y", 0.0)) + offset[1],
-                    }
-            for v in rec.get("vertices") or []:
-                v["x"] = float(v.get("x", 0.0)) + offset[0]
-                v["y"] = float(v.get("y", 0.0)) + offset[1]
+        for it in src:
+            pid, seen, nested = it.parent_id, set(), False
+            while pid and pid not in seen:
+                if pid in ids:
+                    nested = True
+                    break
+                seen.add(pid)
+                parent = self.index.by_id.get(pid)
+                pid = parent.parent_id if parent is not None else 0
+            if not nested:
+                out.append(it)
+        return out
+
+    def _capture_subtree(self, items) -> list[tuple[int, dict]]:
+        """按「父在子前」展平整棵子树，快照成 (原 id, page 记录)。"""
+        out: list[tuple[int, dict]] = []
+        seen: set[int] = set()
+        for top in self.top_level_items(items):
+            for it in [top] + self.index.descendants(top.item_id):
+                if it.item_id in seen:
+                    continue
+                seen.add(it.item_id)
+                # to_page_record 会把尚未存盘的旋转烘焙进顶点，副本不丢姿态
+                out.append((it.item_id, copy.deepcopy(it.to_page_record())))
+        return out
+
+    @staticmethod
+    def _shift_record(rec: dict, dx: float, dy: float) -> None:
+        """平铺结构没有 Qt 父链：偏移必须施加到树里每个几何点。"""
+        for key in ("center_pos", "origin_pos", "head_pos", "end_pos"):
+            v = rec.get(key)
+            if isinstance(v, dict):
+                v["x"] = float(v.get("x", 0.0)) + dx
+                v["y"] = float(v.get("y", 0.0)) + dy
+        for v in rec.get("vertices") or []:
+            v["x"] = float(v.get("x", 0.0)) + dx
+            v["y"] = float(v.get("y", 0.0)) + dy
+
+    @staticmethod
+    def _snapshot_descendants(snapshot, root: int) -> list[int]:
+        """快照里 ``root`` 的全部后代原 id（只认 parent_id）。"""
+        children: dict[int, list[int]] = {}
+        for old, rec in snapshot:
+            children.setdefault(int(rec.get("parent_id") or 0), []).append(old)
+        out, stack = [], list(children.get(root, []))
+        while stack:
+            i = stack.pop()
+            out.append(i)
+            stack.extend(children.get(i, []))
+        return out
+
+    def _name_copies(self, snapshot, id_map, top_ids) -> dict[int, str]:
+        """按旧 Core ``paste`` 口径命名副本：组 ``原名_2``、成员只换前缀。
+
+        对照 ``myQuadTreeScene.paste`` 的 ``free_name`` + ``rename_members``，
+        但修掉三处历史缺陷：非组顶层不再丢弃用户自定义名改用 类型_序号；
+        剪贴板始终是原始快照，连续粘贴得到 原名_2 / 原名_3 而不是
+        原名_2_2_2；成员前缀不匹配或撞名时退回默认命名，不把整名拼到
+        新组名后面越拼越长。
+        """
+        recs = dict(snapshot)
+        used = self.names_in_use()
+        names: dict[int, str] = {}
+        for old, rec in snapshot:
+            if old not in top_ids or rec.get("type") != "group":
+                continue
+            old_name = str(rec.get("name") or "").strip()
+            new_name = self._free_from(old_name or "组", used)
+            names[old] = new_name
+            old_prefix = f"{old_name}_" if old_name else ""
+            new_prefix = f"{new_name}_"
+            for cid in self._snapshot_descendants(snapshot, old):
+                crec = recs[cid]
+                cname = str(crec.get("name") or "")
+                if old_prefix and cname.startswith(old_prefix):
+                    cand = f"{new_prefix}{cname[len(old_prefix):]}"
+                elif not old_prefix:
+                    cand = f"{new_prefix}{cname}"
+                else:
+                    cand = ""
+                if cand and cand not in used:
+                    names[cid] = cand
+                    used.add(cand)
+                else:
+                    names[cid] = self.default_name(
+                        str(crec.get("type") or ""), id_map[cid], used)
+        for old, rec in snapshot:
+            if old not in names:
+                names[old] = self._free_from(
+                    str(rec.get("name") or "").strip()
+                    or TYPE_LABELS.get(str(rec.get("type") or ""), "图元"),
+                    used)
+        return names
+
+    def _instantiate(self, snapshot, offset) -> list[BaseItem]:
+        """从快照造一棵新子树：重发 id、重映射关系、整树统一偏移。"""
+        if not snapshot:
+            return []
+        # 剪贴板快照必须留着连续粘贴，绝不能原地改写
+        snapshot = [(old, copy.deepcopy(rec)) for old, rec in snapshot]
+        dx, dy = float(offset[0]), float(offset[1])
+        known = {old for old, _ in snapshot}
+        id_map = {old: self.index.allocate_id() for old, _ in snapshot}
+        top_ids = {old for old, rec in snapshot
+                   if int(rec.get("parent_id") or 0) not in known}
+        names = self._name_copies(snapshot, id_map, top_ids)
+        z_base = max((it.zValue() for it in self.all_items()), default=0.0) + 1.0
+        made: list[BaseItem] = []
+        for i, (old, rec) in enumerate(snapshot):
+            rec["id"] = id_map[old]
+            rec["name"] = names[old]
+            pid = int(rec.get("parent_id") or 0)
+            gid = int(rec.get("group_id") or 0)
+            rec["parent_id"] = id_map[pid] if pid in known else 0
+            rec["group_id"] = id_map[gid] if gid in known else 0
+            if "children_ids" in rec:
+                rec["children_ids"] = [
+                    id_map[c] for c in (rec.get("children_ids") or [])
+                    if c in id_map
+                ]
+            rec["zValue"] = z_base + i
+            self._shift_record(rec, dx, dy)
             item = self._spawn(rec)
             if item is not None:
-                out.append(item)
-        if out:
+                made.append(item)
+        if made:
             self.index.rebuild_links()
             self.mark_modified()
             self.contentChanged.emit()
-        return out
+        wanted = {id_map[o] for o in top_ids}
+        return [it for it in made if it.item_id in wanted]
+
+    def copy_selected(self) -> int:
+        """Ctrl+C：只剪顶层，但递归带整棵子树。"""
+        self._clipboard = self._capture_subtree(self.selected_items())
+        return len(self._clipboard)
+
+    def paste_clipboard(self, offset=(100.0, 100.0)) -> list[BaseItem]:
+        """Ctrl+V：连续粘贴按次数阶梯偏移，避免副本叠在一起。"""
+        if not self._clipboard:
+            return []
+        self._paste_count += 1
+        k = self._paste_count
+        return self._instantiate(self._clipboard,
+                                 (offset[0] * k, offset[1] * k))
+
+    def duplicate_selected(self, offset=(100.0, 100.0)) -> list[BaseItem]:
+        """Ctrl+D：等价于「复制 + 立即粘贴」，递归带上整棵子树。"""
+        return self._instantiate(
+            self._capture_subtree(self.selected_items()), offset)
 
     def set_item_z(self, items, mode: str) -> None:
         """``front`` / ``back`` / ``raise`` / ``lower``。"""

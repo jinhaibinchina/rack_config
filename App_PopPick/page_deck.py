@@ -560,7 +560,9 @@ class PageDeck(QObject):
         + 完整占位框"，否则放大后文字会发虚。
         """
         for card in self._cards:
-            for name in ("set_motion_cache", "set_widget_fast_paint"):
+            # 顺序有意义：先宣布「进入动画窗口」，再挂位图——新后端据此
+            # 复用已烘好的常驻位图，只有窗口外（apply_static_pages）才重烘。
+            for name in ("set_widget_fast_paint", "set_motion_cache"):
                 setter = getattr(card, name, None)
                 if callable(setter):
                     setter(active)
@@ -609,7 +611,10 @@ class PageDeck(QObject):
 
 
 def find_page_cards(items: Sequence) -> List:
-    """从场景图元里挑出页面卡片（``widget_element``），保持绘制顺序。"""
-    from Designer.Core.elements import widget_element
+    """从场景图元里挑出页面卡片，保持绘制顺序。
 
-    return [item for item in items if isinstance(item, widget_element)]
+    判据走鸭子类型：能挂真实控件工厂的就是页面卡片。旧 Core 的
+    ``widget_element`` 与新 CoreQGraphics 运行后端的 ``RuntimeCard`` 都满足，
+    这样本模块不必 import 任何一套场景实现（迁移前后都能用）。
+    """
+    return [item for item in items if hasattr(item, "set_widget_factory")]

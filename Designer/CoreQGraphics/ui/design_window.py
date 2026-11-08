@@ -21,7 +21,9 @@ from PySide6.QtWidgets import (
     QToolBar,
 )
 
-from ..g_scene import DEFAULT_SIZES, TYPE_LABELS, GraphicsScene
+from ..g_scene import (
+    DEFAULT_SIZES, TYPE_LABELS, WIDGET_TOOL_LABELS, GraphicsScene,
+)
 from ..g_view import GraphicsView
 from .history import PageHistory
 from .layer_tree import LayerTreeDock
@@ -100,6 +102,10 @@ class DesignerWindow(QMainWindow):
         self._make("undo", "撤销", "Ctrl+Z")
         self._make("redo", "重做", "Ctrl+Y")
         self._make("duplicate", "复制所选", "Ctrl+D")
+        # 不设窗口级快捷键：属性面板输入框要保留原生 Ctrl+C / Ctrl+V，
+        # 画布焦点下的 Ctrl+C / Ctrl+V 由 GraphicsView.keyPressEvent 转发。
+        self._make("copy", "复制 (Ctrl+C)")
+        self._make("paste", "粘贴 (Ctrl+V)")
         self._make("delete", "删除所选", "Delete")
         self._make("select_all", "全选", "Ctrl+A")
         self._make("group", "成组", "Ctrl+G")
@@ -121,7 +127,8 @@ class DesignerWindow(QMainWindow):
         self._make("origin_center", "旋转中心复位")
         self._make("toggle_grid", "显示网格", "Ctrl+Shift+N", checkable=True)
         self.actions["toggle_grid"].setChecked(True)
-        self._make("toggle_ids", "显示图元ID", "Ctrl+Shift+I", checkable=True)
+        # 动作 key 沿用 toggle_ids，但开关现在控制的是「选中图元的旋转中心红点」
+        self._make("toggle_ids", "显示中心点标记", "Ctrl+Shift+I", checkable=True)
         self.actions["toggle_ids"].setChecked(True)
         self._make("run_mode", "运行模式预览", "Ctrl+R", checkable=True)
         self._make("about", "关于…")
@@ -138,8 +145,8 @@ class DesignerWindow(QMainWindow):
         for key in ("undo", "redo"):
             edit.addAction(self.actions[key])
         edit.addSeparator()
-        for key in ("duplicate", "delete", "select_all", "group", "ungroup",
-                    "rename", "toggle_visible"):
+        for key in ("duplicate", "copy", "paste", "delete", "select_all",
+                    "group", "ungroup", "rename", "toggle_visible"):
             edit.addAction(self.actions[key])
 
         arrange = bar.addMenu("排列")
@@ -227,9 +234,22 @@ class DesignerWindow(QMainWindow):
             )
         elif key == "duplicate":
             made = scene.duplicate_selected()
-            for it in made:
-                it.setSelected(True)
-            self._after_edit()
+            if made:
+                scene.clearSelection()
+                for it in made:
+                    it.setSelected(True)
+                self._after_edit()
+        elif key == "copy":
+            n = scene.copy_selected()
+            self.status_bar.showMessage(
+                f"已复制 {n} 个图元（含子图元）", 2500)
+        elif key == "paste":
+            made = scene.paste_clipboard()
+            if made:
+                scene.clearSelection()
+                for it in made:
+                    it.setSelected(True)
+                self._after_edit()
         elif key == "delete":
             scene.delete_items(sel)
             self._after_edit()
@@ -313,7 +333,8 @@ class DesignerWindow(QMainWindow):
                 self, "关于",
                 "Designer.CoreQGraphics 设计器\n\n"
                 "原生 QGraphicsScene 平行实现；page_*.json 格式与 Core 一致。\n"
-                "widget 图元为占位实现，不含 PLC / 料仓状态绑定。",
+                "widget 图元支持 7 种控件变体（设计态自绘占位、运行预览挂载真实 Qt 控件），\n"
+                "不含 PLC / 料仓状态绑定。",
             )
         elif key == "toggle_visible":
             # 隐藏图元 Qt 无法选中，scene.selected_items() 会漏掉它们；回退到
@@ -371,7 +392,8 @@ class DesignerWindow(QMainWindow):
         """工具箱/工具栏/菜单统一入口：进入绘制模式（点击画布落点）。"""
         self.view.set_draw_tool(type_key)
         if type_key:
-            label = TYPE_LABELS.get(type_key, type_key)
+            label = WIDGET_TOOL_LABELS.get(
+                type_key, TYPE_LABELS.get(type_key, type_key))
             if type_key in ("polygon", "path"):
                 tip = f"左键加点、右键闭合以创建「{label}」"
             elif type_key in ("line", "rect", "circle"):
@@ -406,7 +428,8 @@ class DesignerWindow(QMainWindow):
         self.scene.clearSelection()
         item.setSelected(True)
         self.status_bar.showMessage(
-            f"已放置「{TYPE_LABELS.get(type_key, type_key)}」，可拖动或用属性面板调整", 4000
+            f"已放置「{WIDGET_TOOL_LABELS.get(type_key, TYPE_LABELS.get(type_key, type_key))}」，"
+            f"可拖动或用属性面板调整", 4000
         )
         self._after_edit()
 

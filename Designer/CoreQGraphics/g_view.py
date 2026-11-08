@@ -13,7 +13,7 @@ import math
 
 from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, Signal
 from PySide6.QtGui import (
-    QBrush, QColor, QCursor, QFont, QFontMetrics, QKeyEvent, QMouseEvent, QPainter,
+    QBrush, QColor, QCursor, QKeyEvent, QMouseEvent, QPainter,
     QPainterPath, QPen, QWheelEvent,
 )
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsView, QMenu, QRubberBand
@@ -22,9 +22,9 @@ from .g_snap import GRID_MAJOR_EVERY, SnapSystem
 
 ELEMENT_MIME_TYPE = "application/x-coreqg-element"
 
-# 选中图元 ID 标注（固定屏幕像素，不随视图缩放变形）
-_MAX_ID_LABELS = 200           # 选中项超过此数不再标注，避免刷屏与掉帧
-_ID_FONT_PX = 11
+# 选中图元的旋转中心标记（固定屏幕像素，不随视图缩放变形）。
+# 只画红点，不再画旁边的 ID 数字标签：多选时一串数字既挡画面又没信息量。
+_MAX_SELECTION_MARKS = 200     # 选中项超过此数不再标注，避免刷屏与掉帧
 _ID_DOT_RADIUS = 3.0
 _ID_DOT_COLOR = QColor(214, 51, 46)
 # 旋转支点标记（蓝色十字圆环，固定屏幕像素）
@@ -37,6 +37,18 @@ _GRID_MAJOR = QColor(90, 120, 150, 110)
 
 # 鼠标附近吸附标记：小于这个屏幕像素的偏移不吸附，避免抖动
 _SNAP_MIN_PX = 2.0
+
+# 拖角改尺寸手柄（固定屏幕像素，仅设计模式 + 单选时显示）
+_HANDLE_HALF = 4.0            # 方块半边长
+_HANDLE_HIT_PX = 8.0          # 命中半径（曼哈顿距离）
+_HANDLE_MIN_SPAN = 28.0       # 四角屏幕跨度下限：太小的图元不画手柄，
+                              # 否则四个手柄挤在中心会抢走「拖动」按下
+_HANDLE_MIN_SCALE = 0.02      # 缩到 2% 停住，防止翻转 / 零尺寸
+_HANDLE_COLOR = QColor(22, 119, 255)
+_HANDLE_EDGE = QColor(12, 70, 160)
+# item.snap_points() 的端点顺序：[左上, 右上, 左下, 右下]
+_CORNER_INDEX = {"nw": 0, "ne": 1, "sw": 2, "se": 3}
+_OPPOSITE_INDEX = {"nw": "se", "ne": "sw", "sw": "ne", "se": "nw"}
 
 
 class GraphicsView(QGraphicsView):
@@ -54,6 +66,8 @@ class GraphicsView(QGraphicsView):
         self._space_held = False
         self._ctrl_held = False
         self.show_grid = True
+        # 历史名沿用 show_ids：现在只控制「选中图元的红色旋转中心点」，
+        # ID 文字标签已移除；视图菜单 Ctrl+Shift+I 切换的就是这个红点。
         self.show_ids = True
         # 拖动中的吸附偏移：已经叠加到选中图元上的额外位移（场景单位）。
         # 每帧用「目标偏移 - 已叠加偏移」求增量，鼠标继续走时图元钉在格点上，
@@ -71,6 +85,8 @@ class GraphicsView(QGraphicsView):
         self._context_page: QPointF | None = None
         # 子图元拖动代理：(根父对象, 上次视口点)；拖动子图元 = 拖动它的根父对象
         self._proxy_drag: tuple[object, QPoint] | None = None
+        # 拖角改尺寸：按下时冻结的逆变换 / 固定对角 / 上一次的总缩放比例
+        self._resize_state: dict | None = None
         self._press_modified = False
         self.setDragMode(QGraphicsView.RubberBandDrag)
         self.setRubberBandSelectionMode(Qt.IntersectsItemShape)
@@ -121,7 +137,7 @@ class GraphicsView(QGraphicsView):
         self.snap.threshold = self.snap.pixel_threshold / scale
 
     def _on_scene_selection_changed(self) -> None:
-        """选中集合变化时整屏重绘：ID 标注只覆盖选中项，局部更新会留残影。"""
+        """选中集合变化时整屏重绘：中心点标记只覆盖选中项，局部更新会留残影。"""
         if getattr(self, "show_ids", True):
             self.viewport().update()
 
@@ -219,6 +235,13 @@ class GraphicsView(QGraphicsView):
             event.accept()
             return
         if event.button() == Qt.LeftButton:
+            # 角手柄优先于选中 / 框选 / 拖动：按在手柄上就是改尺寸
+            corner = self._handle_at(event.position().toPoint())
+            if corner is not None:
+                self._begin_resize(corner, event)
+                if self._resize_state is not None:
+                    event.accept()
+                    return
             scene = self.scene()
             if scene is not None:
                 self._press_modified = bool(
@@ -253,6 +276,121 @@ class GraphicsView(QGraphicsView):
     def context_page_point(self) -> QPointF | None:
         """最近一次右键点击处的 page 场景坐标。"""
         return self._context_page
+
+    # ------------------------------------------------------------------
+    # 拖角改尺寸：选中单一图元时显示 4 个角手柄，按住拖动改宽高
+    # ------------------------------------------------------------------
+    def _resize_item(self):
+        """当前允许拖角的图元：设计模式、单选、可见、不在绘制 / 平移。"""
+        scene = self.scene()
+        if (scene is None or self._draw_type or self._panning
+                or getattr(scene, "is_run_mode", False)
+                or not hasattr(scene, "selected_items")):
+            return None
+        sel = scene.selected_items()
+        if len(sel) != 1 or not sel[0].isVisible():
+            return None
+        return sel[0]
+
+    def _handle_points(self, item) -> dict[str, QPointF]:
+        """四个角在视口里的位置（用 snap_points 的端点，自动跟随旋转）。"""
+        ends, _ = item.snap_points()
+        if len(ends) < 4:
+            return {}
+        pts = {
+            key: QPointF(self.mapFromScene(ends[idx]))
+            for key, idx in _CORNER_INDEX.items()
+        }
+        # 视图缩得很小时四角几乎重合：此时不显示 / 不命中，让点击照常走
+        # 原有的「拖图元 / 拖根父对象」链路。
+        xs = [p.x() for p in pts.values()]
+        ys = [p.y() for p in pts.values()]
+        if (max(xs) - min(xs) < _HANDLE_MIN_SPAN
+                or max(ys) - min(ys) < _HANDLE_MIN_SPAN):
+            return {}
+        return pts
+
+    def _handle_at(self, vp) -> str | None:
+        """命中测试：返回角名 nw / ne / sw / se，没命中返回 None。"""
+        item = self._resize_item()
+        if item is None:
+            return None
+        p = QPointF(vp)
+        for key, hp in self._handle_points(item).items():
+            if (p - hp).manhattanLength() <= _HANDLE_HIT_PX:
+                return key
+        return None
+
+    def _begin_resize(self, corner: str, event: QMouseEvent) -> None:
+        item = self._resize_item()
+        scene = self.scene()
+        if item is None or scene is None:
+            return
+        # 按下瞬间冻结 item 的逆变换：拖动中图元自身在变，用实时变换会让
+        # 鼠标局部坐标跟着「追」，比例永远算不准。
+        inv, ok = item.sceneTransform().inverted()
+        if not ok:
+            return
+        ends, _ = item.snap_points()
+        lp = inv.map(ends[_CORNER_INDEX[corner]])
+        la = inv.map(ends[_CORNER_INDEX[_OPPOSITE_INDEX[corner]]])
+        d0 = (lp.x() - la.x(), lp.y() - la.y())
+        if abs(d0[0]) < 1e-6 or abs(d0[1]) < 1e-6:
+            return
+        anchor_scene = ends[_CORNER_INDEX[_OPPOSITE_INDEX[corner]]]
+        ax, ay = scene.projection.inverse_point(
+            anchor_scene.x(), anchor_scene.y())
+        self._resize_state = {
+            "item": item, "inv": inv, "anchor_local": la,
+            "anchor_page": (ax, ay), "d0": d0, "last": (1.0, 1.0),
+        }
+        self._press_modified = bool(
+            getattr(scene, "is_modified", lambda: False)())
+        self._drag_items_active = False
+        self.setCursor(Qt.SizeFDiagCursor if corner in ("nw", "se")
+                       else Qt.SizeBDiagCursor)
+        self.viewport().update()
+
+    def _update_resize(self, event: QMouseEvent) -> None:
+        st = self._resize_state
+        scene = self.scene()
+        if st is None or scene is None:
+            return
+        cur_scene = self.mapToScene(event.position().toPoint())
+        lc = st["inv"].map(cur_scene)
+        la = st["anchor_local"]
+        d1 = (lc.x() - la.x(), lc.y() - la.y())
+        # 视图局部轴与 page 轴在 AGV 投影下是交换的（p.size(w,h)=(h,w)）：
+        # local y ∝ page 宽 -> sx，local x ∝ page 高 -> sy。
+        total = (d1[1] / st["d0"][1], d1[0] / st["d0"][0])
+        total = (max(_HANDLE_MIN_SCALE, total[0]),
+                 max(_HANDLE_MIN_SCALE, total[1]))
+        last = st["last"]
+        inc = (total[0] / last[0], total[1] / last[1])
+        if abs(inc[0] - 1.0) < 1e-12 and abs(inc[1] - 1.0) < 1e-12:
+            return
+        # 只传增量：仿射 F(p)=A+(p-A)·s 可复合，等价于「相对按下时的总比例」
+        if scene.resize_item_about(st["item"], st["anchor_page"],
+                                   inc[0], inc[1]):
+            st["last"] = total
+        self.viewport().update()
+
+    def _draw_resize_handles(self, painter: QPainter) -> None:
+        item = self._resize_item()
+        if item is None:
+            return
+        painter.save()
+        painter.resetTransform()
+        painter.setRenderHint(QPainter.Antialiasing, False)
+        painter.setPen(QPen(_HANDLE_EDGE, 1.2))
+        # 全蓝填充，避免出现白色像素块被「无 ID 白标签」回归误判
+        painter.setBrush(QBrush(_HANDLE_COLOR))
+        for hp in self._handle_points(item).values():
+            painter.drawRect(QRectF(hp.x() - _HANDLE_HALF,
+                                    hp.y() - _HANDLE_HALF,
+                                    _HANDLE_HALF * 2.0,
+                                    _HANDLE_HALF * 2.0))
+        painter.restore()
 
     def _remember_press_positions(self) -> None:
         """记录本次按下时的图元位置，并把吸附偏移基准归零。"""
@@ -316,12 +454,20 @@ class GraphicsView(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         # 鼠标位置先记下来：吸附目标、附近标记都基于它
         self._set_hover(self.mapToScene(event.position().toPoint()))
+        if self._resize_state is not None:
+            self._update_resize(event)
+            event.accept()
+            return
         if self._proxy_drag is not None:
             root, last = self._proxy_drag
             now = event.position().toPoint()
             delta = self.mapToScene(now) - self.mapToScene(last)
             self._proxy_drag = (root, now)
-            root.setPos(root.scenePos() + delta)   # 子图元在 on_item_moved 里随之位姿
+            # 必须用 pos() 而不是 scenePos()：有自定义支点（origin_pos ≠ 中心）
+            # 且旋转非 0 时，scenePos 与 pos 差着「绕支点那一转」的定长位移，
+            # 拿 scenePos 加 delta 再塞回 setPos，每帧都会多走这一段，斜着的
+            # 图元会越拖越偏（正放时旋转为 0、两者相等，所以只有斜图元暴露）。
+            root.setPos(root.pos() + delta)        # 子图元在 on_item_moved 里随之位姿
             self._apply_snap_follow()              # 拖子图元 = 拖根父，一样要吸附
             event.accept()
             return
@@ -363,6 +509,20 @@ class GraphicsView(QGraphicsView):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.RightButton:
             # 右键按下未转给基类（见 mousePressEvent），抬起同样不转
+            event.accept()
+            return
+        if self._resize_state is not None:
+            self._resize_state = None
+            self._drag_items_active = False
+            self.unsetCursor()
+            scene = self.scene()
+            if scene is not None and hasattr(scene, "contentChanged"):
+                # 属性面板 / 图层树刷新一次即可，不在拖动中每帧广播
+                scene.geometryChanged.emit(None)
+                scene.contentChanged.emit()
+            self.refresh_snap_points()
+            self.viewport().update()
+            self._notify_drag_done()
             event.accept()
             return
         if self._proxy_drag is not None:
@@ -415,6 +575,12 @@ class GraphicsView(QGraphicsView):
                 self.set_draw_tool(None)
             event.accept()
             return
+        if (event.modifiers() & Qt.ControlModifier) and key in (Qt.Key_C, Qt.Key_V):
+            # 只在画布有焦点时接管 Ctrl+C/V；不注册窗口级 QAction 快捷键，
+            # 否则会抢走属性面板输入框里原生的文本复制 / 粘贴。
+            self.actionTriggered.emit("copy" if key == Qt.Key_C else "paste")
+            event.accept()
+            return
         if key == Qt.Key_Space:
             self._space_held = True
             self.setCursor(Qt.OpenHandCursor)
@@ -451,17 +617,21 @@ class GraphicsView(QGraphicsView):
             event.accept()
             return
         sel = scene.selected_items() if hasattr(scene, "selected_items") else []
+        # 父子同时选中时只变换顶层：父缩放 / 旋转已经刚体带动了后代，
+        # 再单独变换一次子图元就是双重变换。
+        batch = (scene.top_level_items(sel)
+                 if hasattr(scene, "top_level_items") else sel)
         if key in (Qt.Key_Plus, Qt.Key_Equal):
-            for it in sel:
+            for it in batch:
                 it.resize_by(1.1)
         elif key == Qt.Key_Minus:
-            for it in sel:
+            for it in batch:
                 it.resize_by(1.0 / 1.1)
         elif key == Qt.Key_BracketLeft:
-            for it in sel:
+            for it in batch:
                 it.rotate_by(-5.0)
         elif key == Qt.Key_BracketRight:
-            for it in sel:
+            for it in batch:
                 it.rotate_by(5.0)
         elif key == Qt.Key_G:
             if hasattr(scene, "group_selected"):
@@ -654,10 +824,13 @@ class GraphicsView(QGraphicsView):
     def drawForeground(self, painter: QPainter, rect) -> None:
         super().drawForeground(painter, rect)
         scene = self.scene()
-        # 设计模式下：选中图元标注中心点小圆点 + ID（画在最上层）
+        # 设计模式下：选中图元在旋转中心处画一个红色小圆点（最上层，无 ID 文字）
         if self.show_ids and scene is not None and not getattr(scene, "is_run_mode", False):
             self._draw_origin_markers(painter)
-            self._draw_selection_ids(painter)
+            self._draw_selection_marks(painter)
+        # 拖角手柄：独立于 show_ids（那是红点开关），设计模式下单选即显示
+        if scene is not None and not getattr(scene, "is_run_mode", False):
+            self._draw_resize_handles(painter)
         # 手动绘制预览层：落点标记 + 定义段（box/circle/line）或顶点连线（poly）
         if self._draw_type:
             if scene is not None and hasattr(scene, "draw_preview_state"):
@@ -726,7 +899,7 @@ class GraphicsView(QGraphicsView):
             self.viewport().update(QRect(vp.x() - 48, vp.y() - 48, 96, 96))
 
     # ------------------------------------------------------------------
-    # 选中图元标注：中心点小圆点 + ID（仅设计模式，固定屏幕像素）
+    # 选中图元旋转中心标记：红色小圆点（仅设计模式，固定屏幕像素）
     # ------------------------------------------------------------------
     def _draw_origin_markers(self, painter: QPainter) -> None:
         """选中图元的旋转支点：中心→支点虚线 + 蓝色十字圆环。
@@ -740,7 +913,7 @@ class GraphicsView(QGraphicsView):
         if scene is None or not hasattr(scene, "selected_items"):
             return
         items = [it for it in scene.selected_items()
-                 if it.has_custom_origin()][:_MAX_ID_LABELS]
+                 if it.has_custom_origin()][:_MAX_SELECTION_MARKS]
         if not items:
             return
         painter.save()
@@ -762,69 +935,34 @@ class GraphicsView(QGraphicsView):
             painter.drawLine(QPointF(ov.x(), ov.y() - 8), QPointF(ov.x(), ov.y() + 8))
         painter.restore()
 
-    def _draw_selection_ids(self, painter: QPainter) -> None:
-        """选中图元标注：红色小圆点 + ID 标签，位置在**旋转中心**（支点）。
+    def _draw_selection_marks(self, painter: QPainter) -> None:
+        """选中图元在**旋转中心**（支点）处画一个红色小圆点。
 
-        默认「绕中心转」的图元支点即几何中心，视觉上与旧版一致；用右键
-        「旋转中心设到此处」改过支点后，标识跟着挪到支点上。
+        默认「绕中心转」时支点即几何中心；用右键「旋转中心设到此处」改过
+        支点后，红点跟着挪到支点上（与蓝色支点环同一位置）。
+        ID 数字标签已移除，这里只保留位置标识本身。
         """
         scene = self.scene()
         if scene is None or not hasattr(scene, "selected_items"):
             return
         items = scene.selected_items()
-        if not items or len(items) > _MAX_ID_LABELS:
+        if not items or len(items) > _MAX_SELECTION_MARKS:
             return
-
-        font = QFont(self.font())
-        font.setPixelSize(_ID_FONT_PX)
-        font.setBold(True)
-        metrics = QFontMetrics(font)
-        font_h = float(metrics.height())
 
         painter.save()
         painter.resetTransform()
         painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setFont(font)
-        border_pen = QPen(QColor(120, 132, 148, 170), 1.0)
-        text_color = QColor(22, 28, 36)
-        dot_pen = QPen(QColor(255, 255, 255, 230), 1.5)
-        dot_brush = QBrush(_ID_DOT_COLOR)
+        painter.setPen(QPen(QColor(255, 255, 255, 230), 1.5))
+        painter.setBrush(QBrush(_ID_DOT_COLOR))
 
         for it in items:
-            # 中心点标识标在「旋转中心」处：默认绕中心转时与几何中心重合，
-            # 设过自定义支点后跟着支点走（与蓝色支点环同一位置）。
             getter = getattr(it, "pivot_scene_point", None)
             if getter is None:
                 getter = getattr(it, "center_scene_point", None)
             scene_pt = getter() if getter is not None else it.scenePos()
             vp = self.mapFromScene(scene_pt)
-            x, y = float(vp.x()), float(vp.y())
-
-            text = str(int(getattr(it, "item_id", 0) or 0))
-            tw = float(metrics.horizontalAdvance(text)) + 10.0
-            th = font_h + 2.0
-            # 默认标在中心点右上方；贴近视口上沿时翻到下方，避免被裁掉
-            ty = y - th - 6.0
-            if ty < 1.0:
-                ty = y + 6.0
-            tx = x + 6.0
-            if tx + tw > self.viewport().width() - 1:
-                tx = x - tw - 6.0
-            tag = QRectF(tx, ty, tw, th)
-
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(QColor(255, 255, 255, 225)))
-            painter.drawRoundedRect(tag, 3.0, 3.0)
-            painter.setBrush(Qt.NoBrush)
-            painter.setPen(border_pen)
-            painter.drawRoundedRect(tag, 3.0, 3.0)
-            painter.setPen(text_color)
-            painter.drawText(tag, Qt.AlignCenter, text)
-
-            # 中心点小圆点（画在文字之上，保证不被标签压住）
-            painter.setPen(dot_pen)
-            painter.setBrush(dot_brush)
-            painter.drawEllipse(QPointF(x, y), _ID_DOT_RADIUS, _ID_DOT_RADIUS)
+            painter.drawEllipse(QPointF(float(vp.x()), float(vp.y())),
+                                _ID_DOT_RADIUS, _ID_DOT_RADIUS)
         painter.restore()
 
     def _draw_preview_overlay(self, painter: QPainter, state) -> None:
