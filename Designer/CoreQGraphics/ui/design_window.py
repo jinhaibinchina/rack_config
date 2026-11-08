@@ -294,15 +294,8 @@ class DesignerWindow(QMainWindow):
                 f"已把 {n} 个图元的旋转中心复位到图元中心" if n
                 else "选中图元的旋转中心本来就在中心", 3000)
             self._after_edit()
-        elif key == "drag_child":
-            # 拖的是子图元：视图已把拖动转成拖根父对象，这里说明一下
-            cur = scene.selected_items()
-            name = cur[0].get_name() if cur else "父对象"
-            self.status_bar.showMessage(
-                f"该图元有父对象，已改为拖动根父对象「{name}」"
-                f"（子图元位姿由父对象决定）", 5000)
         elif key == "drag_done":
-            # 画布拖拽结束（视图发现页面被改动才会发这个命令）
+            # 一次画布交互结束（拖角改尺寸 / 跟手落定后，视图发现页面被改动才发）
             self._after_edit()
         elif key == "fit":
             view.fit_content()
@@ -429,7 +422,7 @@ class DesignerWindow(QMainWindow):
         item.setSelected(True)
         self.status_bar.showMessage(
             f"已放置「{WIDGET_TOOL_LABELS.get(type_key, TYPE_LABELS.get(type_key, type_key))}」，"
-            f"可拖动或用属性面板调整", 4000
+            f"双击可跟手拖动，或用属性面板调整位置", 4000
         )
         self._after_edit()
 

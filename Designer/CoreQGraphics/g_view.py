@@ -64,30 +64,37 @@ class GraphicsView(QGraphicsView):
         self._panning = False
         self._pan_start = QPoint()
         self._space_held = False
-        self._ctrl_held = False
+        # 画布导航门控：设计态恒开，运行态由子类一次性关掉。
+        # 平移与缩放分开两个字段，是因为有的运行窗口只想放开滚轮看细节，
+        # 不想让用户把画面拖走（反之亦然）。
+        self._pan_enabled = True
+        self._zoom_enabled = True
         self.show_grid = True
         # 历史名沿用 show_ids：现在只控制「选中图元的红色旋转中心点」，
         # ID 文字标签已移除；视图菜单 Ctrl+Shift+I 切换的就是这个红点。
         self.show_ids = True
-        # 拖动中的吸附偏移：已经叠加到选中图元上的额外位移（场景单位）。
-        # 每帧用「目标偏移 - 已叠加偏移」求增量，鼠标继续走时图元钉在格点上，
+        # 吸附偏移：已经叠加到选中图元上的额外位移（场景单位）。每帧用
+        # 「目标偏移 - 已叠加偏移」求增量，鼠标继续走时图元钉在格点上，
         # 离开阈值后自动回退，不会越推越远（等价 Core 的 sence_pos_mouse_save 同步）。
         self._snap_offset = QPointF(0.0, 0.0)
         # 最后一次落在画布上的光标位置：光标移出画布（leaveEvent 会清 snap.hover）
         # 后按 T 仍能按上一次位置吸附，不必先把鼠标挪回来
         self._last_hover: QPointF | None = None
-        # 本次按下是否拖的是图元（按空白处是框选，不能被吸附推走）
-        self._drag_items_active = False
-        self._press_positions: dict[int, QPointF] = {}
         # 绘制模式（CAD 式分点）：激活工具后图元跟随鼠标，点击画布落点
         self._draw_type = ""
         # 右键位置（page 场景坐标）：供「旋转中心设到此处」使用
         self._context_page: QPointF | None = None
-        # 子图元拖动代理：(根父对象, 上次视口点)；拖动子图元 = 拖动它的根父对象
-        self._proxy_drag: tuple[object, QPoint] | None = None
         # 拖角改尺寸：按下时冻结的逆变换 / 固定对角 / 上一次的总缩放比例
         self._resize_state: dict | None = None
         self._press_modified = False
+        # 双击「跟手」：双击图元后图元钉在光标上随鼠标走（左键拖动已取消，
+        # 这是鼠标移动图元的唯一入口），
+        # 左键点击落定、Esc 放回原位。_follow_cursor 记上一次处理过的光标位置，
+        # 用增量位移（而不是绝对定位）以免抹掉按 T 吸附出来的偏移。
+        self._follow_items: list = []
+        self._follow_start: list[tuple[object, tuple[float, float]]] = []
+        self._follow_cursor: QPointF | None = None
+        self._follow_dragged = False
         self.setDragMode(QGraphicsView.RubberBandDrag)
         self.setRubberBandSelectionMode(Qt.IntersectsItemShape)
         self.setRenderHint(QPainter.Antialiasing, True)
@@ -103,6 +110,11 @@ class GraphicsView(QGraphicsView):
     # 视图
     # ------------------------------------------------------------------
     def setScene(self, scene) -> None:
+        # 换场景（切页 / 关窗）时跟手状态必须作废，否则会抓着旧场景的图元
+        self._follow_items = []
+        self._follow_start = []
+        self._follow_cursor = None
+        self._follow_dragged = False
         old = self.scene()
         if old is not None:
             try:
@@ -138,6 +150,21 @@ class GraphicsView(QGraphicsView):
 
     def _on_scene_selection_changed(self) -> None:
         """选中集合变化时整屏重绘：中心点标记只覆盖选中项，局部更新会留残影。"""
+        if self._follow_items:
+            # 图层树 / 属性面板改了选中（或被删掉）时跟手就失去意义了，
+            # 直接落定，别让「跟着一个已经取消选中的图元」这种状态留着。
+            scene = self.scene()
+            index = getattr(scene, "index", None)
+            alive, still = False, False
+            try:
+                for it in self._follow_items:
+                    if index is None or it.item_id in index.by_id:
+                        alive = True
+                        still = still or it.isSelected()
+            except RuntimeError:      # 图元已被销毁
+                alive = False
+            if not alive or not still:
+                self.end_follow()
         if getattr(self, "show_ids", True):
             self.viewport().update()
 
@@ -185,22 +212,121 @@ class GraphicsView(QGraphicsView):
             self.viewport().update()
             return
         self._draw_type = type_key
+        self.end_follow()            # 换到绘制工具：先把跟手的图元落定
         self.setDragMode(QGraphicsView.NoDrag)
         self.setCursor(Qt.CrossCursor)
         self.viewport().update()
 
     # ------------------------------------------------------------------
+    # 画布导航门控
+    # ------------------------------------------------------------------
+    # 设计态两个开关恒为 True；运行态窗口（PopPick 的 RuntimeView、
+    # RackConfig 的 _ReadOnlyView / RackSceneView）构造时调
+    # ``set_canvas_navigation_enabled(False)`` 关掉，需要时再单独放开。
+    # 门控只拦「中键 / 空格平移」与「滚轮缩放」两条输入，左键仍归各运行
+    # 窗口自己处理（PopPick 左键拖动是 PageDeck 的翻页手势，不能被抢）。
+    def set_pan_enabled(self, enable: bool) -> None:
+        """允许 / 禁止中键、空格拖动平移画布。"""
+        self._pan_enabled = bool(enable)
+        if not self._pan_enabled and self._panning:
+            self._panning = False
+            self.unsetCursor()
+
+    def is_pan_enabled(self) -> bool:
+        return self._pan_enabled
+
+    def set_zoom_enabled(self, enable: bool) -> None:
+        """允许 / 禁止滚轮缩放（``_zoom_at``，以光标为锚点）。"""
+        self._zoom_enabled = bool(enable)
+
+    def is_zoom_enabled(self) -> bool:
+        return self._zoom_enabled
+
+    def set_canvas_navigation_enabled(self, enable: bool) -> None:
+        """一次性开关「拖拽平移 + 滚轮缩放」。"""
+        self.set_pan_enabled(enable)
+        self.set_zoom_enabled(enable)
+
+    def is_canvas_navigation_enabled(self) -> bool:
+        return self._pan_enabled and self._zoom_enabled
+
+    def is_pan_event(self, event: QMouseEvent) -> bool:
+        """这次按下是否属于「平移手势」（中键，或按住空格的任意键）。"""
+        return event.button() == Qt.MiddleButton or self._space_held
+
+    # ------------------------------------------------------------------
     # 鼠标：平移 / 缩放 / 释放后吸附
     # ------------------------------------------------------------------
+    def _zoom_at(self, view_pos: QPoint, factor: float) -> None:
+        """以视口点 ``view_pos`` 为锚点缩放，缩放前后该点下的场景位置不变。
+
+        不能只调 ``scale()`` 依赖 ``AnchorUnderMouse``：那个锚点用的是
+        QGraphicsView 私有的 ``lastMousePos``，只由基类 ``mouseMoveEvent``
+        更新。跟手分支为了不让基类插进拖动流程，自己处理完就 ``return``，
+        ``lastMousePos`` 于是停在双击之前的位置 —— 滚轮一滚，视图绕着那个
+        过时的点缩放，整幅画面（连着跟手的图元）平移一大段，看上去就是
+        「跟手时一缩放图元就飞走」。
+
+        这里改成自己算：先记下光标下的场景点，缩放完再按差值补滚动条，
+        与锚点模式彻底解耦。
+        """
+        anchor = self.mapToScene(view_pos)
+        mode = self.transformationAnchor()
+        # NoAnchor 让 scale() 不做任何内置锚定，补偿量完全由下面这段决定，
+        # 避免「Qt 锚一次 + 我们再锚一次」时因为 lastMousePos 过时叠加出偏差。
+        self.setTransformationAnchor(QGraphicsView.NoAnchor)
+        try:
+            self.scale(factor, factor)
+        finally:
+            self.setTransformationAnchor(mode)
+        moved = self.mapToScene(view_pos)
+        dx = moved.x() - anchor.x()
+        dy = moved.y() - anchor.y()
+        if abs(dx) < 1e-9 and abs(dy) < 1e-9:
+            return
+        scale = abs(self.transform().m11())
+        if scale <= 1e-9:
+            return
+        # 场景单位 → 滚动条单位（像素）：滚动条值加 Δ 就是把画面往左/上推
+        hbar = self.horizontalScrollBar()
+        vbar = self.verticalScrollBar()
+        hbar.setValue(hbar.value() - int(round(dx * scale)))
+        vbar.setValue(vbar.value() - int(round(dy * scale)))
+
     def wheelEvent(self, event: QWheelEvent) -> None:
+        if not self._zoom_enabled:
+            # ignore 而不是 accept：运行态关掉缩放时，滚轮继续往上冒泡，
+            # 外层若有滚动容器还能照常滚动。
+            event.ignore()
+            return
         factor = 1.15 if event.angleDelta().y() > 0 else 1.0 / 1.15
-        self.scale(factor, factor)
+        view_pos = event.position().toPoint()
+        self._zoom_at(view_pos, factor)
         # 缩放后网格密度与吸附半径都按屏幕口径重算
         self._sync_view_metrics()
+        # 光标下的场景点理论上没变，但滚动条可能在内容边缘被夹住而留下残差，
+        # 一律按缩放后的真实映射重取：hover 标记与跟手基准都跟着走。
+        scene_pos = self.mapToScene(view_pos)
+        self._set_hover(scene_pos)
+        if self._follow_items:
+            # 跟手图元的场景位置不因缩放而变（缩放是视图操作）；基准同步到
+            # 缩放后的光标位置，下一次 mouseMove 的增量才是纯鼠标位移。
+            self._follow_cursor = QPointF(scene_pos)
         self.viewport().update()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MiddleButton or self._space_held:
+        if self._follow_items and event.button() != Qt.NoButton:
+            if event.button() == Qt.LeftButton:
+                # 跟手是个「抓住」状态：单击任意位置即落定，不再进入框选
+                self.end_follow()
+                event.accept()
+                return
+            # 中键平移 / 右键菜单：先落定，再照原流程处理
+            self.end_follow()
+        if self.is_pan_event(event):
+            if not self._pan_enabled:
+                event.ignore()
+                return
             self._panning = True
             self._pan_start = event.pos()
             self.setCursor(Qt.ClosedHandCursor)
@@ -235,7 +361,7 @@ class GraphicsView(QGraphicsView):
             event.accept()
             return
         if event.button() == Qt.LeftButton:
-            # 角手柄优先于选中 / 框选 / 拖动：按在手柄上就是改尺寸
+            # 角手柄优先于选中 / 框选：按在手柄上就是改尺寸
             corner = self._handle_at(event.position().toPoint())
             if corner is not None:
                 self._begin_resize(corner, event)
@@ -246,32 +372,122 @@ class GraphicsView(QGraphicsView):
             if scene is not None:
                 self._press_modified = bool(
                     getattr(scene, "is_modified", lambda: False)())
-            # 只有按在可选图元上才算「拖动图元」；按空白处是框选，不该被吸附推走
-            hit = scene.itemAt(self.mapToScene(event.position().toPoint()),
-                               self.transform()) if scene is not None else None
-            self._drag_items_active = bool(
-                hit is not None
-                and (hit.flags() & QGraphicsItem.ItemIsSelectable)
-                and not getattr(scene, "is_run_mode", False))
-            # 子图元不能单独拖（位姿由父对象决定），这里改成拖它的根父对象，
-            # 免得「拖不动」被误当成卡死。
-            root = self._child_root_under(event.position().toPoint())
-            if root is not None:
-                scene = self.scene()
-                scene.clearSelection()
-                root.setSelected(True)
-                self._proxy_drag = (root, event.position().toPoint())
-                self._drag_items_active = True
-                self._snap_offset = QPointF(0.0, 0.0)
-                self._press_positions = {root.item_id: QPointF(root.scenePos())}
-                self.setCursor(Qt.ClosedHandCursor)
-                self.actionTriggered.emit("drag_child")
-                event.accept()
-                return
+            # 左键按下只做选中 / 框选，**不再拖动图元**：移动图元统一走
+            # 双击跟手（见 mouseDoubleClickEvent），避免点选时手抖把图元挪走。
         super().mousePressEvent(event)
-        # 记录按下时的位置：松手时据此判断「这次到底有没有真的拖动」，
-        # 没拖动（比如未按 CTRL、被闸门锁住）就不做吸附位移。
-        self._remember_press_positions()
+
+    def mouseDoubleClickEvent(self, event):
+        """双击图元 = 抓住它（跟手）；左键按下拖动图元已被取消，走这里。
+
+        与旧 Core 一致的地方：子图元不能单独拖，双击子图元抓的是它的根父对象；
+        运行态 / 绘制中不启用。选中集合里有别的图元时整组一起跟手（与拖动
+        多选的语义一致），位移都按光标增量施加。
+        """
+        if event.button() != Qt.LeftButton:
+            return super().mouseDoubleClickEvent(event)
+        target = self._follow_target_at(event.position().toPoint())
+        if target is None:
+            return super().mouseDoubleClickEvent(event)
+        self.begin_follow(target, self.mapToScene(event.position().toPoint()))
+        event.accept()
+
+    # ------------------------------------------------------------------
+    # 双击跟手：抓住图元 → 图元随光标走 → 单击 / Esc 落定
+    # ------------------------------------------------------------------
+    def _follow_target_at(self, viewport_pos: QPoint):
+        """光标下可作为跟手目标的顶层图元（子图元返回根父对象）。"""
+        scene = self.scene()
+        if (scene is None or getattr(scene, "is_run_mode", False)
+                or self._draw_type or self._panning):
+            return None
+        for it in scene.items(self.mapToScene(viewport_pos)):
+            if getattr(it, "item_id", None) is None or not it.isVisible():
+                continue
+            if not (it.flags() & QGraphicsItem.ItemIsSelectable):
+                continue
+            if getattr(it, "parent_id", 0):
+                root = it.root_parent()
+                return None if root is it else root
+            return it
+        return None
+
+    def begin_follow(self, target, scene_pos: QPointF | None = None) -> bool:
+        """开始跟手：确保目标被选中，把被选中的顶层图元挂到光标上。"""
+        scene = self.scene()
+        if scene is None or target is None:
+            return False
+        if not target.isSelected():
+            scene.clearSelection()
+            target.setSelected(True)
+        sel = [
+            it for it in scene.selected_items()
+            if not getattr(it, "parent_id", 0)
+            and (it.flags() & QGraphicsItem.ItemIsSelectable)
+        ]
+        if not sel:
+            return False
+        self._follow_items = sel
+        self._follow_start = [(it, it.page_center()) for it in sel]
+        self._follow_cursor = (QPointF(scene_pos) if scene_pos is not None
+                               else QPointF(self._last_hover or QPointF()))
+        self._follow_dragged = False
+        self._snap_offset = QPointF(0.0, 0.0)   # 新的抓取，之前叠加的吸附作废
+        self._press_modified = bool(
+            getattr(scene, "is_modified", lambda: False)())
+        self.setCursor(Qt.ClosedHandCursor)
+        self.viewport().update()
+        return True
+
+    def _update_follow(self, scene_pos: QPointF, button_held: bool = False) -> None:
+        """按光标增量平移跟手图元（增量式才能保住按 T 吸出来的偏移）。"""
+        if not self._follow_items:
+            return
+        if self._follow_cursor is None:
+            self._follow_cursor = QPointF(scene_pos)
+            return
+        delta = scene_pos - self._follow_cursor
+        self._follow_cursor = QPointF(scene_pos)
+        moved = False
+        if abs(delta.x()) > 1e-9 or abs(delta.y()) > 1e-9:
+            for it in self._follow_items:
+                it.moveBy(delta.x(), delta.y())   # 子图元在 on_item_moved 里随动
+            moved = True
+        if moved and button_held:
+            # 双击后一直按住：松手即落点（"双击拖"手势）
+            self._follow_dragged = True
+        self.viewport().update()
+
+    def end_follow(self, restore: bool = False) -> None:
+        """结束跟手。``restore=True`` 用于 Esc：整组回到抓住时的位置。"""
+        if not self._follow_items:
+            return
+        items = self._follow_items
+        starts = self._follow_start
+        self._follow_items = []
+        self._follow_start = []
+        self._follow_cursor = None
+        self._follow_dragged = False
+        self.unsetCursor()
+        scene = self.scene()
+        if restore:
+            for it, (cx, cy) in starts:
+                it.set_page_center(cx, cy)
+        if scene is not None:
+            if not restore:
+                if hasattr(scene, "mark_modified"):
+                    scene.mark_modified()
+                if hasattr(scene, "geometryChanged"):
+                    scene.geometryChanged.emit(items[0] if items else None)
+                if hasattr(scene, "contentChanged"):
+                    scene.contentChanged.emit()
+            self.refresh_snap_points()
+        self._notify_drag_done()
+        self.viewport().update()
+
+    def is_following(self) -> bool:
+        """当前是否处于双击跟手状态（供回归 / 外部判断）。"""
+        return bool(self._follow_items)
+
 
     def context_page_point(self) -> QPointF | None:
         """最近一次右键点击处的 page 场景坐标。"""
@@ -346,7 +562,6 @@ class GraphicsView(QGraphicsView):
         }
         self._press_modified = bool(
             getattr(scene, "is_modified", lambda: False)())
-        self._drag_items_active = False
         self.setCursor(Qt.SizeFDiagCursor if corner in ("nw", "se")
                        else Qt.SizeBDiagCursor)
         self.viewport().update()
@@ -392,45 +607,6 @@ class GraphicsView(QGraphicsView):
                                     _HANDLE_HALF * 2.0))
         painter.restore()
 
-    def _remember_press_positions(self) -> None:
-        """记录本次按下时的图元位置，并把吸附偏移基准归零。"""
-        scene = self.scene()
-        self._press_positions = {}
-        self._snap_offset = QPointF(0.0, 0.0)
-        if scene is None or not hasattr(scene, "selected_items"):
-            return
-        for it in scene.selected_items():
-            self._press_positions[it.item_id] = QPointF(it.scenePos())
-
-    def _items_moved_since_press(self) -> bool:
-        """按下到现在，选中图元里有没有真的被拖动过。"""
-        scene = self.scene()
-        if scene is None or not self._press_positions:
-            return False
-        for it in scene.selected_items():
-            start = self._press_positions.get(it.item_id)
-            if start is None:
-                continue
-            if (it.scenePos() - start).manhattanLength() > 1e-9:
-                return True
-        return False
-
-    def _child_root_under(self, viewport_pos: QPoint):
-        """光标下的图元若有父对象，返回它最顶层的父对象（否则 None）。"""
-        scene = self.scene()
-        if scene is None or getattr(scene, "is_run_mode", False):
-            return None
-        if not getattr(scene, "_movable_gate", False) or self._draw_type:
-            return None
-        for it in scene.items(self.mapToScene(viewport_pos)):
-            if getattr(it, "item_id", None) is None or not it.isVisible():
-                continue
-            if not getattr(it, "parent_id", 0):
-                return None
-            root = it.root_parent()
-            return None if root is it else root
-        return None
-
     def _prepare_context_target(self, event: QMouseEvent) -> None:
         """右键不改动既有选中，只保证「点到的图元」成为选中目标。
 
@@ -454,24 +630,17 @@ class GraphicsView(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         # 鼠标位置先记下来：吸附目标、附近标记都基于它
         self._set_hover(self.mapToScene(event.position().toPoint()))
+        if self._follow_items:
+            # 跟手中：不需要按钮按住，光标走到哪图元跟到哪
+            self._update_follow(self.mapToScene(event.position().toPoint()),
+                                bool(event.buttons() & Qt.LeftButton))
+            event.accept()
+            return
         if self._resize_state is not None:
             self._update_resize(event)
             event.accept()
             return
-        if self._proxy_drag is not None:
-            root, last = self._proxy_drag
-            now = event.position().toPoint()
-            delta = self.mapToScene(now) - self.mapToScene(last)
-            self._proxy_drag = (root, now)
-            # 必须用 pos() 而不是 scenePos()：有自定义支点（origin_pos ≠ 中心）
-            # 且旋转非 0 时，scenePos 与 pos 差着「绕支点那一转」的定长位移，
-            # 拿 scenePos 加 delta 再塞回 setPos，每帧都会多走这一段，斜着的
-            # 图元会越拖越偏（正放时旋转为 0、两者相等，所以只有斜图元暴露）。
-            root.setPos(root.pos() + delta)        # 子图元在 on_item_moved 里随之位姿
-            self._apply_snap_follow()              # 拖子图元 = 拖根父，一样要吸附
-            event.accept()
-            return
-        if self._panning:
+        if self._panning and self._pan_enabled:
             delta = event.pos() - self._pan_start
             self._pan_start = event.pos()
             self.horizontalScrollBar().setValue(
@@ -492,11 +661,6 @@ class GraphicsView(QGraphicsView):
                 self.viewport().update()
                 return
         super().mouseMoveEvent(event)
-        # 拖动中不在这里 moveBy：Qt 对可拖图元用「按下点 + 鼠标位移」的**绝对**
-        # 定位，下一次 mouseMove 会覆盖掉我们叠加的偏移（实测只剩零头）。
-        # 实时的「钉住」效果交给光标下的标记展示，位移在松手 / 按 T 时一次性补。
-        if self._drag_items_active and (event.buttons() & Qt.LeftButton):
-            self.viewport().update()
 
     def leaveEvent(self, event) -> None:
         self._set_hover(None)
@@ -513,7 +677,6 @@ class GraphicsView(QGraphicsView):
             return
         if self._resize_state is not None:
             self._resize_state = None
-            self._drag_items_active = False
             self.unsetCursor()
             scene = self.scene()
             if scene is not None and hasattr(scene, "contentChanged"):
@@ -525,30 +688,16 @@ class GraphicsView(QGraphicsView):
             self._notify_drag_done()
             event.accept()
             return
-        if self._proxy_drag is not None:
-            self._proxy_drag = None
-            self._drag_items_active = False
-            self.unsetCursor()
-            scene = self.scene()
-            if scene is not None and hasattr(scene, "mark_modified"):
-                scene.mark_modified()
-            if self.snap.enabled:
-                self._apply_snap_follow()
-            self.refresh_snap_points()
-            self._notify_drag_done()
+        super().mouseReleaseEvent(event)
+        if self._follow_items:
+            if self._follow_dragged:
+                # 双击后接着按住拖过：松手就是落点（与普通拖动一致）
+                self.end_follow()
             event.accept()
             return
-        super().mouseReleaseEvent(event)
-        dragged = self._drag_items_active and self._items_moved_since_press()
-        self._drag_items_active = False
         if self._panning:
             self._panning = False
             self.unsetCursor()
-        elif self.snap.enabled and event.button() == Qt.LeftButton and dragged:
-            # 松手时按「光标相对捕捉点的偏移」整体平移选中图元：
-            # 光标吸了多少，图元就移动多少（require_movable=False 是因为
-            # 用户可能先松开了 CTRL，但拖动确实发生过）。
-            self._apply_snap_follow(require_movable=False)
         self._notify_drag_done()
 
     def _notify_drag_done(self) -> None:
@@ -567,6 +716,11 @@ class GraphicsView(QGraphicsView):
     def keyPressEvent(self, event: QKeyEvent) -> None:
         scene = self.scene()
         key = event.key()
+        if key == Qt.Key_Escape and self._follow_items:
+            # 跟手中按 Esc：整组放回抓住时的位置（不是落在当前点）
+            self.end_follow(restore=True)
+            event.accept()
+            return
         if key == Qt.Key_Escape and self._draw_type:
             scene = self.scene()
             if scene is not None and getattr(scene, "drawing_active", lambda: False)():
@@ -582,16 +736,12 @@ class GraphicsView(QGraphicsView):
             event.accept()
             return
         if key == Qt.Key_Space:
+            if not self._pan_enabled:
+                # 平移被关掉时空格交还给上层（运行态里它可能用于按钮激活）
+                super().keyPressEvent(event)
+                return
             self._space_held = True
             self.setCursor(Qt.OpenHandCursor)
-            event.accept()
-            return
-        if key == Qt.Key_Control:
-            if not self._ctrl_held:
-                self._ctrl_held = True
-                scene = self.scene()
-                if scene is not None and hasattr(scene, "set_movable_gate"):
-                    scene.set_movable_gate(True)
             event.accept()
             return
         if key == Qt.Key_T:
@@ -634,9 +784,11 @@ class GraphicsView(QGraphicsView):
             for it in batch:
                 it.rotate_by(5.0)
         elif key == Qt.Key_G:
+            self.end_follow()          # 跟手中成组：先落定再成组
             if hasattr(scene, "group_selected"):
                 scene.group_selected()
         elif key == Qt.Key_U:
+            self.end_follow()
             if hasattr(scene, "ungroup_selected"):
                 scene.ungroup_selected()
         elif key == Qt.Key_0:
@@ -646,6 +798,9 @@ class GraphicsView(QGraphicsView):
                 scene.is_run_mode = not getattr(scene, "is_run_mode", False)
                 self.viewport().update()
         elif key == Qt.Key_Delete:
+            # 先退出跟手：否则被删的图元还挂在 _follow_items 里，后续鼠标
+            # 移动会访问已销毁的 C++ 对象。
+            self.end_follow()
             if hasattr(scene, "delete_items"):
                 scene.delete_items(sel)
             else:
@@ -666,23 +821,11 @@ class GraphicsView(QGraphicsView):
             self._space_held = False
             if not self._panning:
                 self.unsetCursor()
-        elif event.key() == Qt.Key_Control:
-            self._ctrl_held = False
-            scene = self.scene()
-            if scene is not None and hasattr(scene, "set_movable_gate"):
-                scene.set_movable_gate(False)
-            event.accept()
-            return
         super().keyReleaseEvent(event)
 
     def focusOutEvent(self, event) -> None:
-        # 焦点丢失（如切到别的窗口仍按住 CTRL）时复位移动门控，避免卡在可拖动态
-        self._proxy_drag = None
-        if self._ctrl_held:
-            self._ctrl_held = False
-            scene = self.scene()
-            if scene is not None and hasattr(scene, "set_movable_gate"):
-                scene.set_movable_gate(False)
+        # 跟手状态要收掉：切走再回来时光标已不在原位，继续跟会突然跳一段
+        self.end_follow()
         super().focusOutEvent(event)
 
     # ------------------------------------------------------------------
@@ -721,6 +864,10 @@ class GraphicsView(QGraphicsView):
         QCursor.setPos(self.viewport().mapToGlobal(vp))
         self.snap.hover = QPointF(target)
         self._snap_offset = QPointF(0.0, 0.0)
+        if self._follow_items:
+            # 跟手中：光标已被挪到捕捉点上，基准跟着改，否则下一次 mouseMove
+            # 会把「挪光标这段」再当成位移推一遍，图元越吸越偏。
+            self._follow_cursor = QPointF(target)
 
     def _apply_snap_follow(self, allow_release: bool = True,
                            require_movable: bool = True) -> bool:
@@ -734,8 +881,8 @@ class GraphicsView(QGraphicsView):
 
         ``allow_release=False`` 用于 T 键：只做一次正向吸附，鼠标没指到
         任何捕捉点时保持图元不动，避免把之前吸过的偏移又撤回。
-        ``require_movable`` 用于拖动：没按 CTRL（图形项不可拖）时不能靠
-        吸附把图元偷偷挪走，否则「拖不动」的契约就被绕过了。
+        ``require_movable`` 默认 True，只有 ``ItemIsMovable`` 的图元才动；
+        视图已取消左键拖动（图元默认不可移动），T 键传 False 才作用到任意类型。
 
         吸附目标用 ``always=True`` 取「最近的捕捉点」：附近有端点 / 中点就吸它，
         没有就吸最近的格子交汇点。因此**每个图元类型**（含顶点类、文本、图片、

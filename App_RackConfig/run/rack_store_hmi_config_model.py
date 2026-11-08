@@ -7,9 +7,11 @@ from PySide6.QtCore import QObject, Signal,QPointF
 from PySide6.QtGui import QColor
 
 from .rack_store_model import LIGHT_COLORS, LightColor, normalize_light
-from Designer.Core.elements import base_element, group_element, text_element,line_element
+from .rack_scene_adapter import (
+    base_element, group_element, text_element, line_element,
+)
 
-from Designer.Core.myQuadTreeScene import SceneManager
+from .rack_scene_adapter import SceneManager
 
 class RackHmiConfigModel(QObject):
     """料仓状态面板模型：按 (模块, 通道, 灯位) 访问 32 盏灯和 4 个文本。

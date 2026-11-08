@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QObject,QPointF,Signal,QTimer
 from PySide6.QtWidgets import  QWidget
 # from my_elements_v2 import group_element
-from Designer.Core.elements import (
+from .safety_scene_adapter import (
     base_element,
     circle_element,
     group_element,

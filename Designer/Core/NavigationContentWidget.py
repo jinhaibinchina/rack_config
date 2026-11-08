@@ -76,6 +76,23 @@ from .station_pages import StationCatalog
 from .my_common import SceneMode
 
 
+def _is_group_like(obj: object) -> bool:
+    """是否「组」——两栈兼容。
+
+    设计态传进来的是旧 ``group_element`` 实例；运行态窗口（如 App_SafetyCar）
+    用的是 CoreQGraphics 适配层里的壳，``isinstance`` 对旧类不成立，只能看
+    ``TYPE`` 标签。适配层把新场景的 ``TYPE`` 透传出来（``"group"``）。
+    """
+    return isinstance(obj, group_element) or getattr(obj, "TYPE", "") == "group"
+
+
+def _is_element_like(obj: object) -> bool:
+    """是否「单个图元」——同样两栈兼容（适配层壳不是旧 ``base_element``）。"""
+    if isinstance(obj, base_element):
+        return True
+    return all(hasattr(obj, name) for name in ("TYPE", "get_name", "id"))
+
+
 GLYPHS = {
     "rect": "矩",
     "checkbox": "复",
@@ -299,7 +316,7 @@ class NavigationContentWidget(QWidget):
                     "在画布上点选一个图元查看和编辑它的属性；点空白处可以编辑页面背景。",
                 )
         else:
-            if isinstance(selected_obj, group_element):
+            if _is_group_like(selected_obj):
                 CabinetPropertyItem(
                     item=selected_obj,
                     catalog=self.station_catalog,
@@ -427,11 +444,11 @@ class NavigationContentWidget(QWidget):
                 f"{scene.width()} x {scene.height()} 视图 · {count} 个图元",
             )
             return
-        if isinstance(selected_obj, base_element):
+        if _is_element_like(selected_obj):
             type_key = str(getattr(selected_obj, "type", "") or "")
             type_label = TYPE_LABELS.get(type_key, type_key or "图元")
             group_text = "未成组"
-            if isinstance(selected_obj, group_element):
+            if _is_group_like(selected_obj):
                 group_text = f"{len(selected_obj.childItems())} 个成员"
             elif selected_obj.is_has_parent():
                 parent = selected_obj.parentItem()

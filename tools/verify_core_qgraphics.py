@@ -865,6 +865,62 @@ def main() -> int:
     wscene.set_scene_mode(False)
     check("退出运行预览销毁全部 proxy", len(wscene.widget_proxies) == 0)
 
+    print("\n=== 6.10 删组递归删成员（对照旧 Core base_element.Delete） ===")
+    dl = GraphicsScene()
+    g1 = dl.create_item("group", center=(300.0, 300.0), size=(200.0, 160.0))
+    g2 = dl.create_item("group", center=(320.0, 320.0), size=(80.0, 80.0))
+    bx = dl.create_item("rect", center=(310.0, 310.0), size=(40.0, 30.0))
+    wd = dl.create_item("widget:label", center=(340.0, 340.0), size=(100.0, 26.0))
+    keep = dl.create_item("rect", center=(900.0, 900.0), size=(50.0, 50.0))
+    g2.set_page_parent(g1.item_id)
+    bx.set_page_parent(g2.item_id)
+    wd.set_page_parent(g1.item_id)
+    g1.set_page_field("children_ids", [g2.item_id, wd.item_id])
+    g2.set_page_field("children_ids", [bx.item_id])
+    dl.index.rebuild_links()
+    check("删前组树三层 4 个图元", len(dl.all_items()) == 5
+          and len(dl.index.descendants(g1.item_id)) == 3,
+          f"n={len(dl.all_items())} desc={len(dl.index.descendants(g1.item_id))}")
+
+    dl.set_scene_mode(True)
+    check("运行态组内控件已挂 proxy", wd.item_id in dl.widget_proxies)
+    removed = dl.delete_items([g1])
+    check("删组返回组 + 全部后代的数量", removed == 4, str(removed))
+    check("删组后场景只剩组外图元",
+          [it.item_id for it in dl.all_items()] == [keep.item_id],
+          str([it.item_id for it in dl.all_items()]))
+    check("删组后索引/order/链接无残留",
+          not ({g1.item_id, g2.item_id, bx.item_id, wd.item_id}
+               & set(dl.index.by_id))
+          and not ({g1.item_id, g2.item_id, bx.item_id, wd.item_id}
+                   & set(dl.index.order))
+          and not any(g1.item_id in v for v in dl.index.children_of.values()))
+    check("删组连带移除运行态 proxy",
+          len(dl.widget_proxies) == 0, str(list(dl.widget_proxies)))
+    check("组外图元不受影响（父子/尺寸不变）",
+          keep.parent_id == 0 and keep.page_size() == (50.0, 50.0),
+          str(keep.page_size()))
+    check("删组后 page_data 与场景一致",
+          len(dl.page_data()["items"]) == 1, str(len(dl.page_data()["items"])))
+    dl.set_scene_mode(False)
+
+    # 删成员只删自己，父组仍在（父子关系单向：拥有者删成员，成员不删父）
+    solo = GraphicsScene()
+    sg = solo.create_item("group", center=(100.0, 100.0), size=(200.0, 200.0))
+    sa = solo.create_item("rect", center=(110.0, 110.0), size=(30.0, 30.0))
+    sb = solo.create_item("rect", center=(150.0, 150.0), size=(30.0, 30.0))
+    sa.set_page_parent(sg.item_id)
+    sb.set_page_parent(sg.item_id)
+    sg.set_page_field("children_ids", [sa.item_id, sb.item_id])
+    solo.index.rebuild_links()
+    solo.delete_items([sa])
+    check("删成员不连带父组，且父组 children_ids 同步剔除",
+          sg.item_id in solo.index.by_id
+          and sa.item_id not in solo.index.by_id
+          and sg.children_ids == [sb.item_id]
+          and sb.parent_id == sg.item_id,
+          f"children={sg.children_ids}")
+
     print("\n=== 7. 性能对照请用独立基准 ===")
     print("  第 4~6 节已修改过场景状态，此处帧耗时不可比，故不采样。")
     print("  .venv/Scripts/python.exe tools/bench_qgraphics_scene.py --phase ab")

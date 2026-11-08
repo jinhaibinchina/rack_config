@@ -72,7 +72,7 @@ from common.com.modbus.modbus_data_broker import DataBroker
 from common.com.modbus.modbus import get_bool, set_bool
 from common.com.modbus.modbus_plc_manager import PLCManager
 from App_SafetyCar.my_plc_safety import Ui_safety_display, int_to_hex, plc_safety ,CABINET_NAMES
-from Designer.Core.myQuadTreeScene import QuadTreeScene, SceneManager
+from App_SafetyCar.safety_scene_adapter import SafetySceneView, SceneManager
 from App_SafetyCar.parames_set_ui import Ui_Dialog as Ui_parames_set
 from App_SafetyCar.station_status_query_ui import Ui_Dialog as Ui_station_status_query
 from res.app_safety_car_resource_manager import resource_manager as res_manager
@@ -443,7 +443,8 @@ class SafetyCarWindow(QMainWindow):
         self.scene_layout_inner.setContentsMargins(0, 0, 0, 0)
         self.scene_layout_inner.setSpacing(0)
 
-        self.scene = QuadTreeScene(parent=self)
+        self.scene = SafetySceneView(parent=self)
+        self.scene.set_canvas_navigation_enabled(True)
         self.scene.setObjectName("safetyCarScene")
         self.scene_manager = SceneManager(self.scene, parent=self)
         self.scene.set_scene_manager(self.scene_manager)
@@ -459,9 +460,9 @@ class SafetyCarWindow(QMainWindow):
         if self.scene.mode() != SceneMode.Run:
 
             self.scene.toggle_sence_mode()
-            from Designer.Core.elements import group_element 
             for child in self.scene_manager.m_sorted_items:
-                if isinstance(child, group_element) :
+                # 适配层的壳按 TYPE 分类（旧栈传进来的才是 group_element 实例）
+                if getattr(child, "TYPE", "") == "group":
                     for name in CABINET_NAMES:
                         if name in child.get_name():
                             child.set_interactive(True)
@@ -655,11 +656,9 @@ class SafetyCarWindow(QMainWindow):
             return
 
         # 运行态的事件路由会把复选框等可交互图元也写成 current_selected
-        # （myQuadTreeScene._find_event_group_at 的返回集合），站点说明面板
+        # （见适配层 ``SafetySceneView._hit_interactive``），站点说明面板
         # 只服务于站点组，其它图元不刷新，免得面板被切成图元属性页。
-        from Designer.Core.elements import group_element
-
-        if not isinstance(selected_item, group_element):
+        if getattr(selected_item, "TYPE", "") != "group":
             return
 
         if not self.property_dock.isVisible():

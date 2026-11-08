@@ -24,7 +24,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, ".")
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt  # noqa: E402
-from PySide6.QtGui import QImage, QMouseEvent, QPainter  # noqa: E402
+from PySide6.QtGui import QImage, QMouseEvent, QPainter, QWheelEvent  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
@@ -281,6 +281,30 @@ def main() -> int:
           and all(v.item_id not in scene.index.by_id for v in made.values())
           and all(iid not in scene.index.order for iid in ids))
 
+    # 组被删除时递归删除全部成员（旧 Core base_element.Delete 语义）
+    ga = scene.create_item("rect", center=(1200.0, 1200.0), size=(60.0, 40.0))
+    gb = scene.create_item("rect", center=(1260.0, 1240.0), size=(60.0, 40.0))
+    scene.clearSelection()
+    ga.setSelected(True)
+    gb.setSelected(True)
+    grp = scene.group_selected()
+    check("成组成功（组 + 2 个成员）",
+          grp is not None and len(scene.index.descendants(grp.item_id)) == 2,
+          f"desc={len(scene.index.descendants(grp.item_id)) if grp else '-'}")
+    scene.clearSelection()
+    grp.setSelected(True)
+    app.processEvents()
+    before = len(scene.all_items())
+    QTest.keyPress(window.view, Qt.Key_Delete)
+    app.processEvents()
+    check("Delete 键删组连带递归删除成员",
+          before == base_count + 3
+          and len(scene.all_items()) == base_count
+          and not ({grp.item_id, ga.item_id, gb.item_id} & set(scene.index.by_id))
+          and not ({grp.item_id, ga.item_id, gb.item_id} & set(scene.index.order))
+          and len(scene.page_data()["items"]) == base_count,
+          f"before={before} after={len(scene.all_items())}")
+
     print("\n=== 5. 图层树：双模式 / 过滤 / 选中联动 ===")
     window.layers.mode_box.setCurrentIndex(0)
     window.layers.filter_edit.clear()
@@ -470,61 +494,50 @@ def main() -> int:
     check("多边形绘制进行中标志已清除", not scene.drawing_active())
     view.set_draw_tool(None)
 
-    print("\n=== 8.6 移动需按住 CTRL ===")
+    print("\n=== 8.6 左键按下不再拖动图元（移动只走双击跟手）===")
     view = window.view
     scene = window.scene
     view.set_draw_tool(None)
     scene.set_scene_mode(False)
-    scene.set_movable_gate(False)
     prev_snap = view.snap.enabled
-    view.snap.enabled = False  # 屏蔽 T 门控吸附，避免 release 时改变坐标干扰断言
+    view.snap.enabled = False  # 屏蔽 T 门控吸附，避免干扰位置断言
     rect = scene.create_item("rect", center=(1200.0, 1200.0))
     rect.setSelected(True)
     view.centerOn(rect)
     app.processEvents()
-    check("默认（未按 CTRL）图元不可移动",
+    check("图元默认不可移动（ItemIsMovable=False）",
           not bool(rect.flags() & QGraphicsItem.ItemIsMovable))
 
-    # 无 CTRL：拖拽不应移动图元
-    before = rect.scenePos()
-    p0 = view.mapFromScene(rect.scenePos())
-    p0 = QPoint(int(p0.x()), int(p0.y()))
-    p1 = QPoint(p0.x() + 60, p0.y() + 40)
-    QTest.mousePress(view.viewport(), Qt.LeftButton, pos=p0)
-    QTest.mouseMove(view.viewport(), pos=p1)
-    QTest.mouseMove(view.viewport(), pos=p1)
-    QTest.mouseRelease(view.viewport(), Qt.LeftButton, pos=p1)
-    app.processEvents()
-    after_no_ctrl = rect.scenePos()
-    check("未按 CTRL 拖拽不改变位置",
-          abs(after_no_ctrl.x() - before.x()) < 1e-6
-          and abs(after_no_ctrl.y() - before.y()) < 1e-6,
-          f"before={before} after={after_no_ctrl}")
+    def _drag_item(dx, dy, mods=Qt.NoModifier) -> None:
+        p0 = view.mapFromScene(rect.scenePos())
+        p0 = QPoint(int(p0.x()), int(p0.y()))
+        p1 = QPoint(p0.x() + dx, p0.y() + dy)
+        QTest.mousePress(view.viewport(), Qt.LeftButton, mods, p0)
+        QTest.mouseMove(view.viewport(), p1)
+        QTest.mouseMove(view.viewport(), p1)
+        QTest.mouseRelease(view.viewport(), Qt.LeftButton, mods, p1)
+        app.processEvents()
 
-    # 按住 CTRL：图元变为可移动，拖拽生效
+    before_no_ctrl = QPointF(rect.scenePos())
+    _drag_item(60, 40)
+    check("左键按下拖动不改位置",
+          abs(rect.scenePos().x() - before_no_ctrl.x()) < 1e-6
+          and abs(rect.scenePos().y() - before_no_ctrl.y()) < 1e-6,
+          f"before={before_no_ctrl} after={rect.scenePos()}")
+
     QTest.keyPress(view, Qt.Key_Control)
     app.processEvents()
-    check("按住 CTRL 后图元可移动",
-          bool(rect.flags() & QGraphicsItem.ItemIsMovable))
-    p2 = view.mapFromScene(rect.scenePos())
-    p2 = QPoint(int(p2.x()), int(p2.y()))
-    p3 = QPoint(p2.x() + 60, p2.y() + 40)
-    QTest.mousePress(view.viewport(), Qt.LeftButton, pos=p2)
-    QTest.mouseMove(view.viewport(), pos=p3)
-    QTest.mouseMove(view.viewport(), pos=p3)
-    QTest.mouseRelease(view.viewport(), Qt.LeftButton, pos=p3)
-    app.processEvents()
-    after_ctrl = rect.scenePos()
-    moved = (abs(after_ctrl.x() - after_no_ctrl.x()) > 1e-3
-             or abs(after_ctrl.y() - after_no_ctrl.y()) > 1e-3)
-    check("按住 CTRL 拖拽确实移动了图元", moved,
-          f"noctrl={after_no_ctrl} ctrl={after_ctrl}")
-
-    # 松开 CTRL：恢复不可移动
+    check("按住 CTRL 也不再开启可拖动",
+          not bool(rect.flags() & QGraphicsItem.ItemIsMovable))
+    before_ctrl = QPointF(rect.scenePos())
+    _drag_item(60, 40, Qt.ControlModifier)
     QTest.keyRelease(view, Qt.Key_Control)
     app.processEvents()
-    check("松开 CTRL 后图元恢复不可移动",
-          not bool(rect.flags() & QGraphicsItem.ItemIsMovable))
+    check("CTRL + 左键拖动同样不改位置",
+          abs(rect.scenePos().x() - before_ctrl.x()) < 1e-6
+          and abs(rect.scenePos().y() - before_ctrl.y()) < 1e-6,
+          f"before={before_ctrl} after={rect.scenePos()}")
+    check("拖动尝试后图元仍保持选中（按下只做选择）", rect.isSelected())
     scene.delete_items([rect])
     view.snap.enabled = prev_snap
     app.processEvents()
@@ -806,11 +819,9 @@ def main() -> int:
           f"c={kid.page_center()} o={kid.page_origin()}")
     kid.set_page_angle(angle0)
     app.processEvents()
-    scene.set_movable_gate(True)
-    check("即使按住 CTRL，子图元也不可拖动",
+    check("父 / 子图元都不可拖动（左键拖动已取消）",
           not bool(kid.flags() & QGraphicsItem.ItemIsMovable)
-          and bool(par.flags() & QGraphicsItem.ItemIsMovable))
-    scene.set_movable_gate(False)
+          and not bool(par.flags() & QGraphicsItem.ItemIsMovable))
 
     def _layout_disabled(item) -> int:
         window.property_panel.update_for_selected(item)
@@ -828,7 +839,7 @@ def main() -> int:
     check("父图元布局页仍可编辑", _layout_disabled(par) == 0,
           f"disabled={_layout_disabled(par)}")
 
-    # 拖子图元 = 拖它的根父对象（否则「拖不动」会被当成卡死）
+    # 按下左键拖子图元：只选中它自己，不再代理成「拖根父对象」
     prev_snap2 = view.snap.enabled
     view.snap.enabled = False
     scene.clearSelection()
@@ -837,7 +848,6 @@ def main() -> int:
     app.processEvents()
     par_before = par.page_center()
     kid_before = kid.page_center()
-    QTest.keyPress(view, Qt.Key_Control)
     p0 = window.view.mapFromScene(kid.center_scene_point())
     p0 = QPoint(int(p0.x()), int(p0.y()))
     p1 = QPoint(p0.x() + 40, p0.y() + 30)
@@ -845,23 +855,18 @@ def main() -> int:
     QTest.mouseMove(view.viewport(), pos=p1)
     QTest.mouseMove(view.viewport(), pos=p1)
     QTest.mouseRelease(view.viewport(), Qt.LeftButton, pos=p1)
-    QTest.keyRelease(view, Qt.Key_Control)
     app.processEvents()
-    check("拖子图元改为拖根父对象（根父被选中）",
-          [it.item_id for it in scene.selected_items()] == [par.item_id],
+    check("左键拖子图元不移动父 / 子图元",
+          _close_pt(par.page_center(), par_before, 1e-3)
+          and _close_pt(kid.page_center(), kid_before, 1e-3),
+          f"par {par_before}->{par.page_center()} kid {kid_before}->{kid.page_center()}")
+    check("按下子图元只选中它自己（不再改成选根父）",
+          [it.item_id for it in scene.selected_items()] == [kid.item_id],
           str([it.item_id for it in scene.selected_items()]))
-    moved_par = not _close_pt(par.page_center(), par_before, 1e-3)
-    check("根父对象确实移动了", moved_par,
-          f"{par_before} -> {par.page_center()}")
-    check("子图元跟着父对象一起动",
-          not _close_pt(kid.page_center(), kid_before, 1e-3),
-          f"{kid_before} -> {kid.page_center()}")
 
-    # 斜图元拖动：位移必须等于鼠标位移。有自定义支点且旋转非 0 时 Qt 的
-    # scenePos() 与 pos() 差着「绕支点那一转」的定长偏移；若拖动拿 scenePos
-    # 当基准再 setPos，每帧都会白走这一段 —— 即使鼠标原地不动，图元也持续
-    # 漂移，真正拖动时几帧就飞出画布。正放时两者相等，只有斜图元暴露，
-    # 所以这里必须专门造一个「自定义支点 + 旋转 29°」的根父对象。
+    # 斜图元 + 自定义支点：跟手位移必须严格等于光标位移。
+    # 跟手走的是 moveBy(场景增量)，不以 pos()/scenePos() 为基准，所以支点只在
+    # 旋转时参与，不该影响平移量。
     par.set_page_size(300.0, 200.0)
     _pc = par.page_center()
     par.set_page_origin(_pc[0] + 100.0, _pc[1] - 80.0)
@@ -869,37 +874,31 @@ def main() -> int:
     app.processEvents()
     view.snap.enabled = False
     scene.clearSelection()
-    kid.setSelected(True)
+    par.setSelected(True)
     window.view.resetTransform()
-    window.view.centerOn(kid.center_scene_point())
+    window.view.centerOn(par.center_scene_point())
     app.processEvents()
-    _q = window.view.mapFromScene(kid.center_scene_point())
+    _q = window.view.mapFromScene(par.center_scene_point())
     _q = QPoint(int(_q.x()), int(_q.y()))
-    QTest.keyPress(view, Qt.Key_Control)
-    QTest.mousePress(view.viewport(), Qt.LeftButton, pos=_q)
+    _q2 = QPoint(_q.x() + 70, _q.y() - 40)
+    QTest.mouseDClick(view.viewport(), Qt.LeftButton, Qt.NoModifier, _q)
     app.processEvents()
-    check("斜图元上按下走「拖根父对象」代理分支",
-          view._proxy_drag is not None and view._proxy_drag[0] is par,
-          "proxy_drag=None" if view._proxy_drag is None
-          else type(view._proxy_drag[0]).__name__)
-
-    def _parent_center() -> QPointF:
-        return QPointF(par.mapToScene(QPointF(0.0, 0.0)))
-
-    for _i in range(2):                     # 先让吸附偏移收敛到稳定值
-        QTest.mouseMove(view.viewport(), pos=_q)
-        app.processEvents()
-    _steady = _parent_center()
-    for _i in range(6):                     # 鼠标原地不动：图元不许再挪
-        QTest.mouseMove(view.viewport(), pos=_q)
-        app.processEvents()
-    _drift = _parent_center() - _steady
-    QTest.mouseRelease(view.viewport(), Qt.LeftButton, pos=_q)
-    QTest.keyRelease(view, Qt.Key_Control)
+    check("斜图元双击进入跟手", view.is_following())
+    _pc_before = par.page_center()
+    _a = view.mapToScene(_q)
+    _b = view.mapToScene(_q2)
+    _pa = scene.projection.inverse_point(_a.x(), _a.y())
+    _pb = scene.projection.inverse_point(_b.x(), _b.y())
+    QTest.mouseMove(view.viewport(), _q2)
     app.processEvents()
-    check("斜图元拖动：鼠标不动时图元不漂移（pos/scenePos 基准正确）",
-          abs(_drift.x()) < 0.5 and abs(_drift.y()) < 0.5,
-          f"drift=({_drift.x():.2f},{_drift.y():.2f})")
+    _pc_after = par.page_center()
+    check("斜图元跟手：位移 = 光标位移（自定义支点不影响）",
+          abs((_pc_after[0] - _pc_before[0]) - (_pb[0] - _pa[0])) < 1.0
+          and abs((_pc_after[1] - _pc_before[1]) - (_pb[1] - _pa[1])) < 1.0,
+          f"exp=({_pb[0]-_pa[0]:.2f},{_pb[1]-_pa[1]:.2f}) "
+          f"act=({_pc_after[0]-_pc_before[0]:.2f},{_pc_after[1]-_pc_before[1]:.2f})")
+    QTest.keyPress(view, Qt.Key_Escape)
+    app.processEvents()
     par.set_page_angle(0.0)
     par.set_page_origin(_pc[0], _pc[1])
     app.processEvents()
@@ -1141,56 +1140,41 @@ def main() -> int:
           f"moved=({mv2.x():.3f},{mv2.y():.3f})")
     view.snap.enabled = False
 
-    # ---- 拖动松手：吸附偏移 = 鼠标偏移，多选整体同量平移 ----
+    # ---- 多选按 T 吸附：位移 = 光标偏移，整体同量平移（左键拖动已取消）----
     buddy = scene.create_item("rect", center=(6000.0, 6120.0))
     buddy.set_page_size(80.0, 60.0)
     scene.clearSelection()
     far.setSelected(True)
     buddy.setSelected(True)
-    scene.set_movable_gate(True)
-    view.snap.enabled = True
+    view.snap.enabled = False
+    view._snap_offset = QPointF(0.0, 0.0)
     view.centerOn(far)                  # 挪到视口中央，方便发送鼠标事件
     app.processEvents()
 
     start = {it.item_id: QPointF(it.scenePos()) for it in (far, buddy)}
-    press_vp = view.mapFromScene(far.sceneBoundingRect().center())
-    QTest.mousePress(view.viewport(), Qt.LeftButton, Qt.NoModifier, press_vp)
-    view._set_hover(view.mapToScene(press_vp))
-    # 停在一个网格点右下 d 处：松手后应再走 (-dx, -dy)
-    end_vp = view.mapFromScene(QPointF(tgx + d * 0.5, tgy + d * 0.5))
-
-    def _send_move(vp) -> None:
-        QApplication.sendEvent(view.viewport(), QMouseEvent(
-            QEvent.MouseMove, QPointF(vp),
-            QPointF(view.viewport().mapToGlobal(vp)),
-            Qt.NoButton, Qt.LeftButton, Qt.NoModifier))
-
-    _send_move(press_vp)
-    _send_move(end_vp)
-    app.processEvents()
-    drag_hover = QPointF(view.snap.hover)
-    drag_target, _drag_kind = view.snap.aim(drag_hover,
-                                            exclude=view._selection_own_points())
-    QTest.mouseRelease(view.viewport(), Qt.LeftButton, Qt.NoModifier, end_vp)
+    hover2 = QPointF(tgx + d * 0.7, tgy + d * 0.4)
+    view._set_hover(hover2)
+    marker2, _kind2 = view.snap.aim(hover2,
+                                    exclude=view._selection_own_points(),
+                                    always=True)
+    check("多选时的吸附目标仍是最近捕捉点", marker2 is not None, f"marker={marker2}")
+    QTest.keyClick(view, Qt.Key_T)
     app.processEvents()
 
     offsets = {it.item_id: QPointF(it.scenePos()) - start[it.item_id]
                for it in (far, buddy)}
     same = _close_pt((offsets[far.item_id].x(), offsets[far.item_id].y()),
                      (offsets[buddy.item_id].x(), offsets[buddy.item_id].y()), 1e-6)
-    snap_extra = (0.0, 0.0) if drag_target is None else (
-        drag_target.x() - drag_hover.x(), drag_target.y() - drag_hover.y())
-    hand = view.mapToScene(end_vp) - view.mapToScene(press_vp)
-    tol = 1.5 / max(scale, 1e-9)        # mapFromScene 取整带来的 1px 误差
-    check("拖动松手：图元位移 = 鼠标位移 + 吸附偏移",
-          drag_target is not None
-          and abs(offsets[far.item_id].x() - (hand.x() + snap_extra[0])) < tol
-          and abs(offsets[far.item_id].y() - (hand.y() + snap_extra[1])) < tol,
+    snap_extra = (0.0, 0.0) if marker2 is None else (
+        marker2.x() - hover2.x(), marker2.y() - hover2.y())
+    check("多选按 T 吸附：位移 = 光标到捕捉点的偏移",
+          marker2 is not None
+          and abs(offsets[far.item_id].x() - snap_extra[0]) < 1e-6
+          and abs(offsets[far.item_id].y() - snap_extra[1]) < 1e-6,
           f"item=({offsets[far.item_id].x():.3f},{offsets[far.item_id].y():.3f}) "
-          f"hand=({hand.x():.3f},{hand.y():.3f}) snap=({snap_extra[0]:.3f},{snap_extra[1]:.3f})")
+          f"snap=({snap_extra[0]:.3f},{snap_extra[1]:.3f})")
     check("多选图元同步平移（保持相对位置）", same,
           f"{offsets[far.item_id]} vs {offsets[buddy.item_id]}")
-    scene.set_movable_gate(False)
     view.snap.enabled = False
 
     scene.delete_items([far, buddy])
@@ -1259,7 +1243,6 @@ def main() -> int:
                              QPointF(8700.0, 7700.0), QPointF(8500.0, 7700.0)])
     scene.clearSelection()
     probe.setSelected(True)
-    scene.set_movable_gate(True)
     view.snap.enabled = False
     view._snap_offset = QPointF(0.0, 0.0)
     app.processEvents()
@@ -1287,7 +1270,6 @@ def main() -> int:
     check("按 T 吸附到那个最近捕捉点（鼠标吸多少图元走多少）",
           abs(moved.x() - want.x()) < 1e-6 and abs(moved.y() - want.y()) < 1e-6,
           f"moved=({moved.x():.3f},{moved.y():.3f}) want=({want.x():.3f},{want.y():.3f})")
-    scene.set_movable_gate(False)
     view.snap.enabled = False
     scene.delete_items([probe.item_id])
     scene.clearSelection()
@@ -1793,6 +1775,239 @@ def main() -> int:
     check("退出运行预览后 proxy 清空", len(scene.widget_proxies) == 0,
           str(len(scene.widget_proxies)))
     scene.delete_items([pw])
+    app.processEvents()
+
+    print("\n=== 8.24 双击跟手：左键拖动取消后，图元随光标移动 ===")
+    view = window.view
+
+    def _vp_of(page_xy):
+        return view.mapFromScene(scene.projection.point(*page_xy))
+
+    def _page_of(vp):
+        sp = view.mapToScene(vp)
+        return scene.projection.inverse_point(sp.x(), sp.y())
+
+    fg = scene.create_item("rect", center=(12200.0, 8800.0), size=(80.0, 50.0))
+    fkid = scene.create_item("rect", center=(12200.0, 8800.0), size=(20.0, 20.0))
+    fkid.set_page_parent(fg.item_id)
+    fg.set_page_field("children_ids", [fkid.item_id])
+    scene.index.rebuild_links()
+    scene.clearSelection()
+    view.centerOn(scene.projection.point(12200.0, 8800.0))
+    app.processEvents()
+
+    start = fg.page_center()
+    kstart = fkid.page_center()
+    p0 = _vp_of(start)
+    QTest.mouseDClick(view.viewport(), Qt.LeftButton, Qt.NoModifier, p0)
+    app.processEvents()
+    check("双击图元进入跟手并选中它",
+          view.is_following() and fg.isSelected()
+          and [it.item_id for it in view._follow_items] == [fg.item_id],
+          f"following={view.is_following()} sel={[it.item_id for it in scene.selected_items()]}")
+
+    p1 = p0 + QPoint(48, -36)
+    QTest.mouseMove(view.viewport(), p1)
+    app.processEvents()
+    exp = (_page_of(p1)[0] - _page_of(p0)[0], _page_of(p1)[1] - _page_of(p0)[1])
+    act = (fg.page_center()[0] - start[0], fg.page_center()[1] - start[1])
+    check("跟手位移与光标位移一致（无需任何修饰键）",
+          abs(exp[0] - act[0]) < 0.6 and abs(exp[1] - act[1]) < 0.6,
+          f"exp=({exp[0]:.2f},{exp[1]:.2f}) act=({act[0]:.2f},{act[1]:.2f})")
+    kact = (fkid.page_center()[0] - kstart[0], fkid.page_center()[1] - kstart[1])
+    check("成员随根父对象刚体移动",
+          abs(kact[0] - act[0]) < 0.6 and abs(kact[1] - act[1]) < 0.6,
+          f"kid=({kact[0]:.2f},{kact[1]:.2f}) parent=({act[0]:.2f},{act[1]:.2f})")
+
+    dropped = fg.page_center()
+    QTest.mouseClick(view.viewport(), Qt.LeftButton, Qt.NoModifier, p1)
+    app.processEvents()
+    check("单击落定：退出跟手且停在当前位置",
+          not view.is_following()
+          and abs(fg.page_center()[0] - dropped[0]) < 1e-6
+          and abs(fg.page_center()[1] - dropped[1]) < 1e-6,
+          f"following={view.is_following()} pos={fg.page_center()}")
+
+    scene.clearSelection()
+    fg.setSelected(True)
+    p2 = _vp_of(fg.page_center())
+    QTest.mouseDClick(view.viewport(), Qt.LeftButton, Qt.NoModifier, p2)
+    app.processEvents()
+    QTest.mouseMove(view.viewport(), p2 + QPoint(60, 0))
+    app.processEvents()
+    moved = fg.page_center()
+    QTest.keyPress(view, Qt.Key_Escape)
+    app.processEvents()
+    check("Esc 放回抓住时的位置",
+          not view.is_following()
+          and abs(fg.page_center()[0] - dropped[0]) < 0.6
+          and abs(fg.page_center()[1] - dropped[1]) < 0.6
+          and (abs(moved[0] - dropped[0]) > 1.0
+               or abs(moved[1] - dropped[1]) > 1.0),
+          f"moved={moved} restored={fg.page_center()} was={dropped}")
+
+    scene.clearSelection()
+    kp = _vp_of(fkid.page_center())
+    QTest.mouseDClick(view.viewport(), Qt.LeftButton, Qt.NoModifier, kp)
+    app.processEvents()
+    check("双击子图元抓的是根父对象",
+          view.is_following()
+          and [it.item_id for it in view._follow_items] == [fg.item_id],
+          f"follow={[it.item_id for it in view._follow_items]} root={fg.item_id}")
+    QTest.keyPress(view, Qt.Key_Escape)
+    app.processEvents()
+
+    empty = None
+    for cand in (QPoint(3, 3), QPoint(3, view.viewport().height() - 4),
+                 QPoint(view.viewport().width() - 4, 3)):
+        if view._follow_target_at(cand) is None:
+            empty = cand
+            break
+    if empty is not None:
+        QTest.mouseDClick(view.viewport(), Qt.LeftButton, Qt.NoModifier, empty)
+        app.processEvents()
+    check("双击空白处不进入跟手",
+          empty is not None and not view.is_following(),
+          f"empty={empty}")
+
+    scene.clearSelection()
+    scene.delete_items([fg])      # 组树一起删掉（递归删除）
+    app.processEvents()
+
+    print("\n=== 8.25 跟手时滚轮缩放：锚点跟着光标，图元不乱跳 ===")
+    from Designer.CoreQGraphics.g_view import GraphicsView  # noqa: PLC0415
+
+    # 独立场景 / 视图：不污染主窗口的缩放与 §9 的可见范围判断
+    zscene = GraphicsScene()
+    zview = GraphicsView(zscene)
+    zview.resize(900, 600)
+    zview.show()
+    app.processEvents()
+    zit = zscene.create_item("rect", center=(300.0, 200.0), size=(160.0, 100.0))
+    zview.centerOn(zscene.projection.point(300.0, 200.0))
+    app.processEvents()
+
+    def _zwheel(vp, up=True):
+        gp = zview.viewport().mapToGlobal(vp)
+        ev = QWheelEvent(QPointF(vp), QPointF(gp), QPoint(),
+                         QPoint(0, 120 if up else -120),
+                         Qt.NoButton, Qt.NoModifier, Qt.NoScrollPhase, False)
+        app.sendEvent(zview.viewport(), ev)
+        app.processEvents()
+
+    zgrab = zview.mapFromScene(zscene.projection.point(300.0, 200.0))
+    QTest.mouseMove(zview.viewport(), zgrab)
+    app.processEvents()
+    QTest.mouseDClick(zview.viewport(), Qt.LeftButton, Qt.NoModifier, zgrab)
+    app.processEvents()
+    # 先跟手走一段：让跟手分支把基类的 lastMousePos 甩在后面（回归点）
+    zcur = zgrab + QPoint(30, 20)
+    QTest.mouseMove(zview.viewport(), zcur)
+    app.processEvents()
+    check("独立视图里双击进入跟手", zview.is_following())
+
+    anchor_a = zview.mapToScene(zcur)
+    zpage = zit.page_center()
+    _zwheel(zcur, True)
+    anchor_b = zview.mapToScene(zcur)
+    zpage2 = zit.page_center()
+    check("滚轮缩放以光标为锚点（画面不整体平移）",
+          abs(anchor_b.x() - anchor_a.x()) < 1.5
+          and abs(anchor_b.y() - anchor_a.y()) < 1.5,
+          f"err=({anchor_b.x()-anchor_a.x():.3f},{anchor_b.y()-anchor_a.y():.3f}) "
+          f"m11={zview.transform().m11():.3f}")
+    check("缩放是视图操作，不改图元位置",
+          abs(zpage2[0] - zpage[0]) < 1e-6 and abs(zpage2[1] - zpage[1]) < 1e-6,
+          f"page={zpage} -> {zpage2}")
+
+    # 缩放后继续拖：位移仍等于光标位移（基准已同步，不补一段）
+    za = zview.mapToScene(zcur)
+    zp = zit.page_center()
+    zcur2 = zcur + QPoint(40, 0)
+    QTest.mouseMove(zview.viewport(), zcur2)
+    app.processEvents()
+    zb = zview.mapToScene(zcur2)
+    zp2 = zit.page_center()
+    pa = zscene.projection.inverse_point(za.x(), za.y())
+    pb = zscene.projection.inverse_point(zb.x(), zb.y())
+    exp_page = (pb[0] - pa[0], pb[1] - pa[1])
+    check("缩放过一次后跟手位移依然对得上",
+          abs((zp2[0] - zp[0]) - exp_page[0]) < 1.2
+          and abs((zp2[1] - zp[1]) - exp_page[1]) < 1.2,
+          f"exp_page=({exp_page[0]:.2f},{exp_page[1]:.2f}) "
+          f"act=({zp2[0]-zp[0]:.2f},{zp2[1]-zp[1]:.2f})")
+    check("缩放后仍保持跟手状态", zview.is_following())
+
+    QTest.keyPress(zview, Qt.Key_Escape)
+    app.processEvents()
+
+    print("\n=== 8.3 画布导航门控（运行态复用同一套平移 / 缩放） ===")
+    check("设计态默认开启平移与缩放",
+          zview.is_pan_enabled() and zview.is_zoom_enabled()
+          and zview.is_canvas_navigation_enabled())
+    zview.set_canvas_navigation_enabled(False)
+    check("一次性关闭同时作用到两个开关",
+          not zview.is_pan_enabled() and not zview.is_zoom_enabled()
+          and not zview.is_canvas_navigation_enabled())
+
+    nav_pt = QPoint(zview.viewport().width() // 2,
+                    zview.viewport().height() // 2)
+    m_before = zview.transform().m11()
+    _zwheel(nav_pt, True)
+    check("门控关闭时滚轮不缩放",
+          abs(zview.transform().m11() - m_before) < 1e-9,
+          f"m11={zview.transform().m11():.6f} was={m_before:.6f}")
+
+    QTest.mousePress(zview.viewport(), Qt.MiddleButton, Qt.NoModifier, nav_pt)
+    app.processEvents()
+    panning_off = zview._panning
+    QTest.mouseMove(zview.viewport(), nav_pt + QPoint(30, 20))
+    QTest.mouseRelease(zview.viewport(), Qt.MiddleButton, Qt.NoModifier,
+                       nav_pt + QPoint(30, 20))
+    app.processEvents()
+    check("门控关闭时中键不进入平移", not panning_off)
+
+    QTest.keyPress(zview, Qt.Key_Space)
+    app.processEvents()
+    space_off = zview._space_held
+    QTest.keyRelease(zview, Qt.Key_Space)
+    app.processEvents()
+    check("门控关闭时空格不平移", not space_off)
+
+    zview.set_canvas_navigation_enabled(True)
+    m_before = zview.transform().m11()
+    _zwheel(nav_pt, True)
+    check("门控打开后滚轮恢复缩放",
+          zview.transform().m11() > m_before * 1.01,
+          f"m11={zview.transform().m11():.4f} was={m_before:.4f}")
+
+    QTest.mousePress(zview.viewport(), Qt.MiddleButton, Qt.NoModifier, nav_pt)
+    app.processEvents()
+    panning_on = zview._panning
+    QTest.mouseRelease(zview.viewport(), Qt.MiddleButton, Qt.NoModifier, nav_pt)
+    app.processEvents()
+    check("门控打开后中键恢复平移",
+          panning_on and not zview._panning,
+          f"press={panning_on} release={zview._panning}")
+
+    QTest.keyPress(zview, Qt.Key_Space)
+    app.processEvents()
+    space_on = zview._space_held
+    QTest.keyRelease(zview, Qt.Key_Space)
+    app.processEvents()
+    check("门控打开后空格恢复平移手势",
+          space_on and not zview._space_held,
+          f"press={space_on} release={zview._space_held}")
+
+    # 单独关闭某一个：只想"看细节不许拖走画面"的运行窗口用得上
+    zview.set_pan_enabled(False)
+    check("平移与缩放可单独关",
+          not zview.is_pan_enabled() and zview.is_zoom_enabled()
+          and not zview.is_canvas_navigation_enabled())
+    zview.set_canvas_navigation_enabled(True)
+
+    zview.close()
+    zview.deleteLater()
     app.processEvents()
 
     print("\n=== 9. 关窗不重写页面文件 ===")

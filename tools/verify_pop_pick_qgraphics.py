@@ -33,7 +33,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from PySide6.QtCore import QEventLoop, QPointF, QTimer, Qt  # noqa: E402
+from PySide6.QtCore import QEventLoop, QPoint, QPointF, QTimer, Qt  # noqa: E402
+from PySide6.QtGui import QWheelEvent  # noqa: E402
 from PySide6.QtWidgets import QApplication, QGraphicsItem, QGraphicsView  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 
@@ -305,6 +306,31 @@ def main() -> int:
     check("滚轮事件被忽略（不会缩放画布）", wheel.ignored
           and abs(view.transform().m11() - scale0) < 1e-9,
           f"{scale0} -> {view.transform().m11()}")
+
+    # 运行态不是「永远不能缩放」：门控是开关，窗口想要看细节时可以打开，
+    # 打开的只是中键 / 空格平移与滚轮缩放，左键依旧归 PageDeck 的翻页手势。
+    view.set_canvas_navigation_enabled(True)
+    check("运行态导航门控可以显式打开", view.is_canvas_navigation_enabled())
+    nav_pt = view.viewport().rect().center()
+    nav_ev = QWheelEvent(QPointF(nav_pt),
+                         QPointF(view.viewport().mapToGlobal(nav_pt)),
+                         QPoint(), QPoint(0, 120), Qt.NoButton, Qt.NoModifier,
+                         Qt.NoScrollPhase, False)
+    app.sendEvent(view.viewport(), nav_ev)
+    app.processEvents()
+    check("门控打开后滚轮真的缩放",
+          view.transform().m11() > scale0 * 1.01,
+          f"{scale0} -> {view.transform().m11()}")
+    QTest.mousePress(view.viewport(), Qt.MiddleButton, Qt.NoModifier, nav_pt)
+    app.processEvents()
+    panning_on = view._panning
+    QTest.mouseRelease(view.viewport(), Qt.MiddleButton, Qt.NoModifier, nav_pt)
+    app.processEvents()
+    check("门控打开后中键真的平移",
+          panning_on and not view._panning,
+          f"press={panning_on} release={view._panning}")
+    view.set_canvas_navigation_enabled(False)
+    check("可再关回去", not view.is_canvas_navigation_enabled())
     win._fit_view()
     check("适应窗口后变换有效", view.transform().m11() > 0,
           str(round(view.transform().m11(), 5)))

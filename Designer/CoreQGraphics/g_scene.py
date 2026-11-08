@@ -151,7 +151,8 @@ class GraphicsScene(QGraphicsScene):
         self._draw_item: BaseItem | None = None
         self._draw_type = ""
         self._draw_polygon = False
-        # 移动门控：仅当为 True 时图元可拖动（默认 False，需按住 CTRL）
+        # 可拖动开关：默认 False（左键拖动已取消，移动走双击跟手）；
+        # 仅外部脚本显式 set_movable_gate(True) 时才让图元带 ItemIsMovable
         self._movable_gate = False
         self.setSceneRect(WORLD_RECT)
         self.setItemIndexMethod(QGraphicsScene.BspTreeIndex)
@@ -536,10 +537,11 @@ class GraphicsScene(QGraphicsScene):
         return dict(self._widget_proxies)
 
     def set_movable_gate(self, enabled: bool) -> None:
-        """CTRL 门控：为 True 时图元可拖动，否则仅可选中、不可拖动。
+        """兼容用的「可拖动」开关：为 True 时图元带 ``ItemIsMovable``。
 
-        默认 False，即必须按住 CTRL 才能移动选中图元。运行模式恒不可拖动；
-        有父对象的图元也不行——它们的位姿只能由父对象带动。
+        视图**不再**打开它 —— 左键按下拖动图元已被取消（移动统一走双击
+        跟手），这里保留给外部脚本 / 旧调用方显式启用。运行模式恒不可拖动；
+        有父对象的图元也不行，它们的位姿只能由父对象带动。
         """
         self._movable_gate = bool(enabled)
         self.refresh_movable()
@@ -756,22 +758,35 @@ class GraphicsScene(QGraphicsScene):
         )
 
     def delete_items(self, items) -> int:
-        """删除图元：清 Qt 场景 + 索引 + 逻辑父子 + 其它记录的 children_ids。"""
+        """删除图元（含递归成员）：清 Qt 场景 + 索引 + 逻辑父子 + 残留引用。
+
+        与旧 Core ``base_element.Delete()`` 一致：删除组（或任何拥有成员的
+        图元）时先把它名下的成员全部递归删掉，嵌套组继续递归；不会像以前
+        那样只解除父子关系、把成员留成散图元。反方向不成立——成员不拥有
+        父对象，删成员只删它自己，父对象的 children_ids 由下面的兜底清理。
+        """
         ids = {
             it.item_id for it in items
             if isinstance(it, BaseItem) and it.item_id in self.index.by_id
         }
         if not ids:
             return 0
-        # 删组时保留子图元，只解除父子关系（与旧实现解组语义一致）
-        for gid in ids:
-            group = self.index.by_id.get(gid)
-            if group is not None and group.TYPE == "group":
-                for child in self.index.descendants(gid):
-                    child.set_page_field("parent_id", 0)
-                    child.set_page_field("group_id", 0)
+        # 递归展开后代。SceneIndex.descendants() 本身已是深度优先全展开，
+        # 用 list(ids) 快照遍历基集即可（后代的后代已在各自结果里）。
+        for pid in list(ids):
+            for child in self.index.descendants(pid):
+                ids.add(child.item_id)
         self.clearSelection()
         for iid in ids:
+            # 运行预览的真实控件独立于索引，必须按 id 一起收掉，否则会留在
+            # 场景里盖住别的东西（下一次 _sync_widget_proxies 才会清）。
+            proxy = self._widget_proxies.pop(iid, None)
+            if proxy is not None:
+                self.removeItem(proxy)
+                widget = proxy.widget()
+                proxy.setWidget(None)
+                if widget is not None:
+                    widget.deleteLater()
             item = self.index.by_id.pop(iid, None)
             if item is None:
                 continue
@@ -779,6 +794,8 @@ class GraphicsScene(QGraphicsScene):
             self._last_pose.pop(iid, None)
             if iid in self.index.order:
                 self.index.order.remove(iid)
+        # 兜底：别的记录里可能还留着指向已删 id 的 children_ids / parent_id
+        # （手工改过的 JSON、非法数据），一并清掉，避免索引指向不存在的图元。
         for it in self.all_items():
             rec = it.page_record()
             cids = rec.get("children_ids") or []

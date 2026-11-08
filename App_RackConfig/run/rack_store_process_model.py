@@ -7,9 +7,11 @@ from PySide6.QtCore import QObject, Signal,QPointF
 from PySide6.QtGui import QColor
 
 from .rack_store_model import LIGHT_COLORS, LightColor, normalize_light
-from Designer.Core.elements import base_element, group_element, text_element,rect_element,triangle_element
+from .rack_scene_adapter import (
+    base_element, group_element, text_element, rect_element, triangle_element,
+)
 
-from Designer.Core.myQuadTreeScene import SceneManager
+from .rack_scene_adapter import SceneManager
 
 #: DB12 里 IO 状态字的偏移（按模块）
 DB12_IO_WORD_OFFSETS = {"A": 30, "B": 32}

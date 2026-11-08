@@ -14,13 +14,13 @@ from common.tool import LoadWidget,LoadDialog
 from common.com.snap7 import PLCManager
 from common.com.snap7 import DataBroker
 
-from App_RackConfig.run import  RackStoreWindow,RackStoresWindow
+from App_RackConfig.run import  RackStoreWindowV2 as RackStoreWindow, RackStoresWindowV2 as RackStoresWindow
 
 from App_RackConfig.global_config import global_cfg
 
 from App_RackConfig.flip_clock import FlipDigit_Time_display
 
-from App_RackConfig.run.rack_global_paras_widget import RackGlobalParasWindow
+from App_RackConfig.run.rack_global_paras_widget_v2 import RackGlobalParasWindowV2
 
 from res.app_rack_config_resource_manager import resource_manager as res_mng
 
@@ -1515,7 +1515,7 @@ class WindowContainer(LoadWidget):
         middle_area: QFrame = self.ui.middle_area
         layout = QVBoxLayout()
 
-        w = RackGlobalParasWindow(plc_mgr,self)
+        w = RackGlobalParasWindowV2(plc_mgr,self)
         layout.addWidget(w)
         middle_area.setLayout(layout)
         middle_area.setMaximumWidth(400)

@@ -1,0 +1,416 @@
+{
+    "sceneRect": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 0.0,
+        "height": 0.0
+    },
+    "items": [
+        {
+            "id": 1,
+            "name": "group_8_group_6_矩形_1",
+            "type": "rect",
+            "parent_id": 6,
+            "children_ids": [],
+            "group_id": 6,
+            "center_pos": {
+                "x": -28.992,
+                "y": -2606.805
+            },
+            "origin_pos": {
+                "x": -28.992,
+                "y": -2606.805
+            },
+            "width": 277.7724658857887,
+            "height": 987.0089104103333,
+            "rotate": -129.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#55aaff",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 1.0
+        },
+        {
+            "id": 2,
+            "name": "group_8_group_6_三角形_2",
+            "type": "triangle",
+            "parent_id": 6,
+            "children_ids": [],
+            "group_id": 6,
+            "center_pos": {
+                "x": -353.927,
+                "y": -2770.501
+            },
+            "origin_pos": {
+                "x": -353.927,
+                "y": -2770.501
+            },
+            "width": 1129.518,
+            "height": 621.875,
+            "rotate": -129.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#55007f",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 2.0,
+            "vertices": [
+                {
+                    "x": 209.598,
+                    "y": -3042.869
+                },
+                {
+                    "x": -919.92,
+                    "y": -2501.865
+                },
+                {
+                    "x": -448.002,
+                    "y": -2420.994
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "name": "group_8_group_6_三角形_4",
+            "type": "triangle",
+            "parent_id": 6,
+            "children_ids": [],
+            "group_id": 6,
+            "center_pos": {
+                "x": 1.063,
+                "y": -2282.49
+            },
+            "origin_pos": {
+                "x": 1.063,
+                "y": -2282.49
+            },
+            "width": 773.203,
+            "height": 1027.584,
+            "rotate": -129.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#550000",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 3.0,
+            "vertices": [
+                {
+                    "x": 387.661,
+                    "y": -2796.262
+                },
+                {
+                    "x": -273.303,
+                    "y": -2171.486
+                },
+                {
+                    "x": -385.542,
+                    "y": -1768.678
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "name": "group_8_group_6_多边形_5",
+            "type": "polygon",
+            "parent_id": 6,
+            "children_ids": [],
+            "group_id": 6,
+            "center_pos": {
+                "x": -532.099,
+                "y": -2248.222
+            },
+            "origin_pos": {
+                "x": -532.099,
+                "y": -2248.222
+            },
+            "width": 646.201,
+            "height": 740.3790000000001,
+            "rotate": -129.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 4.0,
+            "vertices": [
+                {
+                    "x": -922.615,
+                    "y": -2505.467
+                },
+                {
+                    "x": -382.83,
+                    "y": -1765.088
+                },
+                {
+                    "x": -276.414,
+                    "y": -2168.463
+                },
+                {
+                    "x": -450.189,
+                    "y": -2431.34
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "name": "group_8_group_6",
+            "type": "group",
+            "parent_id": 8,
+            "children_ids": [
+                4,
+                2,
+                5,
+                1
+            ],
+            "group_id": 8,
+            "center_pos": {
+                "x": -201.949,
+                "y": -2557.305
+            },
+            "origin_pos": {
+                "x": -370.654,
+                "y": -1764.843
+            },
+            "width": 837.4026136527046,
+            "height": 1360.1001380418897,
+            "rotate": -129.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 5.0
+        },
+        {
+            "id": 7,
+            "name": "group_8_文本_7",
+            "type": "text",
+            "parent_id": 8,
+            "children_ids": [],
+            "group_id": 8,
+            "center_pos": {
+                "x": 19.806,
+                "y": -2645.216
+            },
+            "origin_pos": {
+                "x": -0.673,
+                "y": -2627.006
+            },
+            "width": 82.9063368509552,
+            "height": 450.6806946521884,
+            "rotate": 34.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 8
+            },
+            "zValue": 6.0,
+            "context": "文本回家看看"
+        },
+        {
+            "id": 8,
+            "name": "group_8",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                7,
+                6
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -201.949,
+                "y": -2557.305
+            },
+            "origin_pos": {
+                "x": -256.107,
+                "y": -2522.632
+            },
+            "width": 1144.7750947900372,
+            "height": 1583.7208813948835,
+            "rotate": 34.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 7.0
+        },
+        {
+            "id": 9,
+            "name": "图片_9",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -454.072,
+                "y": 2091.8
+            },
+            "origin_pos": {
+                "x": -409.545,
+                "y": 2034.551
+            },
+            "width": 1907.1341432119184,
+            "height": 3142.6276986754856,
+            "rotate": 45.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 8.0,
+            "image_path": "拣选工作站图片.png"
+        },
+        {
+            "id": 10,
+            "name": "图片_10",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 94.4571155836091,
+                "y": -1821.6729433981754
+            },
+            "origin_pos": {
+                "x": 94.4571155836091,
+                "y": -1821.6729433981754
+            },
+            "width": 320.0,
+            "height": 240.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 9.0,
+            "image_path": ""
+        },
+        {
+            "id": 11,
+            "name": "group_13_圆_11",
+            "type": "circle",
+            "parent_id": 13,
+            "children_ids": [],
+            "group_id": 13,
+            "center_pos": {
+                "x": -369.996,
+                "y": -801.536
+            },
+            "origin_pos": {
+                "x": -354.297,
+                "y": -830.944
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#ff55ff",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 10.0,
+            "radius_w": 166.29311241145015,
+            "radius_h": 460.50204688489094
+        },
+        {
+            "id": 12,
+            "name": "group_13_文本_12",
+            "type": "text",
+            "parent_id": 13,
+            "children_ids": [],
+            "group_id": 13,
+            "center_pos": {
+                "x": -619.382,
+                "y": -555.347
+            },
+            "origin_pos": {
+                "x": -731.233,
+                "y": -491.32
+            },
+            "width": 303.5928230642657,
+            "height": 925.949433180622,
+            "rotate": 29.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 31
+            },
+            "zValue": 11.0,
+            "context": "文本而奋斗"
+        },
+        {
+            "id": 13,
+            "name": "group_13",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                12,
+                11
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -619.381,
+                "y": -680.382
+            },
+            "origin_pos": {
+                "x": -219.175,
+                "y": -680.382
+            },
+            "width": 904.6111084939457,
+            "height": 1163.312078092058,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 12.0
+        }
+    ]
+}

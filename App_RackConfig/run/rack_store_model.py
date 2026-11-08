@@ -59,7 +59,24 @@ from PySide6.QtCore import QObject, Qt, QTimer, Signal,QPointF
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication
 
-from Designer.Core.elements import base_element, group_element, text_element
+# 图元接口来自适配层：既接受旧 Designer.Core 图元（旧窗口），也接受
+# CoreQGraphics 的适配壳（rack_scene_adapter）。本文件其余部分与后端无关。
+from .rack_scene_adapter import base_element, group_element, text_element
+
+
+def _is_text_like(item) -> bool:
+    """是不是文本图元。
+
+    三条路都要判：旧栈传进来的是 ``Designer.Core.elements.text_element`` 实例
+    （但它的类已不是本模块 import 的那个 ``text_element`` 了，所以 ``isinstance``
+    不成立），新栈传进来的是适配壳，靠 ``TYPE`` 标签判等。
+    """
+    if isinstance(item, text_element):
+        return True
+    if getattr(item, "TYPE", "") == "text":
+        return True
+    return type(item).__name__ == "text_element"
+
 
 # ---------------------------------------------------------------- 命名约定
 RACK_NAME_RE = re.compile(r"^料架(?P<rack>\d+)$")
@@ -1452,7 +1469,7 @@ class RackStoreModel(QObject):
         slot = self._slot(int(match.group("rack")), int(match.group("slot")))
         part_name = match.group("part")
         slot.parts[part_name] = item
-        if part_name == NUMBER and isinstance(item, text_element):
+        if part_name == NUMBER and _is_text_like(item):
             slot.number_label = item
 
     def _validate(self) -> None:

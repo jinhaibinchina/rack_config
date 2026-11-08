@@ -829,8 +829,10 @@ class RuntimeView(GraphicsView):
         super().__init__(scene, parent)
         self.scene_manager: Optional[RuntimeSceneManager] = None
         self._layer: Optional[RuntimeWidgetLayer] = None
-        self._canvas_navigation = False
         self._run_mode = False
+        # 导航门控交给 GraphicsView（set_pan_enabled / set_zoom_enabled）：
+        # 运行态默认全关，需要看细节时调 set_canvas_navigation_enabled(True)。
+        self.set_canvas_navigation_enabled(False)
         #: 动画期由 layer 精确标脏，忽略 PageDeck 每帧的整窗 ``update()``
         self._exact_repaint = False
         #: 视图变换稳定后再烘位图（fit 之前烘出来的是 1:1 大图，白费）
@@ -926,34 +928,38 @@ class RuntimeView(GraphicsView):
             self._layer.prewarm()
 
     # -- 画布导航 ------------------------------------------------------
-    def set_canvas_navigation_enabled(self, enable: bool) -> None:
-        self._canvas_navigation = bool(enable)
-
-    def is_canvas_navigation_enabled(self) -> bool:
-        return self._canvas_navigation
-
-    def wheelEvent(self, event) -> None:  # noqa: N802 - Qt 命名
-        if not self._canvas_navigation:
-            event.ignore()
-            return
-        super().wheelEvent(event)
+    # 开关本体在 GraphicsView（set_pan_enabled / set_zoom_enabled /
+    # set_canvas_navigation_enabled），这里不再另存一份状态，避免两套布尔值
+    # 打架。下面三个鼠标事件只在「正在平移」时才交给 GraphicsView，其余情况
+    # 直通 QGraphicsView —— 绕开设计器的框选 / CTRL 拖动 / 右键菜单 / 跟手。
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
-        # 绕过 GraphicsView 的绘制 / 框选 / CTRL 拖动 / 右键菜单，只保留
-        # QGraphicsView 对 proxy 控件的正常事件派发。
+        if self.is_pan_event(event):
+            GraphicsView.mousePressEvent(self, event)
+            return
         QGraphicsView.mousePressEvent(self, event)
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        if self._panning:
+            GraphicsView.mouseMoveEvent(self, event)
+            return
         QGraphicsView.mouseMoveEvent(self, event)
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        if self._panning:
+            GraphicsView.mouseReleaseEvent(self, event)
+            return
         QGraphicsView.mouseReleaseEvent(self, event)
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
         QGraphicsView.mouseDoubleClickEvent(self, event)
 
     def keyPressEvent(self, event) -> None:  # noqa: N802
-        # 运行态不响应设计器的 Ctrl+C/V、R、T 等快捷键
+        # 运行态不响应设计器的 Ctrl+C/V、R、T 等快捷键；只放行空格，
+        # 它在中键之外提供第二种平移手势（_pan_enabled 为假时基类会再挡一层）。
+        if event.key() == Qt.Key_Space and self.is_pan_enabled():
+            GraphicsView.keyPressEvent(self, event)
+            return
         event.ignore()
 
     # -- 坐标换算 ------------------------------------------------------

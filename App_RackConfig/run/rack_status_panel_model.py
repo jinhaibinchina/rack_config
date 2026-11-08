@@ -84,7 +84,7 @@ from PySide6.QtCore import QObject, Signal,QPointF
 from PySide6.QtGui import QColor
 
 from .rack_store_model import LIGHT_COLORS, LightColor, normalize_light
-from Designer.Core.elements import base_element, group_element, text_element
+from .rack_scene_adapter import base_element, group_element, text_element
 
 
 __all__ = [
