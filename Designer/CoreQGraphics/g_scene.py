@@ -37,6 +37,27 @@ from .g_widgets import (
 WORLD_RECT = QRectF(-100000, -100000, 200000, 200000)
 DEFAULT_BACKGROUND = "#bee1f59b"
 
+# 正交模式（F8）作用的图元：逐点落子的「点列」类。rect / circle 是两点定框的
+# 对角定义，锁轴反而画不出矩形，保持原行为。视图层与场景层共用这一份表。
+ORTHO_DRAW_TYPES = frozenset(("line", "triangle", "polygon", "path"))
+
+
+def _template_int(value):
+    """模板文件可能是手工编辑的，id 字段一律容错解析。"""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _template_point(value):
+    if not isinstance(value, dict):
+        return None
+    try:
+        return float(value["x"]), float(value["y"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
 # 新建图元的默认外观与尺寸（场景单位，与 Core 的 element_factory 口径一致）
 DEFAULT_STYLE = {
     "stroke": "#000000", "strokeWidth": 2, "fill": True,
@@ -383,15 +404,30 @@ class GraphicsScene(QGraphicsScene):
     # 吸附点 / 视图
     # ------------------------------------------------------------------
     def snap_points(self) -> tuple[list[QPointF], list[QPointF]]:
+        ends, mids, _owners = self.snap_points_with_owners()
+        return ends, mids
+
+    def snap_points_with_owners(
+            self) -> tuple[list[QPointF], list[QPointF], list[int]]:
+        """端点 / 中点，外加每个点所属图元的 id。
+
+        ``owners`` 与 ``ends + mids`` **同序**（先全部端点、再全部中点），
+        ``SnapSystem.update_points`` 按这个顺序把归属挂到坐标上，供视图按 T
+        抓起「这个捕捉点来自的图元」。老调用点继续用 ``snap_points()``。
+        """
         ends: list[QPointF] = []
         mids: list[QPointF] = []
+        end_owners: list[int] = []
+        mid_owners: list[int] = []
         for it in self.index.by_id.values():
             if not it.isVisible():
                 continue
             e, m = it.snap_points()
             ends.extend(e)
             mids.extend(m)
-        return ends, mids
+            end_owners.extend([it.item_id] * len(e))
+            mid_owners.extend([it.item_id] * len(m))
+        return ends, mids, end_owners + mid_owners
 
     def fit_rect(self, margin: float = 40.0) -> QRectF:
         """所有图元的可见包围盒（视图坐标），供 QGraphicsView.fitInView。"""
@@ -650,6 +686,30 @@ class GraphicsScene(QGraphicsScene):
         "rect": 2, "circle": 2, "line": 2, "triangle": 3,
         "polygon": -1, "path": -1,
     }
+    def constrain_ortho(self, anchor: QPointF, point: QPointF) -> tuple[QPointF, str]:
+        """把 ``point`` 相对 ``anchor`` 锁到屏幕水平 / 竖直，返回 ``(page 点, 轴)``。
+
+        约束**必须在视图坐标里做**：AGV 投影是「轴交换 + 双轴取反」
+        （``view = (-y*kx, -x*ky)``），page 的 Δy=0 在屏幕上其实是竖线，
+        page 的 Δx=0 反而是横线。所以先投影 → 按屏幕上较大的位移分量选主轴
+        → 把另一条轴钉回锚点 → 反投影回 page，画出来才是所见即所得。
+
+        轴标记 ``H``（屏幕水平，落盘后 page W=0）/ ``V``（屏幕竖直，
+        page H=0），正好对应属性面板「宽或高为 0 即水平 / 竖直线」的口径。
+        两点重合时原样返回、轴为空，避免零长度线。
+        """
+        proj = self.projection
+        a = proj.point(anchor.x(), anchor.y())
+        b = proj.point(point.x(), point.y())
+        dx, dy = b.x() - a.x(), b.y() - a.y()
+        if abs(dx) < 1e-12 and abs(dy) < 1e-12:
+            return QPointF(point), ""
+        if abs(dx) >= abs(dy):
+            locked, axis = QPointF(b.x(), a.y()), "H"
+        else:
+            locked, axis = QPointF(a.x(), b.y()), "V"
+        x, y = proj.inverse_point(locked.x(), locked.y())
+        return QPointF(x, y), axis
 
     def _draw_clicks(self, type_key: str) -> int:
         return self._DRAW_CLICKS.get(type_key, 1)
@@ -977,7 +1037,17 @@ class GraphicsScene(QGraphicsScene):
         return out
 
     def _capture_subtree(self, items) -> list[tuple[int, dict]]:
-        """按「父在子前」展平整棵子树，快照成 (原 id, page 记录)。"""
+        """展平整棵子树并快照成 (原 id, page 记录)，**按原 Z 序排列**。
+
+        展平本身是「父在子前」的树序遍历，但那**不是层级顺序**：
+        ``_instantiate`` 按快照下标写 ``z_base + i``，照树序写 z 会把组内
+        成员的相对层级打乱，连组框（z 最高）都会被压到副本最底层。
+
+        排序键是 ``(zValue, index.order 位次)``，与 ``SceneIndex.sorted_items()``
+        的稳定排序口径一致 —— 页面里大量图元 zValue 相同，层级完全靠 JSON
+        数组顺序定，同值必须退回数组顺序，不能退回树序。``_spawn`` 不依赖
+        「父已存在」（循环后统一 ``rebuild_links``），所以排序不会破坏父子关系。
+        """
         out: list[tuple[int, dict]] = []
         seen: set[int] = set()
         for top in self.top_level_items(items):
@@ -987,6 +1057,17 @@ class GraphicsScene(QGraphicsScene):
                 seen.add(it.item_id)
                 # to_page_record 会把尚未存盘的旋转烘焙进顶点，副本不丢姿态
                 out.append((it.item_id, copy.deepcopy(it.to_page_record())))
+        rank = {iid: i for i, iid in enumerate(self.index.order)}
+
+        def z_of(rec: dict) -> float:
+            try:
+                return float(rec.get("zValue", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        # Python 排序稳定：z 与位次都相同时保持原来的树序，不会抖
+        out.sort(key=lambda pair: (z_of(pair[1]),
+                                   rank.get(pair[0], len(rank))))
         return out
 
     @staticmethod
@@ -1095,6 +1176,98 @@ class GraphicsScene(QGraphicsScene):
         wanted = {id_map[o] for o in top_ids}
         return [it for it in made if it.item_id in wanted]
 
+    def instantiate_template(self, template, target: QPointF) -> BaseItem | None:
+        """把工具箱模板实例化到 ``target``（page 坐标），返回新的根组图元。
+
+        模板文件与旧设计器共用（``ToolboxTemplate.items`` 就是 page 记录，
+        捕获时根组中心已平移到原点）。这里复用 ``_instantiate`` 的重发 id /
+        重映射关系 / 组名前缀命名 / 整树统一偏移，只额外做三件事：
+
+        1. **可达性**：按 ``parent_id`` 从 root 做父在子前的 DFS，手工编辑过、
+           带悬空 id 的模板不会把无关图元一起带进来；
+        2. **保持层级**：按 ``(zValue, 模板数组顺序)`` 稳定排序再交给
+           ``_instantiate``（它按快照顺序写 ``z_base + i``）。154 个成员的
+           料架模板里 id 顺序和 z 顺序并不一致，按 id 排会把层级整个打乱；
+           zValue 大量相同时，兜底用模板 items 的数组顺序而不是 DFS 树序；
+        3. **失败回滚**：预校验全部类型，真出异常时删掉本次新建的图元。
+        """
+        raw_items = list(getattr(template, "items", ()) or ())
+        by_old: dict[int, dict] = {}
+        for rec in raw_items:
+            if not isinstance(rec, dict):
+                continue
+            old_id = _template_int(rec.get("id"))
+            if old_id is not None:
+                by_old[old_id] = rec
+        if not by_old:
+            raise ValueError("模板没有图元数据")
+
+        root_id = _template_int(getattr(template, "root_id", 0)) or 0
+        if root_id not in by_old:
+            # 兼容手工编辑过的模板：退化到第一个 parent_id 为 0 的记录
+            root_id = next(
+                (oid for oid, rec in by_old.items()
+                 if (_template_int(rec.get("parent_id")) or 0) == 0),
+                next(iter(by_old)),
+            )
+
+        children: dict[int, list[int]] = {}
+        for old_id, rec in by_old.items():
+            parent_old = _template_int(rec.get("parent_id")) or 0
+            if parent_old != old_id:
+                children.setdefault(parent_old, []).append(old_id)
+
+        reachable: list[int] = []
+        seen: set[int] = set()
+
+        def visit(old_id: int) -> None:
+            if old_id in seen or old_id not in by_old:
+                return
+            seen.add(old_id)
+            reachable.append(old_id)
+            for child in children.get(old_id, []):
+                visit(child)
+
+        visit(root_id)
+        if not reachable:
+            raise ValueError("模板没有可实例化的图元")
+        for old_id in reachable:
+            item_type = str(by_old[old_id].get("type") or "")
+            if item_type not in ITEM_TYPES:
+                raise ValueError(f"不支持的图元类型: {item_type or '<空>'}")
+
+        # z 升序 + **模板数组顺序**兜底：_instantiate 用「快照下标」写 z。
+        # 同值必须退回 raw_items 的数组顺序，不能退回 DFS 树序 —— 页面里
+        # 大量图元 zValue 相同，层级靠数组顺序定，用树序会把组内层级打乱。
+        def source_z(old_id: int) -> float:
+            try:
+                return float(by_old[old_id].get("zValue", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        array_rank = {oid: i for i, oid in enumerate(by_old)}
+        ordered = sorted(
+            reachable,
+            key=lambda oid: (source_z(oid),
+                             array_rank.get(oid, len(array_rank))))
+        root_center = _template_point(by_old[root_id].get("center_pos")) or (0.0, 0.0)
+        offset = (float(target.x()) - root_center[0],
+                  float(target.y()) - root_center[1])
+        snapshot = [(oid, copy.deepcopy(by_old[oid])) for oid in ordered]
+
+        before = set(self.index.by_id)
+        try:
+            made = self._instantiate(snapshot, offset)
+        except Exception:
+            extra = [it for iid, it in self.index.by_id.items() if iid not in before]
+            if extra:
+                try:
+                    self.delete_items(extra)
+                except Exception:
+                    pass
+            raise
+        return made[0] if made else None
+
     def copy_selected(self) -> int:
         """Ctrl+C：只剪顶层，但递归带整棵子树。"""
         self._clipboard = self._capture_subtree(self.selected_items())
@@ -1178,13 +1351,15 @@ class GraphicsScene(QGraphicsScene):
         self.geometryChanged.emit(None)
 
     def set_selected_origin(self, x: float, y: float) -> int:
-        """把选中图元的旋转支点设到同一个 page 场景点（右键「旋转中心设到此处」）。
+        """把选中图元的旋转支点设到同一个 page 场景点（按住 O + 右键「旋转中心设到此处」）。
 
         多个图元共用同一个支点是有意的：整组绕同一点转动时就靠它。
         可视中心不动，只换支点。
         """
         n = 0
         for it in self.selected_items():
+            if it.parentItem() is not None:
+                continue
             it.set_page_origin(float(x), float(y))
             n += 1
         if n:
@@ -1207,9 +1382,30 @@ class GraphicsScene(QGraphicsScene):
             self.contentChanged.emit()
         return n
 
+    def select_items(self, items, *, append: bool = False) -> None:
+        """批量选中：只发**一次** ``selectionChanged``。
+
+        逐项 ``setSelected`` 会让 Qt 每选中一个图元就发一次信号，而
+        ``DesignerWindow`` / ``LayerTreeDock`` / ``GraphicsView`` 的槽里都有
+        「遍历整棵树回灌选中 + 重建属性面板」这类随选中数增长的工作。全选
+        1600 个图元实测会被执行 1600 次、耗时数分钟（纯 Qt 选中本身只要
+        0.02s），表现就是「全选卡死」。这里屏蔽信号一次性设置完再补发一次，
+        最终选中集合、槽的可见结果与逐项选中完全一致。
+        """
+        targets = list(items)
+        was_blocked = self.blockSignals(True)
+        try:
+            if not append:
+                self.clearSelection()
+            for it in targets:
+                if it is not None:
+                    it.setSelected(True)
+        finally:
+            self.blockSignals(was_blocked)
+            self.selectionChanged.emit()
+
     def select_all_items(self) -> None:
-        for it in self.all_items():
-            it.setSelected(True)
+        self.select_items(self.all_items())
 
     def find_item_by_name(self, name: str) -> BaseItem | None:
         return next((it for it in self.all_items() if it.get_name() == name), None)

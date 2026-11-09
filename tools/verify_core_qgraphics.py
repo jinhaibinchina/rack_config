@@ -170,7 +170,13 @@ def main() -> int:
           before.get("backgroundColor") == after.get("backgroundColor"))
     check("items 条数一致", len(before["items"]) == len(after["items"]))
     check("items 逐条结构零改动", before["items"] == after["items"])
-    os.remove(tmp)
+    try:
+        os.remove(tmp)
+    except OSError as exc:
+        # 某些运行环境把 os.remove 接管成回收站操作，可能抛 OSError /
+        # PermissionError。临时文件是脚本自己刚写的，下次运行会覆盖，
+        # 清理失败不该把后面的 §4~§7 回归段落一起截断。
+        print(f"  [warn] 临时文件清理失败（不影响断言）: {exc}")
 
     print("\n=== 4. 渲染与确定性 ===")
     img_a = render(new, args.shot + ".png" if args.shot else "")
@@ -920,6 +926,178 @@ def main() -> int:
           and sg.children_ids == [sb.item_id]
           and sb.parent_id == sg.item_id,
           f"children={sg.children_ids}")
+
+    print("\n=== 6.11 组复制保持组内 Z 序（含 zValue 相同的数组顺序兜底） ===")
+
+    def check_group_copy_z(z_values, label):
+        zs = GraphicsScene()
+        members = []
+        for i, z in enumerate(z_values):
+            it = zs.create_item("rect", center=(1000.0 + i * 300.0, 1000.0))
+            it.set_page_field("zValue", z)
+            it.setSelected(True)
+            members.append(it)
+        grp = zs.group_selected()
+        # 原 Z 序：按 zValue 稳定排序，同值按 index.order（JSON 数组顺序）
+        orig_order = [it.item_id for it in zs.index.sorted_items()]
+        zs.clearSelection()
+        grp.setSelected(True)
+        zs.copy_selected()
+        snap = zs._clipboard
+        snap_z = [float(r.get("zValue", 0.0) or 0.0) for _, r in snap]
+        check(f"{label}：复制快照按原 Z 序排列（不是父在子前的树序）",
+              snap_z == sorted(snap_z), f"snap_z={snap_z}")
+
+        old_ids = set(zs.index.order)
+        made = zs.paste_clipboard((500.0, 500.0))
+        new_ids = sorted(i for i in zs.index.order if i not in old_ids)
+        zmap = {snap[i][0]: zs.find_item(new_ids[i])
+                for i in range(min(len(snap), len(new_ids)))}
+        ok_map = (len(made) == 1 and len(zmap) == len(snap)
+                  and all(v is not None for v in zmap.values()))
+        check(f"{label}：副本 id 配对完整", ok_map,
+              f"map={len(zmap)} snap={len(snap)}")
+        if not ok_map:
+            return
+        copies = [zmap[i] for i in orig_order]
+        by_z = sorted(copies, key=lambda it: it.zValue())
+        check(f"{label}：副本整体保持原 Z 序（含组框）",
+              [it.item_id for it in by_z] == [it.item_id for it in copies],
+              f"by_z={[it.item_id for it in by_z]} "
+              f"want={[it.item_id for it in copies]}")
+        gcopy = zmap[grp.item_id]
+        check(f"{label}：组框复制后仍在所有成员之上",
+              all(gcopy.zValue() > zmap[m.item_id].zValue() for m in members),
+              f"group={gcopy.zValue()} "
+              f"members={[zmap[m.item_id].zValue() for m in members]}")
+
+    check_group_copy_z([5.0, 1.0, 3.0], "z 值乱序")
+    check_group_copy_z([1.0, 1.0, 1.0], "z 值全相同")
+
+    # 模板实例化走另一条捕获路径（树序 DFS），同值兜底同样必须是模板
+    # items 的数组顺序。这里故意让「数组顺序」和「DFS 顺序」不同：
+    # 数组 A,B,C,组；从组出发 DFS 是 组,A,C,B（C 挂在 A 下面）。
+    import copy as _copy
+    from types import SimpleNamespace
+    tsrc = GraphicsScene()
+    ta = tsrc.create_item("rect", center=(1000.0, 1000.0))
+    tb = tsrc.create_item("rect", center=(1300.0, 1000.0))
+    tc = tsrc.create_item("rect", center=(1600.0, 1000.0))
+    tg = tsrc.create_item("group", center=(1300.0, 1400.0))
+    for it in (ta, tb, tc, tg):
+        it.set_page_field("zValue", 1.0)   # 全部同值，只能靠数组顺序定层级
+    tg.set_page_field("zValue", 2.0)
+    ta.set_page_parent(tg.item_id)
+    tb.set_page_parent(tg.item_id)
+    tc.set_page_parent(ta.item_id)
+    tg.set_page_field("children_ids", [ta.item_id, tb.item_id])
+    ta.set_page_field("children_ids", [tc.item_id])
+    tsrc.index.rebuild_links()
+    tpl_items = [_copy.deepcopy(tsrc.index.by_id[i].to_page_record())
+                 for i in (ta.item_id, tb.item_id, tc.item_id, tg.item_id)]
+    tpl = SimpleNamespace(items=tpl_items, root_id=tg.item_id)
+
+    tscene = GraphicsScene()
+    tscene.instantiate_template(tpl, QPointF(1300.0, 1400.0))
+    tnew = sorted(tscene.index.order)
+    by_z = sorted((tscene.find_item(i) for i in tnew),
+                  key=lambda it: it.zValue())
+    got_keys = [(it.TYPE, round(it.page_center()[0], 1)) for it in by_z]
+    want_keys = [("rect", 1000.0), ("rect", 1300.0),
+                 ("rect", 1600.0), ("group", 1300.0)]
+    check("模板实例化同值层级按数组顺序（不是 DFS 树序）",
+          got_keys == want_keys, f"got={got_keys} want={want_keys}")
+
+    print("\n=== 6.12 自定义支点子图元：父旋转时父系位姿恒定 ===")
+    # 报障场景：A 的旋转中心 ≠ 可视中心（O + 右键设到绝对点），B 设为 A 的父，
+    # 旋转 B 时 A 必须在父坐标系里保持刚体位姿，图形本体也不能漂。
+    # 顶点类不能拿 frame_corners（那是旋转后的 AABB 角），要取真实顶点。
+    def rigid_points(scene, it):
+        if hasattr(it, "_live_page_points"):
+            return [it.world_to_local(x, y)
+                    for x, y in it._live_page_points()]
+        p = scene.projection
+        return [it.world_to_local(*p.inverse_point(q.x(), q.y()))
+                for q in it.frame_corners()]
+
+    for typ in ("rect", "line", "triangle", "polygon", "path"):
+        ps = GraphicsScene()
+        pb = ps.create_item("rect", center=(1000.0, 1000.0))
+        pb.set_page_size(200.0, 100.0)
+        pa = ps.create_item(typ, center=(1200.0, 1000.0))
+        ps.clearSelection()
+        pa.setSelected(True)
+        ps.set_selected_origin(1250.0, 1050.0)       # O + 右键：绝对点作支点
+        pa.set_page_parent(pb.item_id)
+        ps.index.rebuild_links()
+        c0 = pa.page_local_center()
+        o0 = pa.page_local_origin()
+        a0 = pa.page_local_angle()
+        pts0 = rigid_points(ps, pa)
+        pb.set_page_angle(30.0)
+        c1 = pa.page_local_center()
+        o1 = pa.page_local_origin()
+        a1 = pa.page_local_angle()
+        pts1 = rigid_points(ps, pa)
+        dev = max([abs(c1[0] - c0[0]), abs(c1[1] - c0[1]),
+                   abs(o1[0] - o0[0]), abs(o1[1] - o0[1]), abs(a1 - a0)]
+                  + [max(abs(u[0] - v[0]), abs(u[1] - v[1]))
+                     for u, v in zip(pts0, pts1)])
+        check("%s：父旋转 30° 后子图元父系位姿零漂移" % typ,
+              len(pts0) == len(pts1) and dev < 1e-3,
+              f"pts={len(pts0)} max_dev={dev:.6f}")
+
+    # O + 右键对「所有选中图元」生效：父自己也可能同时被改了支点
+    qs = GraphicsScene()
+    qb = qs.create_item("rect", center=(1000.0, 1000.0))
+    qb.set_page_size(200.0, 100.0)
+    qa = qs.create_item("rect", center=(1200.0, 1000.0))
+    qs.clearSelection()
+    qa.setSelected(True)
+    qb.setSelected(True)
+    qs.set_selected_origin(1250.0, 1050.0)
+    qa.set_page_parent(qb.item_id)
+    qs.index.rebuild_links()
+    c0, o0 = qa.page_local_center(), qa.page_local_origin()
+    p0 = rigid_points(qs, qa)
+    qb.set_page_angle(30.0)
+    c1, o1 = qa.page_local_center(), qa.page_local_origin()
+    p1 = rigid_points(qs, qa)
+    dev = max([abs(c1[0] - c0[0]), abs(c1[1] - c0[1]),
+               abs(o1[0] - o0[0]), abs(o1[1] - o0[1])]
+              + [max(abs(u[0] - v[0]), abs(u[1] - v[1]))
+                 for u, v in zip(p0, p1)])
+    check("父也带自定义支点时，子的图形四角在父系里仍恒定",
+          dev < 1e-3, f"max_dev={dev:.6f}")
+
+    # 报障根因：Qt 拖动（moveBy / 双击跟手）只改 pos，走 shift_origin_by；
+    # 旧版「默认支点」分支只更新 _page_center、没同步 _origin_xy，导致
+    # live_page_pose 把默认支点误判成自定义支点（支点＝拖之前的旧中心）。
+    # 父随后旋转就绕旧中心转，整棵子树相对父漂移，面板父系 X/Y 也跟着变。
+    for amt in ((12.0, -8.0), (-30.0, 20.0)):
+        ds = GraphicsScene()
+        db = ds.create_item("rect", center=(1000.0, 1000.0))
+        db.set_page_size(200.0, 100.0)
+        da = ds.create_item("rect", center=(1200.0, 1000.0))
+        da.set_page_size(100.0, 80.0)
+        da.set_page_parent(db.item_id)
+        ds.index.rebuild_links()
+        ds.clearSelection()
+        da.setSelected(True)
+        ds.set_selected_origin(1250.0, 1050.0)
+        db.moveBy(amt[0], amt[1])          # Qt 层拖动 / 双击跟手
+        live = db.live_page_pose()[:2]
+        check("拖动后默认支点的 _origin_xy 与实时中心一致 %s" % (amt,),
+              abs(db._origin_xy[0] - live[0]) < 1e-6
+              and abs(db._origin_xy[1] - live[1]) < 1e-6,
+              f"origin={db._origin_xy} live={live}")
+        c0, o0 = da.page_local_center(), da.page_local_origin()
+        db.set_page_angle(30.0)
+        c1, o1 = da.page_local_center(), da.page_local_origin()
+        dev = max(abs(c1[0] - c0[0]), abs(c1[1] - c0[1]),
+                  abs(o1[0] - o0[0]), abs(o1[1] - o0[1]))
+        check("父被 Qt 拖动 %s 后再旋转：子父系位姿零漂移" % (amt,),
+              dev < 1e-3, f"max_dev={dev:.6f}")
 
     print("\n=== 7. 性能对照请用独立基准 ===")
     print("  第 4~6 节已修改过场景状态，此处帧耗时不可比，故不采样。")

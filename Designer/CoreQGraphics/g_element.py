@@ -396,14 +396,17 @@ class BaseItem(QGraphicsItem):
 
         角度为 0 时 Qt 不使用变换原点，支点只能靠 ``_origin_xy`` 维护，所以拖动
         必须显式补这一步，否则转起来会绕到旧位置。
+
+        **默认支点同样要同步 ``_origin_xy``**：``live_page_pose()`` 是拿
+        ``_origin_xy`` 与「实时可视中心」比较来判定是否为默认支点的。只更新
+        ``_page_center`` 而把 ``_origin_xy`` 留在拖动前的位置，下一次读位姿就
+        会把默认支点误判成「自定义支点」（支点＝拖之前的旧中心）。父图元随后
+        旋转会绕旧中心转，整棵子树相对父漂移，属性面板的父系 X/Y 也跟着变。
         """
         if abs(dx) < 1e-12 and abs(dy) < 1e-12:
             return
         ccx, ccy = self._page_center
         ox, oy = self._origin_xy
-        if abs(ox - ccx) < 0.05 and abs(oy - ccy) < 0.05:
-            self._page_center = (ccx + dx, ccy + dy)
-            return
         self._origin_xy = (ox + dx, oy + dy)
         self._page_center = (ccx + dx, ccy + dy)
         if "origin_pos" in self._page:

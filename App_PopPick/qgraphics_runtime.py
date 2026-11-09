@@ -960,6 +960,15 @@ class RuntimeView(GraphicsView):
         if event.key() == Qt.Key_Space and self.is_pan_enabled():
             GraphicsView.keyPressEvent(self, event)
             return
+        # 页内输入框（QLineEdit / QDoubleSpinBox）挂在两层嵌套的
+        # QGraphicsProxyWidget 里，系统焦点落在 RuntimeView 上，键盘事件只能靠
+        # 「QGraphicsView.keyPressEvent → scene 焦点项 → proxy」这条链送进去。
+        # 原先一律 ignore()，结果输入框点得进去却打不了字。这里只在场景确实
+        # 有焦点项时转发，刻意绕开 GraphicsView（设计器快捷键都挂在它上面）。
+        scene = self.scene()
+        if scene is not None and scene.focusItem() is not None:
+            QGraphicsView.keyPressEvent(self, event)
+            return
         event.ignore()
 
     # -- 坐标换算 ------------------------------------------------------

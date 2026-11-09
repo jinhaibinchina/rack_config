@@ -27,6 +27,14 @@ from .g_style import (
 )
 from .g_widgets import paint_variant
 
+# 零厚度轴的「命中带」半宽（page 场景单位）。水平线 / 竖直线的几何包围盒
+# 有一条边长度为 0，Qt 默认用 boundingRect() 做命中测试，退化矩形点不中，
+# 所以两侧各外扩这么宽，让线仍然可以点选 / 框选。60 的总带宽沿用旧 Core
+# 的口径（``line_element.update_boundingRect`` 里的 60 / 30）。
+LINE_HIT_HALF = 30.0
+# 触发加厚的「细轴」判定阈值，与旧 Core 一致
+LINE_THIN_AXIS = 6.0
+
 
 def _selection_overlay(painter: QPainter, item: BaseItem) -> None:
     if not item.isSelected():
@@ -702,16 +710,17 @@ class LineItem(_PointBasedItem):
         self._setup_line(hx, hy, ex, ey, cx, cy, angle)
 
     def _setup_line(self, hx, hy, ex, ey, cx, cy, angle) -> None:
-        # 旧 line.update_boundingRect：细轴强制加厚到 60 场景单位
+        # 零厚度轴要留一条「命中带」才能点选 / 框选。旧 Core 想加厚到 60，
+        # 但 setWidth(60) + setLeft(-30) 的顺序错了：QRectF.setLeft 只挪左
+        # 边、保持右边不动，结果宽度变 90、中心还往一侧偏 15。这里改成
+        # 两侧对称外扩，中心仍钉在线上（拖角手柄 / 选中框才不会歪）。
         left, right = min(hx, ex), max(hx, ex)
         top, bottom = min(hy, ey), max(hy, ey)
         rect = QRectF(QPointF(left, top), QPointF(right, bottom))
-        if abs(rect.width()) < 6.0 and abs(rect.height()) > 6.0:
-            rect.setWidth(60.0)
-            rect.setLeft(rect.left() - 30.0)
-        elif abs(rect.height()) < 6.0 and abs(rect.width()) > 6.0:
-            rect.setHeight(60.0)
-            rect.setTop(rect.top() - 30.0)
+        if abs(rect.width()) < LINE_THIN_AXIS and abs(rect.height()) > LINE_THIN_AXIS:
+            rect.adjust(-LINE_HIT_HALF, 0.0, LINE_HIT_HALF, 0.0)
+        elif abs(rect.height()) < LINE_THIN_AXIS and abs(rect.width()) > LINE_THIN_AXIS:
+            rect.adjust(0.0, -LINE_HIT_HALF, 0.0, LINE_HIT_HALF)
         p = self._proj
         center = p.point(cx, cy)
         self._suppress_geo = True
@@ -725,6 +734,38 @@ class LineItem(_PointBasedItem):
         self._local_rect = p.rect(rect).translated(-center.x(), -center.y())
         self._w_view = self._local_rect.width()
         self._h_view = self._local_rect.height()
+
+    def set_page_size(self, w: float, h: float) -> None:
+        """直线专用 W/H：某一轴为 0 即水平 / 竖直线，两轴不能同时为 0。
+
+        基类按「当前尺寸 × 比例」缩放顶点，遇到 0 轴没有比例基准（0 乘任何
+        数还是 0），也无法从 0 重新拉开。这里对「目标或当前含 0」的情况直接
+        重写两个端点：先在自身坐标系（反转 -angle）里以线段中心为基点把两端
+        对称张开 ±w/2 / ±h/2，再转回 page 绝对坐标。端点原有的左右 / 上下
+        次序保留，改完不会把线段翻向；中心与支点都不动，旋转烘焙进端点后
+        ``set_page_head_end`` 默认路径会把 ``rotate`` 归零，两者正好一致。
+
+        两轴都非 0 仍走基类，保留「自身坐标系缩放 + 支点 / 旋转记账」语义。
+        """
+        if w <= 0 and h <= 0:
+            return
+        cur_w, cur_h = self.page_size()
+        if w > 0 and h > 0 and cur_w > 1e-6 and cur_h > 1e-6:
+            return super().set_page_size(w, h)
+        pts = self._live_page_points()
+        if len(pts) < 2:
+            return
+        angle = self.page_angle()
+        cx, cy = self.page_center()
+        a = rotate_xy(pts[0][0], pts[0][1], cx, cy, -angle)
+        b = rotate_xy(pts[1][0], pts[1][1], cx, cy, -angle)
+        sx = 1.0 if b[0] >= a[0] else -1.0
+        sy = 1.0 if b[1] >= a[1] else -1.0
+        hw, hh = max(float(w), 0.0) / 2.0, max(float(h), 0.0) / 2.0
+        head = rotate_xy(cx - sx * hw, cy - sy * hh, cx, cy, angle)
+        end = rotate_xy(cx + sx * hw, cy + sy * hh, cx, cy, angle)
+        # 不传 pivot：中心没变，_rebase_pivot 会把自定义支点原样留下。
+        self.set_page_head_end(QPointF(*head), QPointF(*end))
 
     def draw_step(self, points: list[QPointF], preview: QPointF | None) -> bool:
         """第一点=起点，第二点（或光标）=终点。"""

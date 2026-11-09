@@ -19,6 +19,7 @@ import json
 import math
 import os
 import sys
+import time
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, ".")
@@ -904,7 +905,7 @@ def main() -> int:
     app.processEvents()
     view.snap.enabled = prev_snap2
 
-    print("\n=== 8.13 右键指定旋转中心 ===")
+    print("\n=== 8.13 O + 右键指定旋转中心 ===")
     scene.clearSelection()
     rot2 = scene.create_item("rect", center=(800.0, 800.0))
     rot2.set_page_size(300.0, 200.0)
@@ -916,20 +917,24 @@ def main() -> int:
     vp_hinge = window.view.mapFromScene(
         scene.projection.point(hinge.x(), hinge.y()))
     hp = QPoint(int(vp_hinge.x()), int(vp_hinge.y()))
+    # 新交互：按住 O + 右键把选中图元旋转中心设到点击处（不再走右键菜单）
+    QTest.keyPress(view, Qt.Key_O)
+    app.processEvents()
     QTest.mousePress(view.viewport(), Qt.RightButton, Qt.NoModifier, hp)
     QTest.mouseRelease(view.viewport(), Qt.RightButton, Qt.NoModifier, hp)
+    QTest.keyRelease(view, Qt.Key_O)
     app.processEvents()
     ctx = window.view.context_page_point()
     px_tol = 4.0 / max(scene.projection.kx, 1e-9)
-    check("右键位置已换算成 page 坐标",
+    check("O + 右键位置已换算成 page 坐标",
           ctx is not None and abs(ctx.x() - 900.0) < px_tol
           and abs(ctx.y() - 800.0) < px_tol, str(ctx))
     menu_labels = [a.text() for a in window.view.build_context_menu().actions() if a.text()]
-    check("右键菜单含「旋转中心设到此处」", "旋转中心设到此处" in menu_labels,
-          str(menu_labels[:4]))
-    window._do("origin_here")
-    app.processEvents()
-    check("旋转中心落到右键位置",
+    check("右键菜单已移除「旋转中心设到此处」",
+          "旋转中心设到此处" not in menu_labels, str(menu_labels[:4]))
+    check("右键菜单已移除「旋转中心复位到图元中心」",
+          "旋转中心复位到图元中心" not in menu_labels, str(menu_labels[:4]))
+    check("O + 右键把旋转中心落到点击处",
           abs(rot2.page_origin()[0] - ctx.x()) < 1.0
           and abs(rot2.page_origin()[1] - ctx.y()) < 1.0,
           f"{rot2.page_origin()} vs {ctx}")
@@ -1124,23 +1129,26 @@ def main() -> int:
     QTest.keyClick(view, Qt.Key_T)
     app.processEvents()
     mv = far.scenePos() - before
-    want = (tgx - hover.x(), tgy - hover.y())
-    check("按下 T 立即吸附到最近捕捉点",
-          view.snap.enabled and abs(mv.x() - want[0]) < 1e-6
-          and abs(mv.y() - want[1]) < 1e-6,
-          f"moved=({mv.x():.3f},{mv.y():.3f}) want=({want[0]:.3f},{want[1]:.3f})")
+    check("按下 T 光标吸附到最近捕捉点（仅选中时图元不动）",
+          view.snap.enabled
+          and abs(mv.x()) < 1e-6 and abs(mv.y()) < 1e-6
+          and view._last_hover is not None
+          and abs(view._last_hover.x() - tgx) < 1e-6
+          and abs(view._last_hover.y() - tgy) < 1e-6,
+          f"moved=({mv.x():.3f},{mv.y():.3f}) hover={view._last_hover} "
+          f"target=({tgx:.3f},{tgy:.3f})")
 
     before2 = QPointF(far.scenePos())
-    QTest.keyClick(view, Qt.Key_T)     # 关
-    QTest.keyClick(view, Qt.Key_T)     # 再开
+    QTest.keyClick(view, Qt.Key_T)     # 一次性动作键，连续按两次
+    QTest.keyClick(view, Qt.Key_T)
     app.processEvents()
     mv2 = far.scenePos() - before2
-    check("重复开关 T 不会重复推图元",
+    check("连续按 T 不会移动图元（T 已不是开关门控）",
           abs(mv2.x()) < 1e-6 and abs(mv2.y()) < 1e-6,
           f"moved=({mv2.x():.3f},{mv2.y():.3f})")
     view.snap.enabled = False
 
-    # ---- 多选按 T 吸附：位移 = 光标偏移，整体同量平移（左键拖动已取消）----
+    # ---- 多选按 T（未抓手）：只吸光标，任何图元都不动 ----
     buddy = scene.create_item("rect", center=(6000.0, 6120.0))
     buddy.set_page_size(80.0, 60.0)
     scene.clearSelection()
@@ -1165,15 +1173,16 @@ def main() -> int:
                for it in (far, buddy)}
     same = _close_pt((offsets[far.item_id].x(), offsets[far.item_id].y()),
                      (offsets[buddy.item_id].x(), offsets[buddy.item_id].y()), 1e-6)
-    snap_extra = (0.0, 0.0) if marker2 is None else (
-        marker2.x() - hover2.x(), marker2.y() - hover2.y())
-    check("多选按 T 吸附：位移 = 光标到捕捉点的偏移",
+    check("多选（未抓手）按 T：图元不动，光标吸到最近捕捉点",
           marker2 is not None
-          and abs(offsets[far.item_id].x() - snap_extra[0]) < 1e-6
-          and abs(offsets[far.item_id].y() - snap_extra[1]) < 1e-6,
-          f"item=({offsets[far.item_id].x():.3f},{offsets[far.item_id].y():.3f}) "
-          f"snap=({snap_extra[0]:.3f},{snap_extra[1]:.3f})")
-    check("多选图元同步平移（保持相对位置）", same,
+          and abs(offsets[far.item_id].x()) < 1e-6
+          and abs(offsets[far.item_id].y()) < 1e-6
+          and view._last_hover is not None
+          and abs(view._last_hover.x() - marker2.x()) < 1e-6
+          and abs(view._last_hover.y() - marker2.y()) < 1e-6,
+          f"offset=({offsets[far.item_id].x():.3f},{offsets[far.item_id].y():.3f}) "
+          f"hover={view._last_hover} marker={marker2}")
+    check("多选图元保持相对位置（都不移动）", same,
           f"{offsets[far.item_id]} vs {offsets[buddy.item_id]}")
     view.snap.enabled = False
 
@@ -1267,9 +1276,13 @@ def main() -> int:
     app.processEvents()
     moved = QPointF(probe.scenePos()) - before
     want = (QPointF(0.0, 0.0) if marker is None else marker - hover_pt)
-    check("按 T 吸附到那个最近捕捉点（鼠标吸多少图元走多少）",
-          abs(moved.x() - want.x()) < 1e-6 and abs(moved.y() - want.y()) < 1e-6,
-          f"moved=({moved.x():.3f},{moved.y():.3f}) want=({want.x():.3f},{want.y():.3f})")
+    check("仅选中按 T 只吸光标、图元不动（旧兜底已移除）",
+          abs(moved.x()) < 1e-6 and abs(moved.y()) < 1e-6
+          and marker is not None and view._last_hover is not None
+          and abs(view._last_hover.x() - marker.x()) < 1e-6
+          and abs(view._last_hover.y() - marker.y()) < 1e-6,
+          f"moved=({moved.x():.3f},{moved.y():.3f}) "
+          f"hover={view._last_hover} marker={marker}")
     view.snap.enabled = False
     scene.delete_items([probe.item_id])
     scene.clearSelection()
@@ -2064,17 +2077,24 @@ def main() -> int:
                 12, _is_red_cross),
           f"vp=({hv.x()},{hv.y()})")
 
-    # 选中这条线后再凑近它自己的端点：十字仍然要显示（只是不参与吸附）
+    # 选中这条线后再凑近它自己的端点：自身点彻底不纳入扫描。
+    # 这里的端点恰好压在网格交汇点上，同坐标仍能吸到**格点**十字，但它
+    # 已经不是「图元自身特征点」了；真正验证「不显示」的是 §8.27（那里的
+    # 端点特意挑在不落在格点上的位置）。
     hline.setSelected(True)
     app.processEvents()
     QTest.mouseMove(nview.viewport(), QPoint(hv.x() + 2, hv.y() + 1))
     app.processEvents()
     mk2, act2 = nview._hover_marker()
-    check("选中后靠近自身端点仍显示十字",
+    check("选中后自身端点进入排除集合（不纳入捕捉点扫描）",
+          (head.x(), head.y()) in nview._selection_own_points(),
+          f"own={len(nview._selection_own_points())}")
+    check("光标处仍是唯一一个十字（来自同坐标的网格点）",
           mk2 is not None
           and _close_pt((mk2.x(), mk2.y()), (head.x(), head.y()), 1e-6),
           f"marker={mk2}")
-    check("自身端点只作显示、不参与吸附（十字不加粗）", act2 is False)
+    check("自身点不再作为吸附目标（active 只由门控决定）",
+          act2 == bool(nview.snap.enabled), f"active={act2}")
     hover_pt = QPointF(nview.snap.hover)
     snap_target, _sk = nview.snap.aim(hover_pt,
                                       exclude=nview._selection_own_points(),
@@ -2085,14 +2105,465 @@ def main() -> int:
     app.processEvents()
     moved = QPointF(hline.scenePos()) - keep
     want = QPointF(0.0, 0.0) if snap_target is None else snap_target - hover_pt
-    check("按 T 吸的仍是「格点 / 别人的点」，不会吸到自己端点上",
-          abs(moved.x() - want.x()) < 1e-6 and abs(moved.y() - want.y()) < 1e-6,
+    check("按 T 不吸到自身端点，且仅选中时图元不移动",
+          abs(moved.x()) < 1e-6 and abs(moved.y()) < 1e-6
+          and snap_target is not None and nview._last_hover is not None
+          and math.hypot(nview._last_hover.x() - snap_target.x(),
+                         nview._last_hover.y() - snap_target.y()) < 1e-6,
           f"moved=({moved.x():.3f},{moved.y():.3f}) "
-          f"want=({want.x():.3f},{want.y():.3f})")
+          f"hover={nview._last_hover} target={snap_target}")
 
     nview.snap.enabled = False
     nview.close()
     nview.deleteLater()
+    app.processEvents()
+
+    print("\n=== 8.27 T 键：抓起图元捕捉点 → 排除自身点 → 按 T 对齐到别的捕捉点 ===")
+    # 独立场景 / 视图：不污染主窗口，也不影响 §9 的可见范围判断
+    tscene = GraphicsScene()
+    tview = GraphicsView(tscene)
+    tview.resize(900, 600)
+    tview.show()
+    app.processEvents()
+
+    # 故意用非整十的 page 坐标：端点不会恰好压在网格交汇点上，
+    # 这样「十字来自图元点还是格点」可以明确区分。
+    ga = tscene.create_item("rect", center=(1013.0, 987.0))
+    ga.set_page_size(207.0, 123.0)
+    gb = tscene.create_item("rect", center=(1613.0, 987.0))
+    gb.set_page_size(207.0, 123.0)
+    tview.centerOn(tscene.projection.point(1300.0, 1000.0))
+    app.processEvents()
+    tview.refresh_snap_points()
+
+    def grid_gap(p):
+        gx, gy = tview.snap.nearest_grid(p)
+        return math.hypot(p.x() - gx, p.y() - gy)
+
+    def off_grid(pts):
+        for p in pts:
+            if grid_gap(p) > 1e-6:
+                return QPointF(p)
+        return QPointF(pts[0])
+
+    a_ends, a_mids = ga.snap_points()
+    b_ends, b_mids = gb.snap_points()
+    a_anchor = off_grid(a_ends)
+    b_target = off_grid(b_ends)
+    check("两个捕捉点都不压在网格点上（可区分图元点 / 格点）",
+          grid_gap(a_anchor) > 1e-6 and grid_gap(b_target) > 1e-6,
+          f"a={grid_gap(a_anchor):.3f} b={grid_gap(b_target):.3f}")
+
+    # ---- 需求 1：按 T 吸附到图元捕捉点 → 选中该图元 + 进入抓手 + 记录该点 ----
+    tscene.clearSelection()
+    tview._snap_offset = QPointF(0.0, 0.0)
+    tview._set_hover(QPointF(a_anchor))
+    app.processEvents()
+    aim_kind = tview.snap.aim(QPointF(a_anchor),
+                              exclude=tview._selection_own_points(),
+                              always=True)[1]
+    check("最近的捕捉点确实来自图元（归属表能查到 id）",
+          aim_kind == "element"
+          and ga.item_id in tview.snap.owners_at(QPointF(a_anchor)),
+          f"kind={aim_kind} owners={tview.snap.owners_at(QPointF(a_anchor))}")
+
+    before_a = QPointF(ga.scenePos())
+    QTest.keyClick(tview, Qt.Key_T)
+    app.processEvents()
+    check("按 T 命中图元点 → 该图元被选中",
+          ga.isSelected()
+          and [it.item_id for it in tscene.selected_items()] == [ga.item_id],
+          f"sel={[it.item_id for it in tscene.selected_items()]}")
+    grab_pt = tview.snap_grab_point()
+    check("进入抓手并记录下该图元的捕捉点",
+          tview.is_snap_grabbing() and grab_pt is not None
+          and _close_pt((grab_pt.x(), grab_pt.y()),
+                        (a_anchor.x(), a_anchor.y()), 1e-6),
+          f"grab={grab_pt}")
+    # 抓手后该点已被选中项排除，若 warp 重新 aim 就会漂到旁边的格点 ——
+    # 这正是「按 T 鼠标没有吸附到图元捕捉点」的根因。hover 必须仍落在锚点上。
+    hover_t = tview.snap.hover
+    check("按 T 光标吸附到图元捕捉点（没有漂到旁边格点）",
+          hover_t is not None
+          and math.hypot(hover_t.x() - a_anchor.x(),
+                         hover_t.y() - a_anchor.y()) < 2.0
+          and grid_gap(QPointF(hover_t)) > 1e-6,
+          f"hover={hover_t} anchor={a_anchor} grid_gap="
+          f"{grid_gap(QPointF(hover_t)) if hover_t else -1:.3f}")
+    check("抓手 = 实时跟手状态（图元随鼠标走）",
+          tview.is_following()
+          and [it.item_id for it in tview._follow_items] == [ga.item_id],
+          f"follow={[it.item_id for it in tview._follow_items]}")
+    check("按 T 瞬间不把光标 warp 当成一次拖动（图元不跳）",
+          _close_pt((ga.scenePos().x(), ga.scenePos().y()),
+                    (before_a.x(), before_a.y()), 1e-6),
+          f"pos={ga.scenePos()}")
+    check("T 改为一次性动作键：门控恒开", tview.snap.enabled)
+
+    # ---- 需求 2：已选中图元的特征点彻底不纳入捕捉点扫描 ----
+    own = tview._selection_own_points()
+    check("已选中图元的特征点全部进入排除集合",
+          all((p.x(), p.y()) in own for p in a_ends + a_mids),
+          f"own={len(own)}")
+    tview._set_hover(QPointF(a_anchor))
+    app.processEvents()
+    mk3, _act3 = tview._hover_marker()
+    check("光标停在自身端点上时，十字不再落在自身点上",
+          mk3 is not None
+          and not _close_pt((mk3.x(), mk3.y()),
+                            (a_anchor.x(), a_anchor.y()), 1e-6)
+          and (mk3.x(), mk3.y()) not in own,
+          f"marker={mk3}")
+
+    # ---- 实时跟手：鼠标走到哪，图元与被抓的捕捉点就跟到哪 ----
+    mid_scene = QPointF(a_anchor) + QPointF(0.0, -60.0)
+    vp_mid = tview.mapFromScene(mid_scene)
+    QTest.mouseMove(tview.viewport(), QPoint(vp_mid.x(), vp_mid.y()))
+    app.processEvents()
+    mid_move = QPointF(ga.scenePos()) - before_a
+    check("抓手期间鼠标移动 → 图元实时跟手",
+          abs(mid_move.x()) < 2.0 and abs(mid_move.y() + 60.0) < 2.0,
+          f"moved=({mid_move.x():.2f},{mid_move.y():.2f})")
+    grab_mid = tview.snap_grab_point()
+    check("被抓捕捉点随跟手同步平移（记录不留在原地）",
+          grab_mid is not None
+          and abs(grab_mid.x() - a_anchor.x()) < 2.0
+          and abs(grab_mid.y() - (a_anchor.y() - 60.0)) < 2.0,
+          f"grab={grab_mid}")
+
+    # ---- 需求 3：扫到别的捕捉点按 T → 精修对齐并更新记录的捕捉点 ----
+    vp_b = tview.mapFromScene(QPointF(b_target))
+    QTest.mouseMove(tview.viewport(), QPoint(vp_b.x(), vp_b.y()))
+    app.processEvents()
+    before2 = QPointF(ga.scenePos())
+    QTest.keyClick(tview, Qt.Key_T)
+    app.processEvents()
+    total = QPointF(ga.scenePos()) - before_a
+    want2 = QPointF(b_target) - QPointF(a_anchor)
+    fine = QPointF(ga.scenePos()) - before2
+    check("第二次按 T 后捕捉点精确对齐到新点（总位移 = 两点差）",
+          abs(total.x() - want2.x()) < 2.0
+          and abs(total.y() - want2.y()) < 2.0,
+          f"total=({total.x():.3f},{total.y():.3f}) "
+          f"want=({want2.x():.3f},{want2.y():.3f}) "
+          f"按T补量=({fine.x():.3f},{fine.y():.3f})")
+    grab_pt2 = tview.snap_grab_point()
+    check("记录的捕捉点坐标更新为新捕捉点",
+          grab_pt2 is not None
+          and _close_pt((grab_pt2.x(), grab_pt2.y()),
+                        (b_target.x(), b_target.y()), 1e-6),
+          f"grab={grab_pt2}")
+    ends_after, mids_after = ga.snap_points()
+    check("图元上确实有一个捕捉点落在新坐标上",
+          any(_close_pt((p.x(), p.y()), (b_target.x(), b_target.y()), 1e-6)
+              for p in ends_after + mids_after),
+          f"ends={[(round(p.x(), 1), round(p.y(), 1)) for p in ends_after]}")
+    check("对齐后抓手 / 跟手仍保持（可连续对齐）",
+          tview.is_snap_grabbing() and tview.is_following())
+
+    before3 = QPointF(ga.scenePos())
+    QTest.keyClick(tview, Qt.Key_T)   # 原地再按一次
+    app.processEvents()
+    repeat = QPointF(ga.scenePos()) - before3
+    check("同一位置重复按 T 不重复推图元",
+          abs(repeat.x()) < 1e-6 and abs(repeat.y()) < 1e-6,
+          f"moved=({repeat.x():.3f},{repeat.y():.3f})")
+
+    QTest.keyClick(tview, Qt.Key_Escape)
+    app.processEvents()
+    check("Esc 退出抓手并结束跟手（整组回到抓住时位置）",
+          not tview.is_snap_grabbing()
+          and tview.snap_grab_point() is None
+          and not tview.is_following()
+          and _close_pt((ga.scenePos().x(), ga.scenePos().y()),
+                        (before_a.x(), before_a.y()), 1e-6),
+          f"pos={ga.scenePos()}")
+
+    tscene.delete_items([ga.item_id, gb.item_id])
+    tview.close()
+    tview.deleteLater()
+    app.processEvents()
+
+    print("\n=== 8.28 绘制阶段按 T：只吸附光标，不选中图元 / 不抓手跟手 ===")
+    dscene = GraphicsScene()
+    dview = GraphicsView(dscene)
+    dview.resize(900, 600)
+    dview.show()
+    app.processEvents()
+
+    existing = dscene.create_item("rect", center=(1013.0, 987.0))
+    existing.set_page_size(207.0, 123.0)
+    dview.centerOn(dscene.projection.point(1013.0, 987.0))
+    app.processEvents()
+    dview.refresh_snap_points()
+    e_ends, _em = existing.snap_points()
+
+    def dgap(p):
+        gx, gy = dview.snap.nearest_grid(p)
+        return math.hypot(p.x() - gx, p.y() - gy)
+
+    snap_target = next((QPointF(p) for p in e_ends if dgap(p) > 1e-6),
+                       QPointF(e_ends[0]))
+    dscene.clearSelection()
+    dview.set_draw_tool("line")
+    dscene.begin_draw_tool("line")
+    dscene.draw_add_point(QPointF(900.0, 900.0))   # 已落第一点，进入绘制中
+    dview._set_hover(QPointF(snap_target))
+    app.processEvents()
+    before_existing = QPointF(existing.scenePos())
+    QTest.keyClick(dview, Qt.Key_T)
+    app.processEvents()
+
+    check("绘制中按 T 不选中已有图元",
+          not existing.isSelected(),
+          f"sel={[it.item_id for it in dscene.selected_items()]}")
+    check("绘制中按 T 不进入抓手 / 跟手",
+          not dview.is_snap_grabbing() and not dview.is_following()
+          and dview.snap_grab_point() is None,
+          f"grab={dview.is_snap_grabbing()} follow={dview.is_following()}")
+    check("绘制中按 T 不移动已有图元",
+          _close_pt((existing.scenePos().x(), existing.scenePos().y()),
+                    (before_existing.x(), before_existing.y()), 1e-6),
+          f"pos={existing.scenePos()}")
+    hover_d = dview.snap.hover
+    check("绘制中按 T 仍把光标吸附到图元捕捉点",
+          hover_d is not None
+          and math.hypot(hover_d.x() - snap_target.x(),
+                         hover_d.y() - snap_target.y()) < 2.0,
+          f"hover={hover_d} target={snap_target}")
+    state_d = dscene.draw_preview_state()
+    preview_scene = (dscene.projection.point(state_d[2].x(), state_d[2].y())
+                     if state_d is not None and state_d[2] is not None else None)
+    check("绘制预览同步到吸附点（按 T 取点生效）",
+          preview_scene is not None
+          and math.hypot(preview_scene.x() - snap_target.x(),
+                         preview_scene.y() - snap_target.y()) < 2.0,
+          f"preview={state_d[2] if state_d else None} target={snap_target}")
+    check("绘制工具仍激活（没被跟手抢走）", dview._draw_type == "line")
+
+    vp_move = dview.mapFromScene(QPointF(snap_target) + QPointF(0.0, -40.0))
+    QTest.mouseMove(dview.viewport(), QPoint(vp_move.x(), vp_move.y()))
+    app.processEvents()
+    state_d2 = dscene.draw_preview_state()
+    check("绘制中鼠标移动仍走绘制预览、不触发跟手",
+          not dview.is_following()
+          and _close_pt((existing.scenePos().x(), existing.scenePos().y()),
+                        (before_existing.x(), before_existing.y()), 1e-6)
+          and state_d2 is not None and state_d2[2] is not None,
+          f"follow={dview.is_following()} pos={existing.scenePos()}")
+
+    # ---- 绘制阶段的「自身」：正在画的临时图元端点 / 中点也要排除 ----
+    draw_item = dscene._draw_item
+    d_ends, d_mids = draw_item.snap_points()
+    dview.refresh_snap_points()
+    draw_excluded = dview._draw_own_points()
+    check("绘制临时图元的自身点确实进了捕捉点表（否则无需排除）",
+          len(draw_excluded) > 0
+          and all(c in dview.snap.all_points() for c in draw_excluded),
+          f"excluded={len(draw_excluded)} table={dview.snap.count()}")
+    self_pt = next(
+        (QPointF(p) for p in d_ends + d_mids
+         if (p.x(), p.y()) in draw_excluded and dgap(p) > 1e-6),
+        None)
+    check("存在不压在格点上的自身点（可区分是否误吸）",
+          self_pt is not None, f"excluded={sorted(draw_excluded)[:3]}")
+    if self_pt is not None:
+        dview._set_hover(QPointF(self_pt))
+        app.processEvents()
+        mk_self, _act_self = dview._hover_marker()
+        check("绘制中十字不落在临时图元自身点上",
+              mk_self is not None
+              and not _close_pt((mk_self.x(), mk_self.y()),
+                                (self_pt.x(), self_pt.y()), 1e-6),
+              f"marker={mk_self} self={self_pt}")
+        QTest.keyClick(dview, Qt.Key_T)
+        app.processEvents()
+        final_hover = dview.snap.hover
+        check("绘制中按 T 不吸到临时图元自身点（排除生效）",
+              final_hover is not None
+              and not _close_pt((final_hover.x(), final_hover.y()),
+                                (self_pt.x(), self_pt.y()), 1e-6),
+              f"hover={final_hover} self={self_pt}")
+
+    dscene.cancel_draw()
+    dview.set_draw_tool(None)
+    dscene.delete_items([existing.item_id])
+    dview.close()
+    dview.deleteLater()
+    app.processEvents()
+
+    print("\n=== 8.29 大页面全选性能 / 批量选中 ===")
+    # 逐项 setSelected 会发 N 次 selectionChanged，而图层树回灌 / 属性面板
+    # 重建随选中数增长；1618 个图元的 page_1 实测会卡死数分钟。这里用真实
+    # 大页面锁住「只发一次信号 + 同步结果不变」。
+    big = DesignerWindow(SOURCE_PAGE)
+    big.show()
+    app.processEvents()
+    bs = big.scene
+    total = len(bs.all_items())
+    hits = [0]
+    bs.selectionChanged.connect(lambda: hits.__setitem__(0, hits[0] + 1))
+    t0 = time.perf_counter()
+    bs.select_all_items()
+    elapsed = time.perf_counter() - t0
+    check("大页面全选只发一次 selectionChanged", hits[0] == 1,
+          f"signals={hits[0]} items={total}")
+    check("大页面全选耗时可接受", elapsed < 5.0, f"{elapsed:.3f}s")
+    check("全选后场景选中数正确", len(bs.selected_items()) == total,
+          f"{len(bs.selected_items())}/{total}")
+    check("全选后图层树同步选中全部",
+          len(big.layers.selected_ids()) == total,
+          f"tree={len(big.layers.selected_ids())}")
+    check("全选后属性面板为多选概要",
+          big.property_panel.stack.count() > 0
+          and big.property_panel.stack.widget(0).objectName() == "multi",
+          f"page={big.property_panel.stack.widget(0).objectName() if big.property_panel.stack.count() else '-'}")
+    check("全选后状态栏显示选中数", f"选中 {total}" in big.count_label.text(),
+          big.count_label.text())
+    # 主窗口槽与图层树自身连接会调两次 sync_selection，第二次必须幂等
+    big.layers.sync_selection()
+    big.layers.sync_selection()
+    check("重复 sync_selection 幂等", len(big.layers.selected_ids()) == total,
+          f"tree={len(big.layers.selected_ids())}")
+
+    bs.clearSelection()
+    app.processEvents()
+    check("清空选中后图层树同步清空", len(big.layers.selected_ids()) == 0,
+          f"tree={len(big.layers.selected_ids())}")
+    one, other = bs.all_items()[0], bs.all_items()[1]
+    hits[0] = 0
+    bs.select_items([one])
+    check("批量单选只发一次信号", hits[0] == 1, f"signals={hits[0]}")
+    check("批量单选后图层树只选一个",
+          big.layers.selected_ids() == [one.item_id],
+          f"tree={big.layers.selected_ids()[:5]}")
+    bs.select_items([other], append=True)
+    check("append=True 累加选中", len(bs.selected_items()) == 2
+          and set(i.item_id for i in bs.selected_items())
+          == {one.item_id, other.item_id})
+    big.close()
+    big.deleteLater()
+    app.processEvents()
+    try:
+        bs.selectionChanged.disconnect()
+    except Exception:
+        pass
+
+    print("\n=== 8.30 仅选中时按 T 只移动光标、不移动图元 ===")
+    # 旧版在「未抓手」时会把吸附偏移叠加到已选中图元上（鼠标吸多少、
+    # 图元走多少）。hover 必须**靠近但不落在**格点上，offset 才非零，
+    # 否则测不出这个行为（正好落在格点时 offset=0、图元本来就不动）。
+    sscene = GraphicsScene()
+    sview = GraphicsView(sscene)
+    sview.resize(900, 600)
+    sview.show()
+    app.processEvents()
+    sa = sscene.create_item("rect", center=(1013.0, 987.0))
+    sa.set_page_size(207.0, 123.0)
+    sb = sscene.create_item("rect", center=(1613.0, 987.0))
+    sb.set_page_size(207.0, 123.0)
+    sview.centerOn(sscene.projection.point(1300.0, 1000.0))
+    app.processEvents()
+    sview.refresh_snap_points()
+
+    def s_pts(it):
+        ends, mids = it.snap_points()
+        return ends + mids
+
+    def s_offgrid(p):
+        gx, gy = sview.snap.nearest_grid(p)
+        return math.hypot(p.x() - gx, p.y() - gy) > 1e-6
+
+    b_anchor = next(QPointF(p) for p in s_pts(sb) if s_offgrid(p))
+    grid_pt = QPointF(*sview.snap.nearest_grid(QPointF(2500.0, 2500.0)))
+    near_grid = QPointF(grid_pt) + QPointF(3.0, -4.0)
+
+    sscene.clearSelection()
+    sa.setSelected(True)
+    app.processEvents()
+    pos_a = QPointF(sa.scenePos())
+    sview._set_hover(QPointF(near_grid))
+    app.processEvents()
+    aim_t, aim_k = sview.snap.aim(
+        QPointF(near_grid), exclude=sview._snap_scan_exclude(), always=True)
+    check("hover 靠近格点但不重合（吸附偏移非零，能测出旧兜底）",
+          aim_k == "grid" and aim_t is not None
+          and math.hypot(aim_t.x() - near_grid.x(),
+                         aim_t.y() - near_grid.y()) > 1e-6,
+          f"kind={aim_k} target={aim_t}")
+    QTest.keyClick(sview, Qt.Key_T)
+    app.processEvents()
+    d = QPointF(sa.scenePos()) - pos_a
+    check("仅选中按 T：图元不移动（不再叠加吸附偏移）",
+          abs(d.x()) < 1e-9 and abs(d.y()) < 1e-9, f"delta={d}")
+    # warp 到视口外时 leaveEvent 会清 snap.hover，但 _last_hover 保留吸附点
+    h = sview._last_hover
+    check("仅选中按 T：光标仍吸附到捕捉点",
+          h is not None
+          and _close_pt((h.x(), h.y()), (grid_pt.x(), grid_pt.y()), 1e-6),
+          f"hover={h}")
+    check("仅选中按 T：不进入抓手 / 跟手",
+          not sview.is_snap_grabbing() and not sview.is_following())
+    sview._set_hover(QPointF(near_grid) + QPointF(40.0, 30.0))
+    app.processEvents()
+    d2 = QPointF(sa.scenePos()) - pos_a
+    check("仅选中按 T 后继续移动鼠标：图元仍不动",
+          abs(d2.x()) < 1e-9 and abs(d2.y()) < 1e-9, f"delta={d2}")
+
+    # 多选同样不动
+    sscene.clearSelection()
+    sa.setSelected(True)
+    sb.setSelected(True)
+    app.processEvents()
+    pos_a = QPointF(sa.scenePos())
+    pos_b = QPointF(sb.scenePos())
+    sview._set_hover(QPointF(near_grid))
+    app.processEvents()
+    QTest.keyClick(sview, Qt.Key_T)
+    app.processEvents()
+    da = QPointF(sa.scenePos()) - pos_a
+    db = QPointF(sb.scenePos()) - pos_b
+    check("多选（未抓手）按 T 也不移动任何图元",
+          abs(da.x()) < 1e-9 and abs(da.y()) < 1e-9
+          and abs(db.x()) < 1e-9 and abs(db.y()) < 1e-9,
+          f"a={da} b={db}")
+
+    # 未抓手吸到图元点 → 抓起，但抓起瞬间不移动任何图元
+    sscene.clearSelection()
+    sa.setSelected(True)
+    app.processEvents()
+    pos_a = QPointF(sa.scenePos())
+    pos_b = QPointF(sb.scenePos())
+    sview._set_hover(QPointF(b_anchor))
+    app.processEvents()
+    QTest.keyClick(sview, Qt.Key_T)
+    app.processEvents()
+    da = QPointF(sa.scenePos()) - pos_a
+    db = QPointF(sb.scenePos()) - pos_b
+    check("未抓手吸到图元点：抓起瞬间所有图元不动",
+          abs(da.x()) < 1e-9 and abs(da.y()) < 1e-9
+          and abs(db.x()) < 1e-9 and abs(db.y()) < 1e-9,
+          f"a={da} b={db}")
+    check("抓起后进入抓手（此后按 T 才允许移动图元）",
+          sview.is_snap_grabbing() and sview.is_following())
+
+    # 抓手状态按 T → 被抓图元才移动
+    sview._set_hover(QPointF(grid_pt))
+    app.processEvents()
+    QTest.keyClick(sview, Qt.Key_T)
+    app.processEvents()
+    db2 = QPointF(sb.scenePos()) - pos_b
+    check("抓手状态按 T：被抓图元移动（对齐到新捕捉点）",
+          abs(db2.x()) > 1e-9 or abs(db2.y()) > 1e-9, f"delta={db2}")
+    gp = sview.snap_grab_point()
+    check("抓手对齐后记录点更新为新捕捉点",
+          gp is not None
+          and _close_pt((gp.x(), gp.y()), (grid_pt.x(), grid_pt.y()), 1e-6),
+          f"grab={gp}")
+    QTest.keyClick(sview, Qt.Key_Escape)
+    app.processEvents()
+    sview.close()
+    sview.deleteLater()
     app.processEvents()
 
     print("\n=== 9. 关窗不重写页面文件 ===")
@@ -2123,7 +2594,13 @@ def main() -> int:
 
     for path in (TMP_PAGE, TMP_SAVED):
         if os.path.exists(path):
-            os.remove(path)
+            try:
+                os.remove(path)
+            except OSError as exc:
+                # 运行环境可能把 os.remove 接管成回收站操作并失败；临时文件
+                # 由 make_small_page() 每次重建，清理失败不影响回归判定，
+                # 更不能让它盖掉下面的「失败 N 项」结果输出。
+                print(f"  [warn] 临时文件清理失败（不影响断言）: {exc}")
     # 断开场景信号，避免解释器退出时 C++ 对象已销毁仍触发回调的噪声
     try:
         scene.selectionChanged.disconnect()

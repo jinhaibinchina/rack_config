@@ -1,22 +1,28 @@
-"""图元工具箱 Dock：12 类图元 + 7 种 widget 控件变体，点击进入「绘制模式」。
-矩形/线/圆=两击，三角=三击，多边形/路径=多击+右键闭合，其余=单击放置。
+"""图元工具箱 Dock：12 类图元 + 7 种 widget 变体 + 可复用的「组合模板」。
 
-对齐 ``Designer/modes/design/element_toolbox_dock.py`` 的分组与交互，
-图标同样是代码自绘（无资源文件依赖）。拖放 MIME 为
-``application/x-coreqg-element``，落点由 ``GraphicsView.dropEvent`` 换算。
+矩形/线/圆=两击，三角=三击，多边形/路径=多击+右键闭合，其余=单击放置。
+组合模板按钮点一下插到视图中心、拖到画布落在指定位置，右键可重命名 / 删除。
+
+对齐 ``Designer/Core/ui/element_toolbox_dock.py`` 的分组与交互（缩略图也是
+代码自绘，无资源文件依赖）。两种拖放 MIME 分开：
+``application/x-coreqg-element`` 带图元类型、``application/x-design-template``
+带模板 id，落点换算都在 ``GraphicsView.dropEvent``。
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import QMimeData, QPoint, QPointF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QDrag, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import QMimeData, QPoint, QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import (
+    QColor, QDrag, QIcon, QPainter, QPainterPath, QPen, QPixmap,
+)
 from PySide6.QtWidgets import (
-    QApplication, QDockWidget, QGroupBox, QScrollArea, QToolButton,
-    QVBoxLayout, QWidget,
+    QApplication, QDockWidget, QGroupBox, QLabel, QMenu, QPushButton,
+    QScrollArea, QToolButton, QVBoxLayout, QWidget,
 )
 
 from ..g_scene import TYPE_LABELS, WIDGET_TOOL_KEYS, WIDGET_TOOL_LABELS
-from ..g_view import ELEMENT_MIME_TYPE
+from ..g_view import ELEMENT_MIME_TYPE, TEMPLATE_MIME_TYPE
+from .template_store import ToolboxTemplate
 
 CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("基本图元", ("rect", "circle", "line", "triangle", "polygon", "path")),
@@ -25,6 +31,25 @@ CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("控件变体", WIDGET_TOOL_KEYS),
 )
 ICON_SIZE = 28
+
+# 模板按钮与「保存为模板」按钮的轻量配色（只作用于本 Dock，不影响主窗口）
+TEMPLATE_QSS = """
+QToolButton#coreQgTemplateButton {
+    border: 1px solid #b5d4f4; border-radius: 4px;
+    background: #e6f1fb; padding: 2px 4px;
+}
+QToolButton#coreQgTemplateButton:hover { background: #d2e6fb; }
+QToolButton#coreQgTemplateButton:pressed { background: #b9d8f5; }
+QPushButton#coreQgTemplateCapture {
+    border: 1px solid #185fa5; border-radius: 4px;
+    background: #2563eb; color: white; padding: 5px;
+}
+QPushButton#coreQgTemplateCapture:hover { background: #1d4ed8; }
+QPushButton#coreQgTemplateCapture:disabled {
+    background: #cbd5e1; border-color: #aab6c4; color: #6b7280;
+}
+QLabel#coreQgTemplateHint { color: #6b7280; font-size: 11px; }
+"""
 
 
 def _icon(key: str) -> QIcon:
@@ -96,8 +121,159 @@ def _icon(key: str) -> QIcon:
     return QIcon(pix)
 
 
+def _icon_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _icon_point(value):
+    if not isinstance(value, dict):
+        return None
+    try:
+        return float(value["x"]), float(value["y"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _template_bounds(items):
+    """所有成员的形状包围盒（忽略旋转），用来把缩略图缩放到 28×28。"""
+    points = []
+    for data in items:
+        kind = str(data.get("type", ""))
+        if kind == "line":
+            for key in ("head_pos", "end_pos"):
+                pt = _icon_point(data.get(key))
+                if pt is not None:
+                    points.append(pt)
+            continue
+        if kind in ("triangle", "polygon", "path"):
+            verts = data.get("vertices")
+            if isinstance(verts, list):
+                got = [_icon_point(v) for v in verts]
+                if got and all(v is not None for v in got):
+                    points.extend(got)
+                    continue
+        center = _icon_point(data.get("center_pos")) or _icon_point(data.get("origin_pos"))
+        if center is None:
+            continue
+        cx, cy = center
+        if kind == "circle":
+            rw = _icon_float(data.get("radius_w"))
+            rh = _icon_float(data.get("radius_h"))
+            points.extend([(cx - rw, cy - rh), (cx + rw, cy + rh)])
+        else:
+            w = _icon_float(data.get("width")) / 2.0
+            h = _icon_float(data.get("height")) / 2.0
+            points.extend([(cx - w, cy - h), (cx + w, cy + h)])
+    if not points:
+        return None
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _template_icon(template: ToolboxTemplate) -> QIcon:
+    """按模板成员画一张缩略图（与旧工具箱同一套画法）。"""
+    size = ICON_SIZE
+    pix = QPixmap(size, size)
+    pix.fill(Qt.transparent)
+    painter = QPainter(pix)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+
+    bounds = _template_bounds(template.items)
+    if bounds is None:
+        pen = QPen(QColor("#2563eb"), 1.0, Qt.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRect(QRectF(3, 3, size - 6, size - 6))
+        painter.end()
+        return QIcon(pix)
+
+    x1, y1, x2, y2 = bounds
+    width = max(x2 - x1, 1e-6)
+    height = max(y2 - y1, 1e-6)
+    margin = 3.0
+    scale = min((size - 2 * margin) / width, (size - 2 * margin) / height)
+    ox = (size - width * scale) / 2.0
+    oy = (size - height * scale) / 2.0
+
+    def at(x, y) -> QPointF:
+        return QPointF(ox + (x - x1) * scale, oy + (y - y1) * scale)
+
+    painter.setPen(QPen(QColor("#2563eb"), 1.0, Qt.SolidLine, Qt.RoundCap,
+                        Qt.RoundJoin))
+    # 大模板（料架 1 有 154 个成员）没必要把 28px 图标画满，取前 160 个即可
+    for data in template.items[:160]:
+        kind = str(data.get("type", ""))
+        if kind == "group":
+            continue
+        style = data.get("style") or {}
+        filled = bool(style.get("fill", False)) and kind in (
+            "rect", "triangle", "circle", "text")
+        painter.setBrush(QColor(191, 219, 254, 190) if filled else Qt.NoBrush)
+
+        if kind == "line":
+            head = _icon_point(data.get("head_pos"))
+            end = _icon_point(data.get("end_pos"))
+            if head and end:
+                painter.drawLine(at(*head), at(*end))
+            continue
+
+        verts = data.get("vertices")
+        if kind in ("triangle", "polygon", "path") and isinstance(verts, list):
+            got = [_icon_point(v) for v in verts]
+            if got and all(v is not None for v in got):
+                path = QPainterPath(at(*got[0]))
+                for v in got[1:]:
+                    path.lineTo(at(*v))
+                if kind in ("triangle", "polygon"):
+                    path.closeSubpath()
+                painter.drawPath(path)
+                continue
+
+        center = _icon_point(data.get("center_pos")) or _icon_point(data.get("origin_pos"))
+        if center is None:
+            continue
+        cx, cy = center
+        if kind == "circle":
+            rw = _icon_float(data.get("radius_w"))
+            rh = _icon_float(data.get("radius_h"))
+            tl = at(cx - rw, cy - rh)
+            painter.drawEllipse(QRectF(tl.x(), tl.y(),
+                                       rw * 2.0 * scale, rh * 2.0 * scale))
+            continue
+        w = _icon_float(data.get("width"))
+        h = _icon_float(data.get("height"))
+        tl = at(cx - w / 2.0, cy - h / 2.0)
+        rect = QRectF(tl.x(), tl.y(), w * scale, h * scale)
+        if kind == "triangle":
+            path = QPainterPath()
+            path.moveTo(rect.center().x(), rect.top())
+            path.lineTo(rect.left(), rect.bottom())
+            path.lineTo(rect.right(), rect.bottom())
+            path.closeSubpath()
+            painter.drawPath(path)
+        else:
+            painter.drawRect(rect)
+        if kind == "text":
+            font = painter.font()
+            font.setBold(True)
+            font.setPointSizeF(6.5)
+            painter.setFont(font)
+            painter.drawText(rect, Qt.AlignCenter, "T")
+    painter.end()
+    return QIcon(pix)
+
+
 class ToolButton(QToolButton):
-    """点击 = 发 toolActivated；拖动 = 发 QDrag。"""
+    """点击 = 发 toolActivated；拖动 = 发 QDrag。
+
+    ``MIME_TYPE`` / ``drag_data()`` 留给模板按钮覆写，两种拖放共用一套手势。
+    """
+
+    MIME_TYPE = ELEMENT_MIME_TYPE
 
     def __init__(self, key: str, parent=None) -> None:
         super().__init__(parent)
@@ -110,6 +286,9 @@ class ToolButton(QToolButton):
         self.setFixedHeight(34)
         self.setToolTip(f"{label}：点击后在画布上分点落子（矩形/线/圆两击、三角三击、多边形多击+右键闭合，其余单击）")
         self._press_pos = QPoint()
+
+    def drag_data(self) -> bytes:
+        return self.key.encode("utf-8")
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.LeftButton:
@@ -125,20 +304,49 @@ class ToolButton(QToolButton):
             return
         drag = QDrag(self)
         mime = QMimeData()
-        mime.setData(ELEMENT_MIME_TYPE, self.key.encode("utf-8"))
+        mime.setData(self.MIME_TYPE, self.drag_data())
         drag.setMimeData(mime)
         drag.setPixmap(self.icon().pixmap(ICON_SIZE, ICON_SIZE))
         drag.exec(Qt.CopyAction)
 
 
+class TemplateToolButton(ToolButton):
+    """一个可复用组合模板：点击插到视图中心，拖动落到光标处。"""
+
+    MIME_TYPE = TEMPLATE_MIME_TYPE
+
+    def __init__(self, template: ToolboxTemplate, parent=None) -> None:
+        super().__init__(f"template:{template.id}", parent)
+        self.template = template
+        self.setObjectName("coreQgTemplateButton")
+        self.setText(template.name)
+        self.setIcon(_template_icon(template))
+        self.setToolTip(
+            f"{template.name}\n"
+            f"组合模板 · {template.node_count} 个图元\n"
+            "拖拽到画布，或点击添加到视图中心\n"
+            "右键可重命名或删除"
+        )
+
+    def drag_data(self) -> bytes:
+        return self.template.id.encode("utf-8")
+
+
 class ElementToolboxDock(QDockWidget):
     toolActivated = Signal(str)
+    templateActivated = Signal(str)
+    captureGroupRequested = Signal()
+    templateRenameRequested = Signal(str)
+    templateDeleteRequested = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__("图元工具箱", parent)
         self.setObjectName("coreQgToolbox")
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setStyleSheet(TEMPLATE_QSS)
         self.buttons: list[ToolButton] = []
+        self._template_buttons: list[TemplateToolButton] = []
+        self._capture_button: QPushButton | None = None
 
         content = QWidget(self)
         outer = QVBoxLayout(content)
@@ -161,8 +369,81 @@ class ElementToolboxDock(QDockWidget):
                 self.buttons.append(button)
                 layout.addWidget(button)
             column.addWidget(group)
+        self._build_template_group(holder, column)
         column.addStretch(1)
         scroll.setWidget(holder)
         outer.addWidget(scroll)
         self.setWidget(content)
         self.setMinimumWidth(190)
+
+    def _build_template_group(self, holder: QWidget, column: QVBoxLayout) -> None:
+        group = QGroupBox("组合模板", holder)
+        layout = QVBoxLayout(group)
+        layout.setContentsMargins(6, 10, 6, 6)
+        layout.setSpacing(4)
+
+        self._template_hint = QLabel(
+            "在画布上选中一个组，保存后即可在这里重复使用。", group)
+        self._template_hint.setObjectName("coreQgTemplateHint")
+        self._template_hint.setWordWrap(True)
+        layout.addWidget(self._template_hint)
+
+        self._template_container = QWidget(group)
+        self._template_layout = QVBoxLayout(self._template_container)
+        self._template_layout.setContentsMargins(0, 0, 0, 0)
+        self._template_layout.setSpacing(3)
+        layout.addWidget(self._template_container)
+
+        self._capture_button = QPushButton("将所选组保存为模板", group)
+        self._capture_button.setObjectName("coreQgTemplateCapture")
+        self._capture_button.setEnabled(False)
+        self._capture_button.setToolTip("选中画布上的一个组后即可保存为模板")
+        self._capture_button.clicked.connect(
+            lambda checked=False: self.captureGroupRequested.emit()
+        )
+        layout.addWidget(self._capture_button)
+        column.addWidget(group)
+
+    # ------------------------------------------------------------------
+    # 组合模板
+    # ------------------------------------------------------------------
+    def set_templates(self, templates) -> None:
+        for button in self._template_buttons:
+            self._template_layout.removeWidget(button)
+            # 必须脱离对象树：deleteLater 是延迟删除，旧按钮会继续被
+            # findChildren() 命中，导致自动化拿到错误的按钮。
+            button.setParent(None)
+            button.deleteLater()
+        self._template_buttons.clear()
+
+        for template in templates:
+            button = TemplateToolButton(template, self._template_container)
+            button.clicked.connect(
+                lambda checked=False, tid=template.id:
+                    self.templateActivated.emit(tid)
+            )
+            button.setContextMenuPolicy(Qt.CustomContextMenu)
+            button.customContextMenuRequested.connect(
+                lambda pos, target=button: self._show_template_menu(target, pos)
+            )
+            self._template_layout.addWidget(button)
+            self._template_buttons.append(button)
+
+        self._template_hint.setText(
+            "点击模板添加到视图中心，或拖拽到画布指定位置。" if templates
+            else "在画布上选中一个组，保存后即可在这里重复使用。"
+        )
+
+    def set_capture_enabled(self, enabled: bool) -> None:
+        if self._capture_button is not None:
+            self._capture_button.setEnabled(bool(enabled))
+
+    def _show_template_menu(self, button: TemplateToolButton, pos) -> None:
+        menu = QMenu(self)
+        rename_action = menu.addAction("重命名模板…")
+        delete_action = menu.addAction("删除模板")
+        picked = menu.exec(button.mapToGlobal(pos))
+        if picked == rename_action:
+            self.templateRenameRequested.emit(button.template.id)
+        elif picked == delete_action:
+            self.templateDeleteRequested.emit(button.template.id)

@@ -22,25 +22,46 @@ from PySide6.QtWidgets import (
 )
 
 from ..g_scene import (
-    DEFAULT_SIZES, TYPE_LABELS, WIDGET_TOOL_LABELS, GraphicsScene,
+    DEFAULT_SIZES, ORTHO_DRAW_TYPES, TYPE_LABELS, WIDGET_TOOL_LABELS,
+    GraphicsScene,
 )
 from ..g_view import GraphicsView
 from .history import PageHistory
 from .layer_tree import LayerTreeDock
 from .property_panel import PropertyPanel
+from .template_store import TemplateStore
 from .toolbox import ElementToolboxDock
+
+
+def _default_template_dir(page_path: str) -> str:
+    """模板文件与旧设计器共用一份，两个设计器互相打开对方的模板都能用。
+
+    页面在 ``.../datas/design/pages/`` 下时取上一级 design 目录；否则回退到
+    项目自带的 ``Designer/Core/data.json/datas/design``。
+    """
+    if page_path:
+        pages_dir = os.path.dirname(os.path.abspath(page_path))
+        if os.path.basename(pages_dir).lower() == "pages":
+            return os.path.dirname(pages_dir)
+    return os.path.abspath(os.path.join(
+        os.path.dirname(__file__), "..", "..", "Core", "data.json",
+        "datas", "design"))
 
 
 class DesignerWindow(QMainWindow):
     """可独立运行的设计器窗口。"""
 
-    def __init__(self, page_path: str = "", projection=None, parent=None) -> None:
+    def __init__(self, page_path: str = "", projection=None, parent=None,
+                 template_dir: str = "") -> None:
         super().__init__(parent)
         self.setWindowTitle("CoreQGraphics 设计器")
         self.resize(1500, 940)
         self.scene = GraphicsScene(projection)
         if page_path:
             self.scene.load_page(page_path)
+        self.template_store = TemplateStore(
+            os.path.abspath(template_dir) if template_dir
+            else _default_template_dir(page_path))
 
         self.view = GraphicsView(self.scene, self)
         self.setCentralWidget(self.view)
@@ -49,7 +70,11 @@ class DesignerWindow(QMainWindow):
         self.count_label = QLabel("")
         self.zoom_label = QLabel("")
         self.path_label = QLabel("")
-        for widget in (self.mode_label, self.count_label,
+        # 正交状态常驻状态栏：CAD 里这个开关需要随时可见
+        self.ortho_label = QLabel("正交 关")
+        self.ortho_label.setToolTip(
+            "F8 切换；绘制直线 / 多段线时只出水平或竖直线，按住 Shift 临时反转")
+        for widget in (self.mode_label, self.ortho_label, self.count_label,
                        self.zoom_label, self.path_label):
             self.status_bar.addPermanentWidget(widget)
 
@@ -77,7 +102,7 @@ class DesignerWindow(QMainWindow):
         self._build_menus()
         self._build_toolbar()
         self._connect_signals()
-
+        self._refresh_template_dock()
         self._refresh()
 
     # ------------------------------------------------------------------
@@ -112,6 +137,9 @@ class DesignerWindow(QMainWindow):
         self._make("ungroup", "解组", "Ctrl+Shift+G")
         self._make("rename", "重命名…", "F2")
         self._make("toggle_visible", "显示 / 隐藏", "Ctrl+H")
+        self._make("save_template", "将所选组添加到工具箱…")
+        self.actions["save_template"].setToolTip(
+            "把选中的组（含全部成员）保存为可复用的组合模板")
         for entry in (
             ("align_left", "左对齐"), ("align_right", "右对齐"),
             ("align_top", "顶对齐"), ("align_bottom", "底对齐"),
@@ -127,6 +155,12 @@ class DesignerWindow(QMainWindow):
         self._make("origin_center", "旋转中心复位")
         self._make("toggle_grid", "显示网格", "Ctrl+Shift+N", checkable=True)
         self.actions["toggle_grid"].setChecked(True)
+        # CAD 正交：F8 是事实标准，做成可勾选动作（窗口级，焦点在属性面板
+        # 里也能切），状态真值放在 GraphicsView，动作只是它的镜像。
+        self._make("toggle_ortho", "正交模式 (F8)", "F8", checkable=True)
+        self.actions["toggle_ortho"].setToolTip(
+            "绘制直线 / 三角形 / 多边形 / 路径时只出水平或竖直线；"
+            "按住 Shift 临时反转（开→斜线，关→正交线）")
         # 动作 key 沿用 toggle_ids，但开关现在控制的是「选中图元的旋转中心红点」
         self._make("toggle_ids", "显示中心点标记", "Ctrl+Shift+I", checkable=True)
         self.actions["toggle_ids"].setChecked(True)
@@ -148,6 +182,8 @@ class DesignerWindow(QMainWindow):
         for key in ("duplicate", "copy", "paste", "delete", "select_all",
                     "group", "ungroup", "rename", "toggle_visible"):
             edit.addAction(self.actions[key])
+        edit.addSeparator()
+        edit.addAction(self.actions["save_template"])
 
         arrange = bar.addMenu("排列")
         for key in ("align_left", "align_right", "align_top", "align_bottom",
@@ -161,7 +197,7 @@ class DesignerWindow(QMainWindow):
 
         view_menu = bar.addMenu("视图")
         for key in ("fit", "fit_saved", "zoom_in", "zoom_out",
-                    "toggle_grid", "toggle_ids", "run_mode"):
+                    "toggle_grid", "toggle_ids", "toggle_ortho", "run_mode"):
             view_menu.addAction(self.actions[key])
 
         create = bar.addMenu("新建图元")
@@ -189,15 +225,24 @@ class DesignerWindow(QMainWindow):
                 lambda checked=False, k=key: self._activate_draw_tool(k)
             )
             bar.addAction(action)
+        bar.addSeparator()
+        bar.addAction(self.actions["toggle_ortho"])
 
     def _connect_signals(self) -> None:
         self.scene.selectionChanged.connect(self._on_selection_changed)
         self.scene.contentChanged.connect(self._refresh)
         self.property_panel.itemEdited.connect(lambda _item: self._after_edit())
         self.toolbox.toolActivated.connect(self._activate_draw_tool)
+        self.toolbox.templateActivated.connect(self.add_template_at_view_center)
+        self.toolbox.captureGroupRequested.connect(
+            lambda: self._do("save_template"))
+        self.toolbox.templateRenameRequested.connect(self._rename_template)
+        self.toolbox.templateDeleteRequested.connect(self._delete_template)
         self.scene.drawFinished.connect(self._on_draw_finished)
         self.view.elementDropped.connect(self._on_drop)
+        self.view.templateDropped.connect(self._on_template_dropped)
         self.view.actionTriggered.connect(self._do)
+        self.view.orthoModeChanged.connect(self._on_ortho_changed)
         self.layers.selectionRequested.connect(self._select_from_tree)
         self.layers.actionRequested.connect(self._do_tree_action)
         self.history.changed.connect(self._update_history_actions)
@@ -235,9 +280,7 @@ class DesignerWindow(QMainWindow):
         elif key == "duplicate":
             made = scene.duplicate_selected()
             if made:
-                scene.clearSelection()
-                for it in made:
-                    it.setSelected(True)
+                scene.select_items(made)   # 批量选中：只发一次 selectionChanged
                 self._after_edit()
         elif key == "copy":
             n = scene.copy_selected()
@@ -246,9 +289,7 @@ class DesignerWindow(QMainWindow):
         elif key == "paste":
             made = scene.paste_clipboard()
             if made:
-                scene.clearSelection()
-                for it in made:
-                    it.setSelected(True)
+                scene.select_items(made)   # 批量选中：只发一次 selectionChanged
                 self._after_edit()
         elif key == "delete":
             scene.delete_items(sel)
@@ -286,7 +327,7 @@ class DesignerWindow(QMainWindow):
                 )
             else:
                 self.status_bar.showMessage(
-                    "请先用右键在画布上点一个位置，再选「旋转中心设到此处」", 4000)
+                    "请先选中图元，再按住 O 键 + 右键把旋转中心设到点击处", 4000)
             self._after_edit()
         elif key == "origin_center":
             n = scene.reset_selected_origin()
@@ -314,6 +355,8 @@ class DesignerWindow(QMainWindow):
         elif key == "toggle_ids":
             view.show_ids = self.actions["toggle_ids"].isChecked()
             view.viewport().update()
+        elif key == "toggle_ortho":
+            view.set_ortho_mode(self.actions["toggle_ortho"].isChecked())
         elif key == "run_mode":
             run = self.actions["run_mode"].isChecked()
             scene.set_scene_mode(run)
@@ -327,6 +370,12 @@ class DesignerWindow(QMainWindow):
                 "Designer.CoreQGraphics 设计器\n\n"
                 "原生 QGraphicsScene 平行实现；page_*.json 格式与 Core 一致。\n"
                 "widget 图元支持 7 种控件变体（设计态自绘占位、运行预览挂载真实 Qt 控件），\n"
+                "F8 正交模式：绘制点列图元时锁水平 / 竖直，Shift 临时反转；\n"
+                "直线的宽或高设为 0 即水平 / 竖直线，两者不能同时为 0。\n"
+                "方向键：选中图元后按一下挪一格，按住连续挪；Shift 加速 10 倍，\n"
+                "画布有焦点时生效（无选中时方向键仍用于滚动画布）。\n"
+                "组合模板：选中组后保存进工具箱，点击 / 拖放即可重复实例化，\n"
+                "模板文件与旧设计器共用 toolbox_templates.json。\n"
                 "不含 PLC / 料仓状态绑定。",
             )
         elif key == "toggle_visible":
@@ -336,11 +385,134 @@ class DesignerWindow(QMainWindow):
             self._toggle_visible(targets)
         elif key == "rename":
             self._rename(payload or [it.item_id for it in sel])
+        elif key == "save_template":
+            self._capture_group_as_template(None)
         self._refresh()
+
+    # ------------------------------------------------------------------
+    # 组合模板：菜单 / 画布右键 / 工具箱按钮 / 拖放共用这一组入口
+    # ------------------------------------------------------------------
+    def _refresh_template_dock(self) -> None:
+        self.toolbox.set_templates(self.template_store.templates)
+        has_group = self._selected_group() is not None
+        self.toolbox.set_capture_enabled(has_group)
+        self.actions["save_template"].setEnabled(has_group)
+
+    def _selected_group(self):
+        sel = self.scene.selected_items()
+        if len(sel) == 1 and getattr(sel[0], "TYPE", "") == "group":
+            return sel[0]
+        return None
+
+    def _capture_group_as_template(self, group=None) -> None:
+        group = group or self._selected_group()
+        if group is None:
+            self.status_bar.showMessage(
+                "请先选中一个组（多个图元请先「成组」）", 3000)
+            return
+        default_name = self.template_store.unique_name(
+            group.get_name() or "组合模板")
+        name, ok = QInputDialog.getText(
+            self, "添加到控件工具箱", "模板名称：", text=default_name)
+        if not ok:
+            return
+        try:
+            template = self.template_store.add_from_group(self.scene, group, name)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "添加到控件工具箱", str(exc))
+            return
+        self._refresh_template_dock()
+        self.status_bar.showMessage(
+            f"已添加组合模板「{template.name}」（{template.node_count} 个图元）",
+            3500)
+
+    def _rename_template(self, template_id: str) -> None:
+        template = self.template_store.get(template_id)
+        if template is None:
+            return
+        new_name, ok = QInputDialog.getText(
+            self, "重命名模板", "模板名称：", text=template.name)
+        if not ok:
+            return
+        try:
+            template = self.template_store.rename(template_id, new_name)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "重命名模板", str(exc))
+            return
+        self._refresh_template_dock()
+        self.status_bar.showMessage(f"模板已重命名：{template.name}", 3000)
+
+    def _delete_template(self, template_id: str) -> None:
+        template = self.template_store.get(template_id)
+        if template is None:
+            return
+        reply = QMessageBox.question(
+            self, "删除模板",
+            f"确定从控件工具箱删除模板「{template.name}」吗？\n"
+            "已经放在画布上的图元不会受影响。",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        try:
+            removed = self.template_store.remove(template_id)
+        except OSError as exc:
+            QMessageBox.warning(self, "删除模板", str(exc))
+            return
+        if removed:
+            self._refresh_template_dock()
+            self.status_bar.showMessage(f"已删除模板：{template.name}", 3000)
+
+    def add_template_at_view_center(self, template_id: str) -> None:
+        """点击模板按钮：插到当前视口中心（不是场景原点）。"""
+        center = self.view.viewport().rect().center()
+        self._insert_template(template_id, self.view.mapToScene(center))
+
+    def _on_template_dropped(self, template_id: str, scene_pt: QPointF) -> None:
+        self._insert_template(template_id, scene_pt)
+
+    def _insert_template(self, template_id: str, scene_pt: QPointF) -> None:
+        template = self.template_store.get(template_id)
+        if template is None:
+            self.status_bar.showMessage("模板不存在或已被删除", 3000)
+            return
+        cx, cy = self.scene.projection.inverse_point(scene_pt.x(), scene_pt.y())
+        try:
+            root = self.scene.instantiate_template(template, QPointF(cx, cy))
+        except Exception as exc:
+            print(f"添加控件模板失败({template.name}): {exc}")
+            QMessageBox.warning(
+                self, "添加控件模板",
+                f"无法添加模板「{template.name}」：\n{exc}")
+            return
+        if root is None:
+            self.status_bar.showMessage(f"添加模板失败：{template.name}", 3000)
+            return
+        self.scene.clearSelection()
+        root.setSelected(True)
+        self._after_edit()
+        self.status_bar.showMessage(
+            f"已添加组合模板「{template.name}」（{template.node_count} 个图元）",
+            3500)
 
     def _do_tree_action(self, key: str, ids: list[int]) -> None:
         self._select_from_tree(ids)
         self._do(key, ids)
+
+    def _on_ortho_changed(self, on: bool) -> None:
+        """视图才是正交状态的真值；这里把菜单 / 工具栏 / 状态栏对齐过去。
+
+        ``setChecked`` 不发 ``triggered``，再叠一层 blockSignals 保证以后
+        从画布快捷键切正交时也不会绕回 ``_do`` 形成二次 toggle。
+        """
+        action = self.actions.get("toggle_ortho")
+        if action is not None and action.isChecked() != on:
+            action.blockSignals(True)
+            action.setChecked(on)
+            action.blockSignals(False)
+        self.ortho_label.setText("正交 开" if on else "正交 关")
+        self.status_bar.showMessage(
+            "正交已开启：直线只画水平 / 竖直线（按住 Shift 临时画斜线）" if on
+            else "正交已关闭：按住 Shift 可临时画正交线", 3000)
 
     def _toggle_visible(self, ids: list[int]) -> None:
         for iid in ids:
@@ -395,7 +567,10 @@ class DesignerWindow(QMainWindow):
                 tip = f"在画布上点击三下以创建「{label}」"
             else:
                 tip = f"在画布上单击以放置「{label}」"
-            self.status_bar.showMessage(f"绘制模式：{tip}，按 Esc 退出", 6000)
+            if self.view.is_ortho_mode() and type_key in ORTHO_DRAW_TYPES:
+                tip += "（正交已开启：只出水平/竖直线，按 Shift 临时画斜线）"
+            self.status_bar.showMessage(
+                f"绘制模式：{tip}，按 Esc 退出、F8 切换正交", 6000)
         else:
             self.status_bar.showMessage("已退出绘制模式", 2000)
         self._refresh()
@@ -513,5 +688,8 @@ class DesignerWindow(QMainWindow):
         for key in ("delete", "duplicate", "group", "ungroup", "z_front",
                     "z_back", "z_raise", "z_lower"):
             self.actions[key].setEnabled(has_sel)
+        has_group = self._selected_group() is not None
+        self.actions["save_template"].setEnabled(has_group)
+        self.toolbox.set_capture_enabled(has_group)
 
 

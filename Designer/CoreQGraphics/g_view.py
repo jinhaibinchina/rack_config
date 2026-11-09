@@ -1,7 +1,7 @@
 """QGraphicsView 视图与交互层。
 
 Core 没有独立 view 类（自绘 QWidget 兼视图），这里补一层：
-框选 / 平移 / 缩放 / 旋转 / 分组解组 / T 门控吸附 / 红色十字标记。
+框选 / 平移 / 缩放 / 旋转 / 分组解组 / T 抓起-吸附-对齐 / 红色十字标记。
 
 视图变换保持 Qt 默认（y 向下、无镜像）；AGV 轴交换已在加载时投影进
 item 几何，所以文字不会被镜像，画面朝向仍与旧实现一致。
@@ -11,16 +11,22 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
-    QBrush, QColor, QCursor, QKeyEvent, QMouseEvent, QPainter,
+    QBrush, QColor, QCursor, QFontMetrics, QKeyEvent, QMouseEvent, QPainter,
     QPainterPath, QPen, QWheelEvent,
 )
-from PySide6.QtWidgets import QGraphicsItem, QGraphicsView, QMenu, QRubberBand
+from PySide6.QtWidgets import (
+    QApplication, QGraphicsItem, QGraphicsView, QMenu, QRubberBand,
+)
 
-from .g_snap import GRID_MAJOR_EVERY, SnapSystem
+from .g_scene import ORTHO_DRAW_TYPES
+from .g_snap import GRID_MAJOR_EVERY, GRID_STEP, SnapSystem
 
 ELEMENT_MIME_TYPE = "application/x-coreqg-element"
+# 组合模板按钮拖的是模板 id，不是图元类型；与旧设计器共用同一种载荷，
+# 但 MIME 单独开一个，落在画布上时由主窗口走 TemplateStore 实例化。
+TEMPLATE_MIME_TYPE = "application/x-design-template"
 
 # 选中图元的旋转中心标记（固定屏幕像素，不随视图缩放变形）。
 # 只画红点，不再画旁边的 ID 数字标签：多选时一串数字既挡画面又没信息量。
@@ -37,8 +43,19 @@ _GRID_MAJOR = QColor(90, 120, 150, 110)
 
 # 鼠标附近吸附标记：小于这个屏幕像素的偏移不吸附，避免抖动
 _SNAP_MIN_PX = 2.0
+
+# 方向键微调：短按走一格；按住超过延迟后按固定间隔连续走。持续移动由
+# 视图自己的定时器驱动（不依赖系统键盘自动重复设置，也不会被 autoRepeat
+# 事件叠加成双倍位移）；同时按住两个方向键时走合向量（对角）。
+_NUDGE_KEYS = {
+    Qt.Key_Left: (-1.0, 0.0), Qt.Key_Right: (1.0, 0.0),
+    Qt.Key_Up: (0.0, -1.0), Qt.Key_Down: (0.0, 1.0),
+}
+_NUDGE_DELAY_MS = 350
+_NUDGE_INTERVAL_MS = 80
+_NUDGE_FAST_FACTOR = 10.0     # Shift + 方向键 = 一次 10 格
 # 捕捉点十字：与旧 Core 一致用纯红（选中中心红点 214,51,46 更暗、支点环是蓝的，
-# 三者不会混淆）。门控打开时更饱和、更粗，表示「现在按 T 会吸过去」。
+# 三者不会混淆）。吸附系统开启时更饱和、更粗，表示「现在按 T 会吸过去」。
 _SNAP_CROSS_COLOR = QColor(255, 0, 0)
 _SNAP_CROSS_IDLE = QColor(255, 34, 34)
 
@@ -59,7 +76,9 @@ class GraphicsView(QGraphicsView):
     """交互视图。``scene()`` 应为 :class:`GraphicsScene`。"""
 
     elementDropped = Signal(str, QPointF)   # (type_key, 视图场景坐标)
+    templateDropped = Signal(str, QPointF)  # (template_id, 视图场景坐标)
     actionTriggered = Signal(str)           # 右键菜单的统一命令名
+    orthoModeChanged = Signal(bool)         # 正交开关（F8 / 菜单）状态变化
 
     def __init__(self, scene=None, parent=None) -> None:
         super().__init__(parent)
@@ -74,6 +93,11 @@ class GraphicsView(QGraphicsView):
         self._pan_enabled = True
         self._zoom_enabled = True
         self.show_grid = True
+        # O 键作为「设置旋转中心」的修饰键：按住 O 时右键把选中图元的旋转中心
+        # 钉到点击处（见 mousePressEvent），取代原右键菜单项。
+        self._origin_key_held = False
+        # 按 O + 右键已消费右键菜单，避免随后弹出的 contextMenuEvent 再画菜单
+        self._origin_suppress_menu = False
         # 历史名沿用 show_ids：现在只控制「选中图元的红色旋转中心点」，
         # ID 文字标签已移除；视图菜单 Ctrl+Shift+I 切换的就是这个红点。
         self.show_ids = True
@@ -89,13 +113,35 @@ class GraphicsView(QGraphicsView):
         # 选中项自身捕捉点的缓存（见 _selection_own_points）
         self._own_cache: set | None = None
         self._own_key: tuple | None = None
+        # T 键「抓起 → 对齐」：被抓图元的 id 与它那个捕捉点（场景绝对坐标）。
+        # 抓手期间图元**不实时跟手**，下一次按 T 才把该点对齐到新的捕捉点。
+        # 只存 id 不存图元对象，图元被删除 / 撤销重建后不会留下悬空 C++ 引用。
+        self._snap_grab_id: int | None = None
+        self._snap_grab_point: QPointF | None = None
         # 绘制模式（CAD 式分点）：激活工具后图元跟随鼠标，点击画布落点
         self._draw_type = ""
-        # 右键位置（page 场景坐标）：供「旋转中心设到此处」使用
+        # CAD 正交开关：绘制点列图元时只出屏幕水平 / 竖直段。默认关，
+        # 不改变既有绘制语义；按住 Shift 临时反转（见 _ortho_for_event）。
+        self._ortho_mode = False
+        # 最近一次预览锁定的轴（"H" / "V" / ""），用于画 H/V 提示标签
+        self._ortho_axis = ""
+        # 右键位置（page 场景坐标）：按住 O + 右键时把选中图元旋转中心设到这里
         self._context_page: QPointF | None = None
         # 拖角改尺寸：按下时冻结的逆变换 / 固定对角 / 上一次的总缩放比例
         self._resize_state: dict | None = None
         self._press_modified = False
+        # 方向键微调：按键集合 + 延迟/连发两个定时器。步长默认跟随当前网格，
+        # 可用 set_nudge_step() 固定（见 nudge_step）。
+        self._nudge_step: float | None = None
+        self._nudge_keys: dict[int, tuple[float, float]] = {}
+        self._nudge_shift = False
+        self._nudge_active = False
+        self._nudge_delay = QTimer(self)
+        self._nudge_delay.setSingleShot(True)
+        self._nudge_delay.timeout.connect(self._start_nudge_repeat)
+        self._nudge_repeat = QTimer(self)
+        self._nudge_repeat.setInterval(_NUDGE_INTERVAL_MS)
+        self._nudge_repeat.timeout.connect(self._nudge_tick)
         # 双击「跟手」：双击图元后图元钉在光标上随鼠标走（左键拖动已取消，
         # 这是鼠标移动图元的唯一入口），
         # 左键点击落定、Esc 放回原位。_follow_cursor 记上一次处理过的光标位置，
@@ -124,7 +170,13 @@ class GraphicsView(QGraphicsView):
     # 视图
     # ------------------------------------------------------------------
     def setScene(self, scene) -> None:
-        # 换场景（切页 / 关窗）时跟手状态必须作废，否则会抓着旧场景的图元
+        # 换场景（切页 / 关窗）时跟手 / 抓手 / 方向键状态必须作废，否则定时器
+        # 会拿着旧场景的图元继续移动；这里直接丢弃，不记撤销。
+        self._nudge_delay.stop()
+        self._nudge_repeat.stop()
+        self._nudge_keys.clear()
+        self._nudge_active = False
+        self._clear_snap_grab()
         self._follow_items = []
         self._follow_start = []
         self._follow_cursor = None
@@ -176,6 +228,11 @@ class GraphicsView(QGraphicsView):
     def _on_scene_selection_changed(self) -> None:
         """选中集合变化时整屏重绘：中心点标记只覆盖选中项，局部更新会留残影。"""
         self._invalidate_own_points()
+        # 图层树 / 属性面板改了选中、或抓手图元被删掉：抓手就此作废，
+        # 别把「已经不在选中里」的图元继续挂着。
+        if self._snap_grab_id is not None and self._grabbed_item(
+                check_selected=True) is None:
+            self._clear_snap_grab()
         if self._follow_items:
             # 图层树 / 属性面板改了选中（或被删掉）时跟手就失去意义了，
             # 直接落定，别让「跟着一个已经取消选中的图元」这种状态留着。
@@ -219,7 +276,11 @@ class GraphicsView(QGraphicsView):
     def refresh_snap_points(self) -> None:
         scene = self.scene()
         self._invalidate_own_points()
-        if scene is not None and hasattr(scene, "snap_points"):
+        if scene is not None and hasattr(scene, "snap_points_with_owners"):
+            ends, mids, owners = scene.snap_points_with_owners()
+            self.snap.update_points(ends, mids, owners)
+        elif scene is not None and hasattr(scene, "snap_points"):
+            # 外部自定义场景只有老接口：点集照建，只是没有归属信息
             ends, mids = scene.snap_points()
             self.snap.update_points(ends, mids)
 
@@ -229,6 +290,8 @@ class GraphicsView(QGraphicsView):
     # ------------------------------------------------------------------
     def set_draw_tool(self, type_key: str | None) -> None:
         """激活/取消绘制工具。空值取消，恢复框选与默认光标。"""
+        self._clear_snap_grab()
+        self._ortho_axis = ""
         scene = self.scene()
         if type_key and getattr(scene, "is_run_mode", False):
             type_key = None
@@ -242,6 +305,66 @@ class GraphicsView(QGraphicsView):
         self.end_follow()            # 换到绘制工具：先把跟手的图元落定
         self.setDragMode(QGraphicsView.NoDrag)
         self.setCursor(Qt.CrossCursor)
+        self.viewport().update()
+
+    # ------------------------------------------------------------------
+    # CAD 正交模式：绘制点列图元时把「上一落点 → 当前光标」锁到屏幕主轴
+    # ------------------------------------------------------------------
+    def set_ortho_mode(self, enable: bool) -> None:
+        """打开 / 关闭正交（F8）。状态由视图持有，菜单按钮只是它的镜像。"""
+        on = bool(enable)
+        if on == self._ortho_mode:
+            return
+        self._ortho_mode = on
+        self._ortho_axis = ""
+        self.orthoModeChanged.emit(on)
+        self.viewport().update()
+
+    def is_ortho_mode(self) -> bool:
+        return self._ortho_mode
+
+    def _draw_page_point(self, event) -> QPointF:
+        """绘制模式下把鼠标位置换算成 page 点，必要时施加正交约束。"""
+        scene = self.scene()
+        pos_scene = self.mapToScene(event.position().toPoint())
+        cx, cy = scene.projection.inverse_point(pos_scene.x(), pos_scene.y())
+        return self._ortho_page_point(QPointF(cx, cy), event.modifiers())
+
+    def _ortho_page_point(self, page_pt: QPointF, modifiers) -> QPointF:
+        """把绘制用的 page 点锁到屏幕主轴，返回约束后的点。
+
+        预览与落点都走这一个入口，所以「预览看到的是水平线、点下去就是
+        水平线」必然一致。锚点取 ``draw_preview_state()`` 的最后一个落点：
+        直线是起点，多段线 / 三角形是刚落下的上一个顶点（逐段锁定，与
+        CAD 正交一致）。首点之前没有锚点，原样返回。
+
+        Shift 临时反转（CAD 惯例）：开着时按住 = 临时画斜线，关着时按住 =
+        临时画正交线。用传进来的 modifiers 而不是全局键盘状态，画布失焦
+        或按键事件顺序变化都不会留下残留。
+        """
+        scene = self.scene()
+        self._ortho_axis = ""
+        if self._draw_type not in ORTHO_DRAW_TYPES:
+            return page_pt
+        temp = bool(modifiers & Qt.ShiftModifier)
+        if self._ortho_mode == temp:       # XOR：两值相同即正交不生效
+            return page_pt
+        state = scene.draw_preview_state() if hasattr(scene, "draw_preview_state") else None
+        if state is None or not state[1]:
+            return page_pt
+        constrained, axis = scene.constrain_ortho(state[1][-1], page_pt)
+        self._ortho_axis = axis
+        return constrained
+
+    def _refresh_ortho_preview(self, modifiers) -> None:
+        """Shift 按下 / 松开时，用上一次光标位置立刻重画预览（不必先动鼠标）。"""
+        scene = self.scene()
+        if (scene is None or self._last_hover is None
+                or not hasattr(scene, "draw_preview")):
+            return
+        cx, cy = scene.projection.inverse_point(
+            self._last_hover.x(), self._last_hover.y())
+        scene.draw_preview(self._ortho_page_point(QPointF(cx, cy), modifiers))
         self.viewport().update()
 
     # ------------------------------------------------------------------
@@ -341,6 +464,28 @@ class GraphicsView(QGraphicsView):
             self._follow_cursor = QPointF(scene_pos)
         self.viewport().update()
 
+    def _group_root_at(self, scene_pos: QPointF):
+        """设计模式点选：命中「组成员」时返回应真正选中的根组，否则 None。
+
+        group 在画布上按 CAD 的块参照处理：单击组内任何成员都选中整个组，
+        成员不能被画布单独选中（要精确编辑成员请用图层树 / 属性面板）。
+        只有根祖先是 ``TYPE == "group"`` 才重定向——普通逻辑父子（根是
+        rect / text 等）保持「按下只选中它自己」的原语义。运行态不改。
+        """
+        scene = self.scene()
+        if scene is None or getattr(scene, "is_run_mode", False):
+            return None
+        for it in scene.items(scene_pos):
+            if getattr(it, "item_id", None) is None or not it.isVisible():
+                continue
+            if not (it.flags() & QGraphicsItem.ItemIsSelectable):
+                continue
+            root = it.root_parent()
+            if root is not it and getattr(root, "TYPE", "") == "group":
+                return root
+            break        # 命中的是顶层图元 / 组框本身，交回基类正常处理
+        return None
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if self._follow_items and event.button() != Qt.NoButton:
             if event.button() == Qt.LeftButton:
@@ -362,9 +507,7 @@ class GraphicsView(QGraphicsView):
         if self._draw_type:
             scene = self.scene()
             if scene is not None and hasattr(scene, "begin_draw_tool"):
-                pos_scene = self.mapToScene(event.position().toPoint())
-                cx, cy = scene.projection.inverse_point(pos_scene.x(), pos_scene.y())
-                page_pt = QPointF(cx, cy)
+                page_pt = self._draw_page_point(event)
                 # 多边形 / 路径：右键闭合
                 if event.button() == Qt.RightButton and scene.drawing_polygon():
                     scene.finish_polygon(page_pt)
@@ -384,6 +527,16 @@ class GraphicsView(QGraphicsView):
                 self._context_page = QPointF(
                     *scene.projection.inverse_point(scene_pt.x(), scene_pt.y())
                 )
+            # O + 右键：把选中图元的旋转中心设到点击处（取代原右键菜单项），
+            # 不弹右键菜单。只在设计模式、非绘制 / 非平移时生效。
+            if (self._origin_key_held and scene is not None
+                    and not getattr(scene, "is_run_mode", False)
+                    and not self._draw_type and not self._panning):
+                self.actionTriggered.emit("origin_here")
+                self._origin_suppress_menu = True
+                event.accept()
+                return
+            self._origin_suppress_menu = False
             self._prepare_context_target(event)
             event.accept()
             return
@@ -401,6 +554,22 @@ class GraphicsView(QGraphicsView):
                     getattr(scene, "is_modified", lambda: False)())
             # 左键按下只做选中 / 框选，**不再拖动图元**：移动图元统一走
             # 双击跟手（见 mouseDoubleClickEvent），避免点选时手抖把图元挪走。
+            # 组成员不单独选中：点在成员上改成选它的根组；空白处按下仍由
+            # 基类启动框选（Qt 只在按下点没有 item 时才画橡皮筋），不受影响。
+            root = self._group_root_at(
+                self.mapToScene(event.position().toPoint()))
+            if root is not None:
+                multi = bool(event.modifiers()
+                             & (Qt.ControlModifier | Qt.ShiftModifier))
+                if not multi:
+                    scene.clearSelection()
+                for it in list(scene.selected_items()):
+                    r = it.root_parent()
+                    if it is not r and getattr(r, "TYPE", "") == "group":
+                        it.setSelected(False)
+                root.setSelected(True)
+                event.accept()
+                return
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
@@ -440,6 +609,7 @@ class GraphicsView(QGraphicsView):
 
     def begin_follow(self, target, scene_pos: QPointF | None = None) -> bool:
         """开始跟手：确保目标被选中，把被选中的顶层图元挂到光标上。"""
+        self._clear_snap_grab()      # 跟手与「T 抓手」互斥，别两套状态同时抓
         scene = self.scene()
         if scene is None or target is None:
             return False
@@ -478,6 +648,13 @@ class GraphicsView(QGraphicsView):
         if abs(delta.x()) > 1e-9 or abs(delta.y()) > 1e-9:
             for it in self._follow_items:
                 it.moveBy(delta.x(), delta.y())   # 子图元在 on_item_moved 里随动
+            # T 抓手：被抓的捕捉点也随图元一起走。下一次按 T 的对齐量是
+            # 「新捕捉点 - 记录点」，不跟着更新就会把整段跟手位移重复推一遍。
+            if self._snap_grab_point is not None:
+                self._snap_grab_point = QPointF(self._snap_grab_point) + delta
+                # 图元挪了，自身点坐标全变：排除集合的缓存必须作废，否则
+                # 移动中十字会按旧坐标筛选，按 T 时也可能排除错点。
+                self._invalidate_own_points()
             moved = True
         if moved and button_held:
             # 双击后一直按住：松手即落点（"双击拖"手势）
@@ -486,6 +663,7 @@ class GraphicsView(QGraphicsView):
 
     def end_follow(self, restore: bool = False) -> None:
         """结束跟手。``restore=True`` 用于 Esc：整组回到抓住时的位置。"""
+        self._clear_snap_grab()
         if not self._follow_items:
             return
         items = self._follow_items
@@ -648,14 +826,18 @@ class GraphicsView(QGraphicsView):
         if scene is None or getattr(scene, "is_run_mode", False):
             return
         pos = self.mapToScene(event.position().toPoint())
+        # 点在组成员上：右键目标也改成根组，避免「画布右键反而把成员选中」
+        # 与左键「只能选组」的语义打架。
+        root = self._group_root_at(pos)
         for it in scene.items(pos):
             if getattr(it, "item_id", None) is None or not it.isVisible():
                 continue
             if not (it.flags() & QGraphicsItem.ItemIsSelectable):
                 continue
-            if not it.isSelected():
+            target = root or it
+            if not target.isSelected():
                 scene.clearSelection()
-                it.setSelected(True)
+                target.setSelected(True)
             break
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
@@ -685,9 +867,7 @@ class GraphicsView(QGraphicsView):
         if self._draw_type and self.scene() is not None:
             scene = self.scene()
             if hasattr(scene, "draw_preview"):
-                pos_scene = self.mapToScene(event.position().toPoint())
-                cx, cy = scene.projection.inverse_point(pos_scene.x(), pos_scene.y())
-                scene.draw_preview(QPointF(cx, cy))
+                scene.draw_preview(self._draw_page_point(event))
                 event.accept()
                 self.viewport().update()
                 return
@@ -742,11 +922,167 @@ class GraphicsView(QGraphicsView):
         self._press_modified = now
 
     # ------------------------------------------------------------------
+    # 键盘微调：方向键按「屏幕方向」把选中图元挪一格
+    # ------------------------------------------------------------------
+    def nudge_step(self) -> float:
+        """一次移动的步长（**视图场景坐标**单位，不是 page 单位）。
+
+        默认跟随 ``SnapSystem.grid_step``，即当前可见网格的一格；它随缩放
+        自适应，屏幕上恒为 18~90px。要固定步长用 ``set_nudge_step(50.0)``，
+        传 ``None`` 恢复跟随网格。AGV 投影交换了轴，所以这里的一格在 page
+        坐标里是 x / y 反向换算，方向键本身始终按屏幕上下左右。
+        """
+        if self._nudge_step is not None:
+            return max(0.0, float(self._nudge_step))
+        step = float(getattr(self.snap, "grid_step", 0.0) or 0.0)
+        return step if step > 0.0 else float(GRID_STEP)
+
+    def set_nudge_step(self, step: float | None) -> None:
+        """覆写方向键步长；``None`` = 恢复跟随当前网格步长。"""
+        self._nudge_step = None if step is None else max(0.0, float(step))
+
+    def _nudge_targets(self) -> list:
+        """真正被移动的顶层图元。
+
+        先按 ``top_level_items`` 去掉「父子同时选中」（否则父带动子、子又被
+        单独挪一次 = 双重变换）；再把仍带父对象的项上溯到根——子图元不能
+        自行平移（``set_page_center`` 会拒绝），画布单选组时选中的本来就是
+        组，这里覆盖的是「图层树里精确选中了某个成员」的情形：方向键仍把
+        整组当成一个原子移动，与画布点选语义一致。
+        """
+        scene = self.scene()
+        if scene is None or not hasattr(scene, "selected_items"):
+            return []
+        sel = [it for it in scene.selected_items()
+               if getattr(it, "item_id", None) is not None]
+        if not sel:
+            return []
+        batch = (scene.top_level_items(sel)
+                 if hasattr(scene, "top_level_items") else sel)
+        out: list = []
+        seen: set[int] = set()
+        for it in batch:
+            if getattr(it, "translate_locked", lambda: False)():
+                root = it.root_parent() if hasattr(it, "root_parent") else None
+                if root is not None:
+                    it = root
+            if getattr(it, "item_id", None) is None or it.item_id in seen:
+                continue
+            seen.add(it.item_id)
+            out.append(it)
+        return out
+
+    def _nudge_vector(self) -> tuple[float, float]:
+        """当前按住的方向键合向量（已乘步长）。"""
+        if not self._nudge_keys:
+            return (0.0, 0.0)
+        step = self.nudge_step()
+        if self._nudge_shift:
+            step *= _NUDGE_FAST_FACTOR
+        dx = sum(v[0] for v in self._nudge_keys.values()) * step
+        dy = sum(v[1] for v in self._nudge_keys.values()) * step
+        return (dx, dy)
+
+    def _nudge_by(self, dx: float, dy: float, targets=None) -> bool:
+        """按视图场景坐标增量平移，与双击跟手共用 ``moveBy`` 链路：
+        ``itemChange`` -> ``on_item_moved`` 负责标脏、支点随行、后代刚体随动。
+        移动过程中**不**重建吸附点（page_1 有约 1.4 万个点），留到收尾做一次。
+        """
+        if abs(dx) < 1e-9 and abs(dy) < 1e-9:
+            return False
+        items = self._nudge_targets() if targets is None else targets
+        if not items:
+            return False
+        for it in items:
+            it.moveBy(dx, dy)
+        self.viewport().update()
+        return True
+
+    def _handle_nudge_press(self, event: QKeyEvent) -> bool:
+        """返回 False = 不接管（交还基类，方向键照常滚动画布）。"""
+        key = event.key()
+        if key not in _NUDGE_KEYS:
+            return False
+        mods = event.modifiers()
+        if mods & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier):
+            return False
+        scene = self.scene()
+        if (scene is None or getattr(scene, "is_run_mode", False)
+                or self._draw_type or self._follow_items):
+            return False
+        if self.nudge_step() <= 0.0:
+            return False
+        self._nudge_shift = bool(mods & Qt.ShiftModifier)
+        if key in self._nudge_keys:
+            # 系统键盘自动重复发来的重复 press：我们自己的定时器在驱动，
+            # 吞掉即可，绝不重复移动（否则速度随 OS 键盘设置变化）。
+            return True
+        targets = self._nudge_targets()
+        if not targets:
+            return False
+        self._nudge_keys[key] = _NUDGE_KEYS[key]
+        self._nudge_active = True
+        # 新按下的键只走「自己那一步」：若这里用合向量，先按右再按上会
+        # 把水平分量重复算一次。合向量只在连发定时器的 tick 里使用。
+        step = self.nudge_step() * (_NUDGE_FAST_FACTOR if self._nudge_shift else 1.0)
+        ux, uy = _NUDGE_KEYS[key]
+        self._nudge_by(ux * step, uy * step, targets)   # 短按只走这一步
+        # 已经处于连发时不重启延迟，新方向直接并入合向量继续走
+        if self._nudge_repeat.isActive():
+            self._nudge_delay.stop()
+        else:
+            self._nudge_delay.start(_NUDGE_DELAY_MS)
+        return True
+
+    def _start_nudge_repeat(self) -> None:
+        if self._nudge_keys:
+            self._nudge_repeat.start()
+
+    def _nudge_tick(self) -> None:
+        dx, dy = self._nudge_vector()
+        if not self._nudge_by(dx, dy):
+            self._finish_nudge()
+
+    def _finish_nudge(self) -> None:
+        """一次连续方向键操作收尾：刷新吸附点 / 面板，并只记一次撤销。"""
+        self._nudge_delay.stop()
+        self._nudge_repeat.stop()
+        if not self._nudge_active:
+            return
+        self._nudge_active = False
+        scene = self.scene()
+        self.refresh_snap_points()
+        if scene is not None:
+            if hasattr(scene, "geometryChanged"):
+                scene.geometryChanged.emit(None)
+            if hasattr(scene, "contentChanged"):
+                scene.contentChanged.emit()
+        self.viewport().update()
+        # 主窗口的 "drag_done" 分支走 history.commit()：整段连续移动合并成
+        # 一个撤销步，不会每 80ms 深拷贝一次 1618 图元的整页快照。
+        self.actionTriggered.emit("drag_done")
+
+    # ------------------------------------------------------------------
     # 键盘：T 门控 + 常用编辑
     # ------------------------------------------------------------------
     def keyPressEvent(self, event: QKeyEvent) -> None:
         scene = self.scene()
         key = event.key()
+        if key == Qt.Key_Shift and self._nudge_keys:
+            # 先按方向键、后按 Shift：连发定时器的下一步就该加速
+            self._nudge_shift = True
+        if key in _NUDGE_KEYS:
+            if self._handle_nudge_press(event):
+                event.accept()
+            else:
+                # 运行态 / 绘制态 / 跟手 / 无选中：交还基类，方向键滚动画布
+                super().keyPressEvent(event)
+            return
+        if key == Qt.Key_Shift and self._draw_type and not event.isAutoRepeat():
+            # 正交的 Shift 临时反转：不挪鼠标也立刻改预览
+            self._refresh_ortho_preview(Qt.ShiftModifier)
+            event.ignore()
+            return
         if key == Qt.Key_Escape and self._follow_items:
             # 跟手中按 Esc：整组放回抓住时的位置（不是落在当前点）
             self.end_follow(restore=True)
@@ -756,8 +1092,15 @@ class GraphicsView(QGraphicsView):
             scene = self.scene()
             if scene is not None and getattr(scene, "drawing_active", lambda: False)():
                 scene.cancel_draw()
+                self._ortho_axis = ""
             else:
                 self.set_draw_tool(None)
+            event.accept()
+            return
+        if key == Qt.Key_Escape and self.is_snap_grabbing():
+            # 兜底：抓手通常伴随跟手（已由上面的 _follow_items 分支处理，
+            # Esc 会整组放回抓住时的位置）；这里只收掉残留的抓手状态。
+            self._clear_snap_grab()
             event.accept()
             return
         if (event.modifiers() & Qt.ControlModifier) and key in (Qt.Key_C, Qt.Key_V):
@@ -775,27 +1118,17 @@ class GraphicsView(QGraphicsView):
             self.setCursor(Qt.OpenHandCursor)
             event.accept()
             return
+        if (key == Qt.Key_O
+                and not (event.modifiers()
+                         & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))):
+            # O 只作「设置旋转中心」的修饰键：置位后由 O + 右键消费，本身不触发
+            # 任何动作，也不抢 Ctrl+O 等带修饰的快捷键。
+            self._origin_key_held = True
+            event.accept()
+            return
         if key == Qt.Key_T:
-            self.snap.enabled = not self.snap.enabled
-            self.refresh_snap_points()
-            # 门控打开后立刻按「光标当前所在位置」吸附过去：鼠标吸了多少偏移，
-            # 选中的图元就移动多少。_snap_offset 不清零 —— 它记的是「已经叠加
-            # 到图元上的额外位移」，清掉会让再次开 T 时又推一次。
-            if self.snap.enabled:
-                # 光标刚移出画布（去点了属性面板 / 图层树）时 snap.hover 已被
-                # 清空，退回最后一次画布位置，免得「按 T 没反应」
-                if self.snap.hover is None and self._last_hover is not None:
-                    self.snap.hover = QPointF(self._last_hover)
-                moved = self._apply_snap_follow(allow_release=False,
-                                                require_movable=False)
-                # 光标不在画布上、或十字正落在选中项自己的点上（那里不吸附）
-                # 就别去挪系统光标，只把图元吸过去
-                if self.viewport().underMouse() and self._hover_marker()[1]:
-                    self._warp_cursor_to_snap()
-                if moved:
-                    # 吸附真的挪了图元：记一个撤销点（拖动路径靠 release 记）
-                    self.actionTriggered.emit("drag_done")
-            self.viewport().update()
+            # T 现在是一次性「吸附 / 抓起 / 对齐」动作键，不再是开关门控
+            self._snap_action()
             event.accept()
             return
         sel = scene.selected_items() if hasattr(scene, "selected_items") else []
@@ -849,15 +1182,32 @@ class GraphicsView(QGraphicsView):
         event.accept()
 
     def keyReleaseEvent(self, event: QKeyEvent) -> None:
+        if event.key() == Qt.Key_Shift:
+            self._nudge_shift = False
+        if event.key() in _NUDGE_KEYS and not event.isAutoRepeat():
+            self._nudge_keys.pop(event.key(), None)
+            if not self._nudge_keys:
+                self._finish_nudge()
+        if event.key() == Qt.Key_Shift and self._draw_type:
+            self._refresh_ortho_preview(Qt.NoModifier)
         if event.key() == Qt.Key_Space:
             self._space_held = False
             if not self._panning:
                 self.unsetCursor()
+        if event.key() == Qt.Key_O:
+            self._origin_key_held = False
         super().keyReleaseEvent(event)
 
     def focusOutEvent(self, event) -> None:
         # 跟手状态要收掉：切走再回来时光标已不在原位，继续跟会突然跳一段
         self.end_follow()
+        # 焦点切走时系统可能不再补发 keyRelease，方向键状态在这里兜底收尾
+        self._nudge_keys.clear()
+        self._nudge_shift = False
+        self._finish_nudge()
+        # O 键状态一并清掉，避免焦点切走后卡在「按住 O」的假状态
+        self._origin_key_held = False
+        self._origin_suppress_menu = False
         super().focusOutEvent(event)
 
     # ------------------------------------------------------------------
@@ -870,6 +1220,12 @@ class GraphicsView(QGraphicsView):
         而全选 1600 个图元时它有一万多个点（每次重算约 60ms，鼠标会明显发涩），
         所以按选中集合缓存；几何变化（``geometryChanged`` / ``refresh_snap_points``
         / 换场景）时显式失效。
+
+        **共享坐标例外**：排除的是「选中图元的特征点」，不是「这个坐标」。
+        若同一坐标上还有**未选中**图元的点（对齐时极常见：被抓图元的端点已经
+        跟手挪到目标图元的端点上，两点重合），就必须保留，否则目标点会一起
+        消失，按 T 只能吸到旁边的格点。判据走 ``SnapSystem.owners_at`` 的
+        坐标 -> 图元归属表，按 owner 过滤而不是按坐标一刀切。
         """
         scene = self.scene()
         own: set = set()
@@ -883,7 +1239,54 @@ class GraphicsView(QGraphicsView):
             e, m = it.snap_points()
             for p in e + m:
                 own.add((p.x(), p.y()))
+        sel_ids = set(key)
+        shared = {
+            c for c in own
+            if any(iid not in sel_ids
+                   for iid in self.snap.owners_at(QPointF(c[0], c[1])))
+        }
+        own -= shared
         self._own_cache, self._own_key = own, key
+        return own
+
+    def _draw_own_points(self) -> set:
+        """正在绘制的临时图元**自身**的捕捉点：取点吸附不能吸到自己。
+
+        ``begin_draw_tool`` 用 ``create_item(commit=False)`` 建图元，它同样进了
+        ``index.by_id``；可见类型（line / rect / circle / text ...）的端点 / 中点
+        会被 ``snap_points_with_owners`` 收进捕捉点表，但它没被选中，所以
+        ``_selection_own_points()`` 抓不到。不排除就会吸到自己刚落的点或预览
+        端点，等于自我牵引。
+
+        只排除「**只有**绘制图元自己」的坐标：若同一坐标上还有别的图元的点
+        （例如从已有图元的端点起画），那是合法捕捉目标，必须保留。判据同样
+        走 ``SnapSystem.owners_at``，避免按坐标一刀切。
+        """
+        scene = self.scene()
+        item = getattr(scene, "_draw_item", None) if scene is not None else None
+        if item is None:
+            return set()
+        try:
+            e, m = item.snap_points()
+            iid = item.item_id
+        except RuntimeError:      # 绘制图元已被销毁
+            return set()
+        own = {(p.x(), p.y()) for p in e + m}
+        if not own:
+            return own
+        return {c for c in own
+                if set(self.snap.owners_at(QPointF(c[0], c[1]))) <= {iid}}
+
+    def _snap_scan_exclude(self) -> set:
+        """本次捕捉点扫描要排除的坐标：选中项自身 + 绘制中临时图元自身。
+
+        绘制阶段的「自身」有两层：既有选中图元，以及正在画的那个临时图元。
+        显示（``_hover_marker``）、吸附（``_snap_action``）都走这一份，口径
+        才不会分叉。
+        """
+        own = self._selection_own_points()
+        if self._draw_type:
+            own = own | self._draw_own_points()
         return own
 
     def _invalidate_own_points(self, *_args) -> None:
@@ -894,31 +1297,43 @@ class GraphicsView(QGraphicsView):
         scale = abs(self.transform().m11())
         return scale if scale > 1e-9 else 1.0
 
-    def _warp_cursor_to_snap(self) -> None:
+    def _warp_cursor_to_snap(self, target: QPointF | None = None) -> None:
         """把系统光标也挪到捕捉点上（旧 Core ``warp_cursor`` 的等价物）。
 
-        图元与光标走的是同一个偏移，所以挪完仍然对位。挪完必须把 ``hover`` 与
-        「已叠加偏移」一起归位：光标已经在捕捉点上了，相对偏移就是 0；否则下一次
-        ``mouseMoveEvent`` 会按新光标位置算出 ``offset = 0``，再把图元推回原处。
+        ``target`` 由调用方直接给定时就是本次按 T 吸到的那个点，**不再重算**
+        ``_hover_marker()``：抓起图元后它已被选中，刚吸到的点立刻变成「选中项
+        自身的点」被排除，重算会漂到旁边的格点 / 别的图元点上 —— 表现就是
+        「按 T 鼠标没有吸附到图元的捕捉点」。
 
-        光标不在画布上时 ``snap.hover`` 已被 ``leaveEvent`` 清空，这里自然跳过，
-        不会把鼠标从别的窗口劫走。
+        图元与光标走的是同一个偏移，所以挪完仍然对位。状态必须先归位再挪光标：
+        某些平台 ``QCursor.setPos`` 会同步派发 ``mouseMoveEvent``，那时
+        ``_follow_cursor`` 必须已经是新位置，否则 warp 会被当成一次拖动。
+        光标不在画布上时调用方不会调这里，不会把鼠标从别的窗口劫走。
         """
-        target, _active = self._hover_marker()
+        if target is None:
+            target, _active = self._hover_marker()
         if target is None:
             return
+        target = QPointF(target)
         vp = self.mapFromScene(target)
-        QCursor.setPos(self.viewport().mapToGlobal(vp))
+        # 光标只会落在整像素上，mapToScene(vp) 与 target 通常差不到 1 个单位。
+        # 跟手基准记这个「实际落点」：warp 派发出来的 mouseMove 算出的增量
+        # 就是 0，图元不会在按 T 的瞬间微微跳一下。
+        landed = self.mapToScene(vp)
         self.snap.hover = QPointF(target)
+        self._last_hover = QPointF(target)
         self._snap_offset = QPointF(0.0, 0.0)
         if self._follow_items:
-            # 跟手中：光标已被挪到捕捉点上，基准跟着改，否则下一次 mouseMove
-            # 会把「挪光标这段」再当成位移推一遍，图元越吸越偏。
-            self._follow_cursor = QPointF(target)
+            self._follow_cursor = QPointF(landed)
+        QCursor.setPos(self.viewport().mapToGlobal(vp))
 
     def _apply_snap_follow(self, allow_release: bool = True,
                            require_movable: bool = True) -> bool:
-        """把光标吸附偏移叠加到选中图元上，返回本次是否真的移动了。
+        """（历史兼容入口，T 键已不再调用）把吸附偏移叠加到选中图元上。
+
+        ``_snap_action()`` 现在只在**已抓手**时移动图元（``_align_grab_to``）；
+        仅选中 / 未选中状态下按 T 只挪光标，不再走这里。保留方法仅为兼容
+        可能的外部调用，设计器自身没有任何调用点。
 
         ``_snap_offset`` 记录「已经叠加过的总偏移」，每帧只补差量，所以：
 
@@ -926,8 +1341,8 @@ class GraphicsView(QGraphicsView):
         * 鼠标移出阈值 → 差量自动抵消，图元回到跟手位置（``allow_release``）；
         * 同一位置反复按 T → 偏移不变、增量为 0，不会越推越远。
 
-        ``allow_release=False`` 用于 T 键：只做一次正向吸附，鼠标没指到
-        任何捕捉点时保持图元不动，避免把之前吸过的偏移又撤回。
+        ``allow_release=False`` 原用于 T 键的一次性正向吸附（现已不再由 T
+        触发）：鼠标没指到任何捕捉点时保持图元不动，避免把之前吸过的偏移撤回。
         ``require_movable`` 默认 True，只有 ``ItemIsMovable`` 的图元才动；
         视图已取消左键拖动（图元默认不可移动），T 键传 False 才作用到任意类型。
 
@@ -949,7 +1364,7 @@ class GraphicsView(QGraphicsView):
         if not sel:
             return False
 
-        target, _kind = self.snap.aim(hover, exclude=self._selection_own_points(),
+        target, _kind = self.snap.aim(hover, exclude=self._snap_scan_exclude(),
                                       always=True)
         if target is None:
             if not allow_release:
@@ -975,6 +1390,197 @@ class GraphicsView(QGraphicsView):
     # 兼容旧调用点
     def _apply_snap_to_selection(self) -> None:
         self._apply_snap_follow()
+
+    # ------------------------------------------------------------------
+    # T 键：吸附光标 → 抓起图元 → 下一次按 T 把抓起的捕捉点对齐过去
+    # ------------------------------------------------------------------
+    def is_snap_grabbing(self) -> bool:
+        """当前是否抓着某个图元的捕捉点（供回归 / 外部判断）。"""
+        return self._snap_grab_id is not None
+
+    def snap_grab_point(self) -> QPointF | None:
+        """记录的被抓捕捉点（场景绝对坐标）；未抓手返回 None。"""
+        return (QPointF(self._snap_grab_point)
+                if self._snap_grab_point is not None else None)
+
+    def _clear_snap_grab(self) -> None:
+        """退出抓手：换场景 / 选中变化 / Esc / 失焦 / 切工具。"""
+        had = self._snap_grab_id is not None
+        self._snap_grab_id = None
+        self._snap_grab_point = None
+        if had and not self._follow_items:
+            self.unsetCursor()
+
+    def _grabbed_item(self, check_selected: bool = False):
+        """抓手图元（子图元返回根父对象）；图元被删 / 取消选中返回 None。"""
+        scene = self.scene()
+        if scene is None or self._snap_grab_id is None:
+            return None
+        index = getattr(scene, "index", None)
+        item = index.by_id.get(self._snap_grab_id) if index is not None else None
+        if item is None:
+            return None
+        if check_selected and not item.isSelected():
+            return None
+        try:
+            return item.root_parent() if item.parent_id else item
+        except RuntimeError:      # 图元 C++ 对象已被销毁
+            return None
+
+    def _grab_item_for_point(self, target: QPointF):
+        """这个捕捉点来自哪个可抓起的顶层图元；网格点 / 无归属返回 None。"""
+        scene = self.scene()
+        index = getattr(scene, "index", None) if scene is not None else None
+        if index is None:
+            return None
+        selected = ({it.item_id for it in scene.selected_items()}
+                    if hasattr(scene, "selected_items") else set())
+        for iid in self.snap.owners_at(target):
+            item = index.by_id.get(iid)
+            if item is None or not item.isVisible():
+                continue
+            if not (item.flags() & QGraphicsItem.ItemIsSelectable):
+                continue
+            # 已选中图元（或其父）的特征点已被排除，不该再被抓起
+            if item.item_id in selected or item.parent_id in selected:
+                continue
+            return item.root_parent() if item.parent_id else item
+        return None
+
+    def _begin_snap_grab(self, item, point: QPointF) -> None:
+        """抓起：选中该图元、记住它的捕捉点，并进入**实时跟手**。
+
+        「抓手模式」就是项目里双击抓图元的那套（ClosedHandCursor）：鼠标走到
+        哪图元跟到哪，被抓的捕捉点由 ``_update_follow`` 同步平移；下次按 T
+        再把该点精修吸附到新的捕捉点上。
+        """
+        scene = self.scene()
+        if scene is None or self._draw_type:
+            # 绘制阶段绝不抓起（双保险：_snap_action 已提前返回绘制分支）
+            return
+        self._clear_snap_grab()
+        scene.clearSelection()
+        item.setSelected(True)
+        # begin_follow 内部会 _clear_snap_grab（此刻已空），所以抓手字段
+        # 必须在它之后再设，否则会被清掉。
+        if not self.begin_follow(item, QPointF(point)):
+            return
+        self._snap_grab_id = item.item_id
+        self._snap_grab_point = QPointF(point)
+        self._invalidate_own_points()
+
+    def _align_grab_to(self, target: QPointF) -> None:
+        """把被抓图元整体平移，使被抓的捕捉点精确落到 target；记录同步更新。
+
+        抓手期间图元只做刚体平移，所以「被抓点」当前位置就是记录值（实时跟手
+        时由 ``_update_follow`` 逐帧同步）；``target - 记录值`` 既是图元的
+        位移，也是记录的更新量。跟手集合整体平移，保持多选时的相对位置。
+        """
+        scene = self.scene()
+        item = self._grabbed_item()
+        if scene is None or item is None or self._snap_grab_point is None:
+            self._clear_snap_grab()
+            return
+        delta = target - self._snap_grab_point
+        self._snap_grab_point = QPointF(target)
+        if abs(delta.x()) < 1e-9 and abs(delta.y()) < 1e-9:
+            return
+        movers = list(self._follow_items) if self._follow_items else [item]
+        if not any(it is item for it in movers):
+            movers.append(item)
+        for it in movers:
+            it.moveBy(delta.x(), delta.y())
+        if hasattr(scene, "mark_modified"):
+            scene.mark_modified()
+        if hasattr(scene, "geometryChanged"):
+            scene.geometryChanged.emit(item)
+        if hasattr(scene, "contentChanged"):
+            scene.contentChanged.emit()
+        # 图元挪了，捕捉点表 / 自身点缓存 / 归属表都要重建
+        self.refresh_snap_points()
+        self.actionTriggered.emit("drag_done")   # 记一个撤销点
+
+    def _snap_action(self) -> None:
+        """按 T 的一次性动作：光标吸附到最近捕捉点 + 抓起 / 对齐。
+
+        * 未抓手且点**来自图元** → 选中该图元、进入抓手（**实时跟手**）、
+          记录它的捕捉点；鼠标走到哪，图元和那个捕捉点就跟到哪；
+        * 已抓手 → 把被抓图元平移，使被抓点精确落到新捕捉点，记录同步更新；
+          抓手 / 跟手保持，可继续移动或连续对齐；
+        * 未抓手（仅选中 / 未选中）时**绝不移动任何图元**：只把光标 warp 到
+          捕捉点；点来自图元时选中并抓起它（抓起瞬间同样不改位置）。
+          图元因吸附而移动**只发生在已处于抓手的对齐分支**。
+        * **绘制工具激活时**（``_draw_type`` 非空）→ 只把光标 / 待落点吸到
+          捕捉点并同步预览，不选中、不抓手、不跟手、不移动任何图元。
+
+        光标 warp 用的是**本次算出的 target**，不是重算 ``_hover_marker()``：
+        抓起后该点立刻变成「选中项自身的点」被排除，重算会漂到旁边的格点，
+        表现就是「按 T 鼠标没有吸附到图元的捕捉点」。
+
+        「自身」点由 ``_snap_scan_exclude()`` 从扫描里**彻底剔除**：已选中
+        图元的特征点，以及绘制阶段正在画的临时图元自身的端点 / 中点。既不
+        吸附、也不画十字。
+        """
+        scene = self.scene()
+        # 记录「鼠标此刻是否还在画布上」：leaveEvent 会清 hover，那时只把图元
+        # 吸过去，不去劫持别的窗口里的鼠标。
+        cursor_on_canvas = self.snap.hover is not None
+        hover = (self.snap.hover if cursor_on_canvas else self._last_hover)
+        if scene is None or hover is None:
+            return
+        # 一次性动作键：吸附系统恒开（十字常亮为可吸状态），不再按 T 关闭；
+        # 外部仍可直接设 snap.enabled=False 关掉门控（回归 / 运行态各管各的）。
+        self.snap.enabled = True
+        if not cursor_on_canvas:
+            self.snap.hover = QPointF(hover)
+        self.refresh_snap_points()
+        hover = QPointF(hover)
+        target, kind = self.snap.aim(
+            hover, exclude=self._snap_scan_exclude(), always=True)
+        if target is None:
+            return
+        target = QPointF(target)
+        if self._draw_type:
+            # 绘制中按 T：只把光标 / 待落点吸附到捕捉点，**不选中已有图元、
+            # 不进入抓手跟手、也不平移任何图元**。跟手会抢走 mouseMoveEvent
+            # 的绘制预览分支，逐点落子流程直接断掉；绘制阶段 T 只是 CAD 的
+            # 「取点吸附」，不是搬图元。
+            if cursor_on_canvas or self.viewport().underMouse():
+                self._warp_cursor_to_snap(target)
+            self._sync_draw_preview_to_snap(target)
+            self.viewport().update()
+            return
+        grabbed = self._grabbed_item()
+        if grabbed is not None and self._snap_grab_point is not None:
+            self._align_grab_to(target)
+        else:
+            # 未抓手：只移动光标，绝不把吸附偏移叠加到「已选中」图元上。
+            # 旧版这里曾调 _apply_snap_follow() 平移选中项（鼠标吸多少、
+            # 图元就走多少），已按需求移除 —— 图元只有在被抓手抓住后、
+            # 再次按 T 对齐时才移动。
+            # 已经在跟手（双击抓着别的图元）时不额外抓起。
+            if kind == "element" and not self._follow_items:
+                item = self._grab_item_for_point(target)
+                if item is not None:
+                    self._begin_snap_grab(item, target)
+        if cursor_on_canvas or self.viewport().underMouse():
+            self._warp_cursor_to_snap(target)
+        self.viewport().update()
+
+    def _sync_draw_preview_to_snap(self, target: QPointF) -> None:
+        """绘制中按 T：把吸附点同步进绘制预览。
+
+        预览与落点共用 ``_ortho_page_point``（正交约束都在这里做），所以
+        「按 T 吸过去看到的预览」和「点下去的落点」口径一致。warp 派发的
+        mouseMove 也会刷一次预览，这里再按精确捕捉点覆盖一遍。
+        """
+        scene = self.scene()
+        if scene is None or not hasattr(scene, "draw_preview"):
+            return
+        cx, cy = scene.projection.inverse_point(target.x(), target.y())
+        page_pt = self._ortho_page_point(QPointF(cx, cy),
+                                         QApplication.keyboardModifiers())
+        scene.draw_preview(page_pt)
 
     # ------------------------------------------------------------------
     # 设计网格（由主窗口开关控制，默认关）
@@ -1042,30 +1648,21 @@ class GraphicsView(QGraphicsView):
         """光标处该显示的那**一个**捕捉点，以及它此刻是否真的会吸附。
 
         ``always=True``：附近没端点 / 中点时退到最近的格子交汇点，保证「光标
-        附近始终只有一个十字」——大图元内部（自己的点被排除）也有标记可吸。
+        附近始终只有一个十字」——大图元内部也有标记可吸。
 
-        选中项**自己**的端点 / 中点也画（比别的候选更近时顶替格点）：鼠标凑到
-        刚选中的那个图元的端点时，十字就画在端点上，否则看着像「端点上根本没有
-        捕捉点」。但它**不是**吸附目标（``active`` 恒为 False、只画细十字），
-        吸附仍然跳过自身 —— 理由见 ``_apply_snap_follow``。
+        **自身点彻底不纳入扫描**：``exclude`` 用 ``_snap_scan_exclude()``，
+        既剔除已选中图元的特征点，也剔除绘制阶段正在画的临时图元自身的
+        端点 / 中点，所以既不吸附、也不画十字。旧版曾有「自身点画细十字」
+        的特判，结果是十字画在自己身上、``_warp_cursor_to_snap`` 也把光标
+        挪过去，而 ``_apply_snap_follow`` 吸到的却是别处的点 —— 按 T 后
+        光标与图元错位。现在显示、吸附、warp 三者共用同一份 ``aim`` 结果。
         """
         hover = self.snap.hover
         if hover is None:
             return None, False
-        own = self._selection_own_points()
-        target, _kind = self.snap.aim(hover, exclude=own, always=True)
-        activated = bool(self.snap.enabled)
-        if own:
-            # 只问「全局最近点是不是选中项自己的点」——走 SnapSystem 的空间哈希
-            # 局部扫描；全选 1600 个图元时逐点遍历自己的一万多个点要 10ms/帧。
-            near, dist = self.snap._nearest_indexed(hover, self.snap.threshold)
-            if near is not None and (near.x(), near.y()) in own:
-                far = (math.inf if target is None
-                       else math.hypot(target.x() - hover.x(),
-                                       target.y() - hover.y()))
-                if dist < far - 1e-9:
-                    return near, False
-        return target, activated
+        target, _kind = self.snap.aim(
+            hover, exclude=self._snap_scan_exclude(), always=True)
+        return target, bool(self.snap.enabled)
 
     def _draw_hover_snap_points(self, painter: QPainter) -> None:
         """只画**最近的那一个**捕捉点（固定屏幕像素）。
@@ -1104,9 +1701,9 @@ class GraphicsView(QGraphicsView):
         painter.setPen(pen)
         for a, b in arms:
             painter.drawLine(a, b)
-        if active:
-            painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(vp, 8.5, 8.5)
+        # if active:
+        #     painter.setBrush(Qt.NoBrush)
+        #     painter.drawEllipse(vp, 8.5, 8.5)
         painter.restore()
 
     def _set_hover(self, scene_pt: QPointF | None) -> None:
@@ -1167,7 +1764,7 @@ class GraphicsView(QGraphicsView):
     def _draw_selection_marks(self, painter: QPainter) -> None:
         """选中图元在**旋转中心**（支点）处画一个红色小圆点。
 
-        默认「绕中心转」时支点即几何中心；用右键「旋转中心设到此处」改过
+        默认「绕中心转」时支点即几何中心；用 O + 右键「旋转中心设到此处」改过
         支点后，红点跟着挪到支点上（与蓝色支点环同一位置）。
         ID 数字标签已移除，这里只保留位置标识本身。
         """
@@ -1229,34 +1826,65 @@ class GraphicsView(QGraphicsView):
                 ry = abs(prev_view.y() - pts_view[0].y())
                 r = math.hypot(rx, ry)
                 painter.drawEllipse(pts_view[0], r, r)
+        # 正交锁定提示：贴在预览终点旁，用屏幕像素画，缩放后不变形
+        if self._ortho_axis and type_key in ORTHO_DRAW_TYPES and prev_view is not None:
+            vp = self.mapFromScene(prev_view)
+            label = "水平 H" if self._ortho_axis == "H" else "竖直 V"
+            painter.save()
+            painter.resetTransform()
+            font = painter.font()
+            font.setPointSizeF(9.0)
+            painter.setFont(font)
+            badge = QRectF(vp.x() + 14, vp.y() - 24,
+                           QFontMetrics(font).horizontalAdvance(label) + 14, 20)
+            painter.setPen(QPen(QColor(22, 119, 255), 1.0))
+            painter.setBrush(QBrush(QColor(230, 241, 255, 235)))
+            painter.drawRoundedRect(badge, 3.0, 3.0)
+            painter.setPen(QColor(22, 80, 170))
+            painter.drawText(badge.adjusted(7, 0, -7, 0),
+                             Qt.AlignVCenter | Qt.AlignLeft, label)
+            painter.restore()
         painter.restore()
 
     # ------------------------------------------------------------------
     # 工具箱拖放
     # ------------------------------------------------------------------
+    @staticmethod
+    def _drop_mime(mime) -> str:
+        """模板 MIME 优先：一次拖放只可能带一种载荷。"""
+        for fmt in (TEMPLATE_MIME_TYPE, ELEMENT_MIME_TYPE):
+            if mime.hasFormat(fmt):
+                return fmt
+        return ""
+
     def dragEnterEvent(self, event) -> None:
-        if event.mimeData().hasFormat(ELEMENT_MIME_TYPE):
+        if self._drop_mime(event.mimeData()):
             event.setDropAction(Qt.CopyAction)
             event.accept()
         else:
             super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event) -> None:
-        if event.mimeData().hasFormat(ELEMENT_MIME_TYPE):
+        if self._drop_mime(event.mimeData()):
             event.setDropAction(Qt.CopyAction)
             event.accept()
         else:
             super().dragMoveEvent(event)
 
     def dropEvent(self, event) -> None:
-        if not event.mimeData().hasFormat(ELEMENT_MIME_TYPE):
+        fmt = self._drop_mime(event.mimeData())
+        if not fmt:
             super().dropEvent(event)
             return
-        raw = bytes(event.mimeData().data(ELEMENT_MIME_TYPE)).decode("utf-8", "ignore")
+        raw = bytes(event.mimeData().data(fmt)).decode("utf-8", "ignore")
         scene_pt = QPointF(self.mapToScene(event.position().toPoint()))
         event.setDropAction(Qt.CopyAction)
         event.accept()
-        if raw:
+        if not raw:
+            return
+        if fmt == TEMPLATE_MIME_TYPE:
+            self.templateDropped.emit(raw, scene_pt)
+        else:
             self.elementDropped.emit(raw, scene_pt)
 
     # ------------------------------------------------------------------
@@ -1264,9 +1892,6 @@ class GraphicsView(QGraphicsView):
     # ------------------------------------------------------------------
     _CONTEXT_ENTRIES = (
         ("属性…", "property"),
-        (None, None),
-        ("旋转中心设到此处", "origin_here"),
-        ("旋转中心复位到图元中心", "origin_center"),
         (None, None),
         ("移到最前", "z_front"), ("上移一层", "z_raise"),
         ("下移一层", "z_lower"), ("移到最后", "z_back"),
@@ -1293,9 +1918,24 @@ class GraphicsView(QGraphicsView):
             action.triggered.connect(
                 lambda checked=False, k=key: self.actionTriggered.emit(k)
             )
+        # 「组合模板」只在单选一个组时出现：命令名与菜单 / 工具箱按钮共用
+        # 同一个入口，主窗口自己再从场景里取这个组，避免把图元对象塞进信号。
+        scene = self.scene()
+        sel = scene.selected_items() if hasattr(scene, "selected_items") else []
+        if len(sel) == 1 and getattr(sel[0], "TYPE", "") == "group":
+            menu.addSeparator()
+            action = menu.addAction("添加到控件工具箱")
+            action.setToolTip("把选中的组（含全部成员）保存为可复用的组合模板")
+            action.triggered.connect(
+                lambda checked=False: self.actionTriggered.emit("save_template")
+            )
         return menu
 
     def contextMenuEvent(self, event) -> None:
+        # 按住 O 或刚执行过 O + 右键时，不弹右键菜单（旋转中心改走 O + 右键）
+        if self._origin_suppress_menu or self._origin_key_held:
+            self._origin_suppress_menu = False
+            return
         scene = self.scene()
         if scene is not None and getattr(scene, "is_run_mode", False):
             return

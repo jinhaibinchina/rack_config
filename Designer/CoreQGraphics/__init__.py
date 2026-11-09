@@ -51,8 +51,8 @@ UI 外壳在子包 ``Designer.CoreQGraphics.ui``：属性面板 / 工具箱 / �
   ``world_to_local`` 互换。
 * 旋转支点 ``origin_pos`` 与可视中心 ``center_pos`` 解耦：``_place()`` 按
   ``q → pos + o + R(q - o)`` 摆位，所以 ``mapToScene(0) == center``、
-  支点处不动，改角度即铰链式旋转。画布上右键菜单「旋转中心设到此处」把支点
-  钉在点击位置，选中时画蓝色十字圆环 + 中心到支点的虚线；**旋转中心标识（红色
+  支点处不动，改角度即铰链式旋转。画布上按住 O 键 + 右键把支点钉在点击位置
+  （取代原右键菜单项），选中时画蓝色十字圆环 + 中心到支点的虚线；**旋转中心标识（红色
   小圆点，不再带 ID 数字标签）画在支点处**（``pivot_scene_point()``），默认绕中心
   转时与几何中心重合。视图菜单「显示中心点标记」（Ctrl+Shift+I）控制这个红点。
 * **顶点类的旋转是「记账」不是「重建」**：``line / triangle / polygon / path`` 的
@@ -202,23 +202,112 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
   到线外 30 单位，三角形的顶点也可能不在包围盒角上），拿它当捕捉点就会出现
   「鼠标贴着看得见的端点却没有十字」。拖角改尺寸用 ``frame_corners()``，与
   捕捉点分开，互不干扰。
-* 光标附近最近的那**一个**点画成**红色细十字**（旧 Core 同款纯红，带一圈深色
-  描边保证压在黑色描边上也看得见），会命中的那个加粗 + 套圆环；阈值按屏幕像素
-  （``pixel_threshold = 12px``）换算成场景单位，缩放后手感一致。``T`` 键只是
-  **开关吸附**，不影响标记显示。选中项**自己**的端点 / 中点也画（否则鼠标凑到
-  刚选中的图元端点上看不到十字），但它恒为细十字且**不参与吸附**——吸到自己
-  身上等于「点随图元动」，每帧按 offset 再叠加一次会把图元甩飞。
-* 吸附位移以**鼠标位置**为基准：``_apply_snap_follow()`` 算出
-  ``目标点 - 光标点`` 的偏移，原样叠加到选中的无父图元上——鼠标吸了多少，
-  图元就移动多少，多选整体平移保持相对位置。按 T 立即吸一次（左键拖动已取消，
-  吸附只由 T 触发，不再有「松手补一次」）。``_snap_offset`` 记录已叠加量，
-  重复按 T 或原地不动都不会重复推图元。
+* 光标附近最近的那**一个**点画成**红色十字**（旧 Core 同款纯红，带一圈深色
+  描边保证压在黑色描边上也看得见），门控打开时加粗 + 套圆环；阈值按屏幕像素
+  （``pixel_threshold = 12px``）换算成场景单位，缩放后手感一致。
+  **已选中图元的特征点彻底不纳入捕捉点扫描**（``exclude=_selection_own_points()``）：
+  既不吸附、也不画十字、光标也不会 warp 过去。显示 / 吸附 / warp 共用同一份
+  ``aim()`` 结果，不会出现「十字在自己身上、图元却吸到别处」的错位。
+* ``T`` 是**一次性动作键**（不再是开关门控），见 ``_snap_action()``：
+  1. 光标吸附到最近的捕捉点；若该点来自图元（``SnapSystem.owners_at`` 查归属，
+     来自 ``GraphicsScene.snap_points_with_owners``），就选中该图元、进入
+     **抓手 = 实时跟手**（``begin_follow``，ClosedHandCursor），并记下它的
+     捕捉点（``_snap_grab_id`` / ``_snap_grab_point``）。鼠标走到哪图元跟到哪，
+     ``_update_follow`` 同步平移记录点。warp 必须用**本次算出的 target**，
+     不能重算 ``_hover_marker()``：抓起后该点已被选中项排除，重算会让光标
+     漂到旁边的格点（表现就是「按 T 鼠标没吸到图元捕捉点」）。
+  2. 抓手期间鼠标扫到别的捕捉点再按 T：图元整体平移 ``新点 - 记录点``，
+     被抓的那个捕捉点精确落到新点上，记录同步更新为新坐标；抓手 / 跟手
+     保持，可连续对齐多次。单击落定、Esc 整组回到抓住时位置；改选中 /
+     换场景 / 切工具 / 失焦也会退出。
+   3. **未抓手（仅选中 / 未选中）时绝不移动图元**：按 T 只把光标 warp 到
+      捕捉点；若该点来自图元则顺带选中并抓起它，但抓起瞬间位置不变。旧版曾
+      在此调 ``_apply_snap_follow()`` 把「鼠标吸了多少」叠加到已选中的无父
+      图元上（多选整体平移），已按需求移除；该方法仅作历史兼容保留，设计器
+      自身无调用点。图元因吸附而移动**只允许发生在第 2 条的抓手对齐分支**。
+  4. **绘制工具激活时**（``_draw_type`` 非空）按 T 只做 CAD 式「取点吸附」：
+     光标与绘制预览吸到捕捉点（``_sync_draw_preview_to_snap``，预览 / 落点
+     共用 ``_ortho_page_point``），**不选中已有图元、不抓手、不跟手、不平移
+     任何图元**——跟手会抢走 ``mouseMoveEvent`` 的绘制预览分支，逐点落子就
+     断了；``_begin_snap_grab`` 里也留了一道同样的门。
+     扫描统一走 ``_snap_scan_exclude()``：除选中项自身点外，还要剔除
+     **正在绘制的临时图元自身**的端点 / 中点（``_draw_own_points``）。它虽是
+     ``commit=False`` 建的，仍进 ``index.by_id`` 且可见，不排除就会吸到自己
+     刚落的点；与别的图元共享的坐标按 owner 保留，仍是合法捕捉目标。
+
+正交模式（CAD 的 F8）：
+* ``GraphicsView.set_ortho_mode(True)`` 打开后，绘制 ``line`` / ``triangle`` /
+  ``polygon`` / ``path`` 时，每个新点相对**上一个落点**锁到屏幕水平或竖直；
+  ``rect`` / ``circle`` 是两点定框的对角定义，不受影响。开关真值在视图，
+  ``orthoModeChanged`` 把菜单 / 工具栏 / 状态栏同步过去；按住 ``Shift`` 临时
+  反转（开→斜线、关→正交线），按下 / 松开时不必挪鼠标也会立刻重画预览。
+* **约束在视图坐标里做**（``GraphicsScene.constrain_ortho``）：AGV 投影是
+  「轴交换 + 双轴取反」，page 的 Δy=0 在屏幕上其实是竖线。按屏幕上较大的
+  位移分量选主轴、把另一轴钉回锚点、再反投影回 page，才是所见即所得；
+  屏幕水平 → page W=0，屏幕竖直 → page H=0。
+* 预览与落点共用 ``GraphicsView._draw_page_point`` 一个入口，不会出现
+  「预览水平、落点却是斜的」。多段线逐段锁定，锚点取最后一个落点。
+* 属性面板「布局」页对直线允许 W 或 H 为 0（``LineItem.set_page_size`` 覆写
+  直接重写两个端点，保留方向、中心与支点），两轴不能同时为 0（面板回滚 +
+  气泡提示，底层也拒绝）。``_setup_line`` 的零厚度轴命中带改成两侧对称外扩
+  30（总 60），修掉旧 Core ``setWidth(60)+setLeft(-30)`` 顺序错误导致的
+  「宽 90、中心偏 15」——包围盒中心必须仍钉在线上。
 
 移动图元：
 * **左键按下拖动已取消**（含 CTRL）：``ItemIsMovable`` 恒为 False，按下左键只
   做选中 / 框选，按在角手柄上才是改尺寸。移动图元统一走「双击跟手」，避免点选
-  时手抖把图元挪走；子图元也一样，按下只选中它自己，不再代理成拖根父对象。
+  时手抖把图元挪走；普通子图元也一样，按下只选中它自己，不再代理成拖根父对象
+  （**组成员除外**，见下一段）。
   ``GraphicsScene.set_movable_gate(True)`` 保留给外部脚本显式启用，视图不再调用。
+
+方向键微调（选中图元后按一下挪一格，按住连续挪）：
+* ``GraphicsView.nudge_step()`` 是步长真值（**视图场景坐标**单位），默认等于
+  ``SnapSystem.grid_step``，即当前可见网格的一格，随缩放自适应、屏幕上恒为
+  18~90px；``set_nudge_step(v)`` 可固定步长，``set_nudge_step(None)`` 恢复跟随。
+  方向是**屏幕上下左右**：AGV 投影交换了轴，屏幕向右在 page 里是 ``y`` 减小、
+  屏幕向下是 ``x`` 减小，所以不要在 page 坐标里换算按键方向。
+* 持续移动由视图自己的两个 ``QTimer`` 驱动（350ms 延迟 + 80ms 间隔），
+  **不依赖系统键盘自动重复**；OS 发来的 autoRepeat ``keyPressEvent`` 只被吞掉，
+  不重复计数，速度不受用户键盘设置影响。``_nudge_keys`` 记录当前按住的方向键，
+  同时按两个键走合向量（对角），松开其中一个不停表、只换向。
+* 平移走与双击跟手同一条 ``moveBy`` 增量链路：``itemChange`` →
+  ``on_item_moved`` 负责标脏、支点随行、后代刚体随动。目标先过
+  ``top_level_items`` 去掉「父子同时选中」，再把仍带父对象的项上溯到根
+  （子图元被 ``translate_locked`` 禁止自行平移），因此画布选中的组整体移动、
+  图层树单选某个成员时也是整组移动。
+* 连续移动期间**不**重建吸附点（page_1 约 1.4 万点，每帧重建会掉帧），
+  ``_finish_nudge()`` 在最后一个键松开 / ``focusOutEvent`` 时统一刷新吸附点、
+  ``geometryChanged`` / ``contentChanged``，并 emit ``"drag_done"`` 让主窗口
+  ``history.commit()`` —— 整段连续移动**只占一个撤销步**。
+* 运行态、绘制工具激活、双击跟手中、带 Ctrl/Alt/Meta 修饰、或没有选中图元时
+  都不接管，交还基类（方向键照常滚动画布）。Shift + 方向键 = 一次 10 格。
+
+批量选中与全选性能：
+* ``GraphicsScene.select_items(items, append=False)`` 是批量选中的统一入口：
+  先屏蔽 scene 信号一次性设置完，最后只发**一次** ``selectionChanged``。
+  逐项 ``setSelected`` 会让 Qt 每选中一个图元就发一次信号，而
+  ``LayerTreeDock.sync_selection``（全树回灌）/ ``PropertyPanel``（重建面板）
+  / 视图重绘的槽都随选中数增长；1618 图元的 page_1 全选实测从「数分钟
+  卡死」降到 0.07s。``select_all_items()`` 与复制 / 粘贴后选中副本都走它。
+* ``LayerTreeDock.sync_selection`` 用「树当前选中集合 == 目标集合」幂等短路
+  （主窗口选中槽与图层树自身连接会调两次），有差异时攒一份
+  ``QItemSelection`` 交给 ``selectionModel().select(..., ClearAndSelect|Rows)``
+  一次回灌。逐节点 ``QTreeWidgetItem.setSelected`` 会让 Qt 反复维护已有选中
+  区间，1618 个节点实测 0.8s，是单次同步里最贵的一块。
+
+组选中（CAD 块参照语义）：
+* 设计模式下画布**左键点选**命中组成员时，``GraphicsView._group_root_at()``
+  把它重定向成根组：清空选中后只选组，成员不会被画布单独选中；Ctrl / Shift
+  多选时把根组加入并把已在选中集合里的组成员剔掉。右键目标同样走根组，
+  免得「左键只能选组、右键却把成员选中」互相打架。
+* 判据是**根祖先的 TYPE == "group"**，不是「有 parent_id」。普通逻辑父子
+  （根是 rect / text 等）仍保持「按下只选中它自己」的原语义；运行态不改。
+* 只拦「按下点在 item 上」的点选。空白处按下由基类照常启动框选（Qt 只在
+  按下点没有 item 时才画橡皮筋），所以框选手势不受影响；框选结果仍按 Qt
+  原语义，可能包含成员。要精确编辑单个成员请用图层树 / 属性面板——
+  那里直接 ``setSelected(True)``，不走画布重定向。
+* 不动 ``ItemIsSelectable`` flag：实测关掉后 ``setSelected(True)`` 也无效，
+  会连带废掉图层树、属性面板和成组 / 解组。
 
 双击跟手（双击图元 → 图元钉在光标上；鼠标移动图元的唯一入口）：
 * ``GraphicsView.mouseDoubleClickEvent`` 命中可选图元即进入 ``_follow_items``
@@ -238,6 +327,24 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
   画面绕那个过时点平移，表现就是「跟手时一滚轮图元就飞走」。缩放本身是视图
   操作，不改图元几何；缩放后 ``_follow_cursor`` 同步到光标实际场景点，下一次
   移动仍是纯鼠标位移。
+
+组合模板（工具箱里的可复用组，对照 ``Core/ui/template_store.py``）：
+* 模板文件 ``toolbox_templates.json`` 与旧设计器**共用同一份**、格式逐字同构：
+  ``ToolboxTemplate.items`` 就是 page 记录列表，捕获时把整棵子树的几何点
+  统一平移到「根组中心 = 原点」，宽高 / 半径 / 旋转一律不动。目录默认取
+  页面所在的 ``.../datas/design/``，可用 ``DesignerWindow(template_dir=…)`` 改。
+* 捕获走平铺结构：``SceneIndex.children_of`` 做父在子前的 DFS（``parent_id`` /
+  ``children_ids``，不是 Qt 父链），每个成员取 ``to_page_record()``，未存盘的
+  旋转会先烘焙。空组 / 非组图元直接拒绝。
+* 实例化 ``GraphicsScene.instantiate_template`` 复用 ``_instantiate`` 的重发 id、
+  重映射关系、组名前缀命名与整树偏移；额外做三件事：从 root 做可达性 DFS
+  （防手工编辑模板的悬空 id）、按记录里的 ``zValue`` 稳定排序再交给
+  ``_instantiate``（它按快照下标写 z，154 成员的料架模板按 id 排会打乱层级）、
+  预校验类型并在异常时删掉本次新建的图元。
+* UI 入口四处：编辑菜单 / 画布右键（单选组时才有）/ 工具箱「将所选组保存为模板」
+  按钮 / 模板按钮点一下插到视口中心或拖到画布指定位置；模板按钮右键可重命名、
+  删除。拖放 MIME 与图元工具分开（``application/x-design-template`` 带模板 id）。
+  模板操作只写模板文件，**不改页面、不进撤销栈**；插入模板走 ``_after_edit()``。
 """
 
 from .g_element import BaseItem
@@ -260,12 +367,12 @@ __all__ = [
     "BaseItem", "ITEM_TYPES", "SceneProjection", "GraphicsScene", "SceneIndex",
     "SnapSystem", "Style", "GraphicsView", "load_page",
     "DesignerWindow", "PropertyPanel", "ElementToolboxDock", "LayerTreeDock",
-    "PageHistory", "open_designer",
+    "PageHistory", "TemplateStore", "ToolboxTemplate", "open_designer",
 ]
 
 _UI_EXPORTS = {
     "DesignerWindow", "PropertyPanel", "ElementToolboxDock", "LayerTreeDock",
-    "PageHistory", "open_designer",
+    "PageHistory", "TemplateStore", "ToolboxTemplate", "open_designer",
 }
 
 

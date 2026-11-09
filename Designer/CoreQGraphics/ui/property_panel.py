@@ -12,11 +12,11 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QFileInfo, Qt, QTimer, Signal
+from PySide6.QtCore import QFileInfo, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QListWidget, QPushButton, QSplitter, QStackedWidget,
-    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QToolTip, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 # 纯控件层：与旧属性面板共用，零业务依赖
@@ -253,6 +253,25 @@ class PropertyPanel(QWidget):
             box.setValue(value)
             box.blockSignals(False)
 
+    def _set_size_field(self, it, source, is_width: bool, value: float) -> None:
+        """提交 W/H；直线不允许两轴同时为 0（线段会退化成一个点）。
+
+        拒绝时把输入框回滚到图元里的真值，并且**不调 _commit**：一次被
+        拒绝的编辑不该产生撤销快照 / 脏标记。用气泡提示说明原因，比把
+        控件置灰更直观（用户能自己把另一个轴改回来）。
+        """
+        cur_w, cur_h = it.page_size()
+        new_w, new_h = ((value, cur_h) if is_width else (cur_w, value))
+        if new_w <= 1e-9 and new_h <= 1e-9:
+            source.blockSignals(True)
+            source.setValue(float(cur_w if is_width else cur_h))
+            source.blockSignals(False)
+            QToolTip.showText(
+                source.mapToGlobal(QPoint(0, source.height())),
+                "宽和高不能同时为 0：直线至少要有一个方向的长度", source)
+            return
+        self._commit(lambda: it.set_page_size(new_w, new_h))
+
     def _set_widget_type(self, it, key: str) -> None:
         """切 widget 变体：写顶层 ``widgetType``，延后重建面板刷新提示。"""
         self._commit(lambda: it.set_page_field("widgetType", normalize_variant(key)))
@@ -387,26 +406,35 @@ class PropertyPanel(QWidget):
             (y_box, lambda: it.page_local_center()[1]),
         ])
 
-        # 宽/高：矩形类改几何矩形，顶点类按比例缩放顶点；两个方向都可能因
-        # 「当前长度为 0」（水平 / 垂直线）而无法缩放，此时只读展示。
+        # 宽 / 高：矩形类改几何矩形，顶点类按比例缩放顶点。
+        # 直线是特例：某一轴为 0 = 水平 / 竖直线（端点在该轴上重合），
+        # 两个轴不能同时为 0，否则线段退化成一个点，见 _set_size_field。
         explicit = it.has_explicit_geometry()
-        w_ok = explicit or w > 1e-6
-        h_ok = explicit or h > 1e-6
-        w_box = make_double(w, 0.0 if explicit else 0.1, 1e6, 1.0, 3, tooltip="宽")
-        h_box = make_double(h, 0.0 if explicit else 0.1, 1e6, 1.0, 3, tooltip="高")
+        is_line = it.TYPE == "line"
+        allow_zero = explicit or is_line
+        w_ok = allow_zero or w > 1e-6
+        h_ok = allow_zero or h > 1e-6
+        w_box = make_double(w, 0.0 if allow_zero else 0.1, 1e6, 1.0, 3,
+                            tooltip="宽；直线设为 0 = 端点 X 相同（页面竖直线）")
+        h_box = make_double(h, 0.0 if allow_zero else 0.1, 1e6, 1.0, 3,
+                            tooltip="高；直线设为 0 = 端点 Y 相同（页面水平线）")
         w_box.valueChanged.connect(
-            lambda v: self._commit(lambda: it.set_page_size(v, it.page_size()[1]))
-        )
+            lambda v: self._set_size_field(it, w_box, True, float(v)))
         h_box.valueChanged.connect(
-            lambda v: self._commit(lambda: it.set_page_size(it.page_size()[0], v))
-        )
+            lambda v: self._set_size_field(it, h_box, False, float(v)))
         if not w_ok:
             w_box.setEnabled(False)
-            w_box.setToolTip("该方向长度为 0（端点在同一竖线上），请在画布上拖端点")
+            w_box.setToolTip("该方向长度为 0 且不是直线，请在画布上拖端点")
         if not h_ok:
             h_box.setEnabled(False)
-            h_box.setToolTip("该方向长度为 0（端点在同一横线上），请在画布上拖端点")
+            h_box.setToolTip("该方向长度为 0 且不是直线，请在画布上拖端点")
         card.add_row(("宽 W", w_box), ("高 H", h_box))
+        if is_line:
+            card.add_hint(
+                "直线的 W 或 H 设为 0 即把端点压到同一条轴上（页面坐标口径："
+                "W=0 竖直、H=0 水平；AGV 投影交换了轴，屏幕方向相反）。"
+                "两者不能同时为 0。F8 正交画出来的线就是这两种；"
+                "从 0 改回非 0 会以线段中心为基点对称拉开。")
         self._geo_bindings.extend([
             (w_box, lambda: it.page_size()[0]),
             (h_box, lambda: it.page_size()[1]),
@@ -447,8 +475,8 @@ class PropertyPanel(QWidget):
             (ox_box, lambda: it.page_local_origin()[0]),
             (oy_box, lambda: it.page_local_origin()[1]),
         ])
-        card.add_hint("旋转中心默认是几何中心；也可以直接在画布上右键，"
-                      "选「旋转中心设到此处」把支点钉在指定位置。")
+        card.add_hint("旋转中心默认是几何中心；也可以选中图元后按住 O 键 + "
+                      "右键，把支点钉在点击的指定位置。")
         if not explicit:
             card.add_hint("该图元的形状由顶点 / 端点决定：宽高按比例缩放顶点"
                           "（保持形状），改形状本身请在画布上拖点。")

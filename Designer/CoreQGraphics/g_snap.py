@@ -55,18 +55,38 @@ class SnapSystem:
         # 空间哈希：抓取点动辄上万（page_1 约 1.4 万），每帧线性扫描会拖慢鼠标
         self._cell = 64.0
         self._index: dict[tuple[int, int], list[tuple[str, float, float]]] = {}
+        # 捕捉点归属：坐标 -> 拥有该点的图元 id 列表。点集本身按坐标去重，
+        # 但同一个坐标可能被多个图元共享，所以这里存列表，由视图挑可抓的那个。
+        # 网格点是解析算出来的，不会进这份表，也就自然「不来自任何图元」。
+        self._owners: dict[tuple[float, float], list[int]] = {}
 
     # ------------------------------------------------------------------
     def clear(self) -> None:
         self.points["endpoints"].clear()
         self.points["midpoints"].clear()
         self._index.clear()
+        self._owners.clear()
 
-    def update_points(self, ends, mids) -> None:
+    def update_points(self, ends, mids, owners=None) -> None:
+        """重建点集；``owners`` 与 ``list(ends) + list(mids)`` 同序，给出每个
+        点的图元 id（由 ``GraphicsScene.snap_points_with_owners`` 提供）。
+
+        不传 owners 时只建点集（外部脚本 / 回归直接调 update_points 的老口径），
+        这种点查不到归属，视图按 T 时会当作「不来自图元」走网格兜底。
+        """
+        ends = list(ends)
+        mids = list(mids)
         e = self.points["endpoints"]
         m = self.points["midpoints"]
         e.clear()
         m.clear()
+        self._owners.clear()
+        if owners is not None:
+            for p, oid in zip(ends + mids, owners):
+                bucket = self._owners.setdefault(
+                    (float(p.x()), float(p.y())), [])
+                if oid not in bucket:
+                    bucket.append(oid)
         for p in ends:
             e.add((float(p.x()), float(p.y())))
         for p in mids:
@@ -97,6 +117,10 @@ class SnapSystem:
 
     def all_points(self):
         return self.points["endpoints"] | self.points["midpoints"]
+
+    def owners_at(self, point: QPointF) -> list[int]:
+        """该捕捉点来自哪些图元（按 id）；网格点 / 无归属返回空列表。"""
+        return list(self._owners.get((float(point.x()), float(point.y())), ()))
 
     def count(self) -> tuple[int, int]:
         return len(self.points["endpoints"]), len(self.points["midpoints"])

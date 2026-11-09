@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QItemSelection, QItemSelectionModel, Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox, QDockWidget, QHBoxLayout, QLineEdit, QMenu, QTreeWidget,
@@ -127,22 +127,39 @@ class LayerTreeDock(QDockWidget):
         # Qt 不允许选中隐藏（setVisible(False)）图元，scene.selectedItems() 会漏掉
         # 它们；若直接用它对树回灌，树里刚选中的隐藏节点会被清掉，导致用户再也
         # 右键不到「显示/隐藏」来恢复。这里把树当前选中的隐藏节点并入 wanted。
-        for node in self.tree.selectedItems():
+        selected = self.tree.selectedItems()
+        for node in selected:
             raw = node.data(0, ID_ROLE)
             if raw is None:
                 continue
             it = self.scene.find_item(int(raw))
             if it is not None and not it.get_visibility():
                 wanted.add(it.item_id)
+        # 幂等短路：树已经是目标集合就直接返回。主窗口的选中槽和本类的
+        # selectionChanged 连接会把 sync_selection 调两次，第二次不该重做。
+        current = {int(n.data(0, ID_ROLE)) for n in selected
+                   if n.data(0, ID_ROLE) is not None}
+        if current == wanted:
+            return
         self._syncing = True
         self.tree.blockSignals(True)
         try:
+            # 逐节点 setSelected 时 Qt 的 QItemSelectionModel 每次都要维护
+            # 已有选中区间，1618 个节点实测 0.8s（近似 O(n²)），全选后一次
+            # 同步就够呛。这里攒成一份 QItemSelection 一次性 select。
+            batch = QItemSelection()
             stack = [self.tree.topLevelItem(i)
                      for i in range(self.tree.topLevelItemCount())]
             while stack:
                 node = stack.pop()
-                node.setSelected(int(node.data(0, ID_ROLE)) in wanted)
+                raw = node.data(0, ID_ROLE)
+                if raw is not None and int(raw) in wanted:
+                    index = self.tree.indexFromItem(node, 0)
+                    if index.isValid():
+                        batch.select(index, index)
                 stack.extend(node.child(i) for i in range(node.childCount()))
+            self.tree.selectionModel().select(
+                batch, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
         finally:
             self.tree.blockSignals(False)
             self._syncing = False
