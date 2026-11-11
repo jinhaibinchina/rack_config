@@ -66,8 +66,8 @@ DEFAULT_STYLE = {
 }
 DEFAULT_SIZES: dict[str, tuple[float, float]] = {
     "rect": (400.0, 240.0), "circle": (240.0, 240.0),
-    "text": (400.0, 120.0), "image": (320.0, 240.0),
-    "checkbox": (120.0, 120.0), "widget": (400.0, 200.0),
+    "text": (120.0, 400.0), "image": (320.0, 240.0),
+    "checkbox": (120.0, 120.0), "widget": (100.0, 360.0),
     "group": (600.0, 400.0), "line": (400.0, 240.0),
     "triangle": (300.0, 260.0), "polygon": (320.0, 260.0),
     "path": (320.0, 260.0),
@@ -142,7 +142,15 @@ class GraphicsScene(QGraphicsScene):
     """CoreQGraphics 的场景对象。"""
 
     # UI 外壳用：结构变化 / 属性变化 / 脏状态
+    #
+    # contentChanged 是历史遗留的「内容变了」粗信号，仍照常发射，供状态栏
+    # 一类与具体图元无关的订阅者使用。真正贵的两位消费者（图层树 / 吸附点
+    # 表）改订阅下面两个细粒度信号：
+    #   structureChanged —— 图元集合 / 父子关系 / 排序变了，必须整表重建；
+    #   itemChanged(ids) —— 仅这些 id 的字段 / 几何变了，可只重算这几项。
     contentChanged = Signal()
+    structureChanged = Signal()
+    itemChanged = Signal(object)         # list[int]
     geometryChanged = Signal(object)
     drawFinished = Signal(object)        # 一次手动绘制完成，携带新图元
     drawCancelled = Signal()             # 取消进行中的绘制
@@ -189,7 +197,11 @@ class GraphicsScene(QGraphicsScene):
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         self._page_path = path
-        return self.load_data(data)
+        n = self.load_data(data)
+        # 整页换掉：图层树要按新页重建（旧版只能靠 fit_content 顺带刷吸附点，
+        # 树里还挂着上一页的行）。撤销走 load_data + restore 自己的广播。
+        self.emit_structure_changed()
+        return n
 
     def load_data(self, data: dict) -> int:
         """从内存 dict 装载（撤销栈 / 单测用），不改动 ``_page_path``。"""
@@ -366,6 +378,8 @@ class GraphicsScene(QGraphicsScene):
             [c.item_id for c in self.index.descendants(iid)],
             "", f"{group.get_name()}_", self.names_in_use())
         self.refresh_movable()   # 成员挂上父对象后不再可单独拖动
+        # 新增组框 + 成员父子关系变化：图层树结构、吸附点归属都得整表重建
+        self.emit_structure_changed()
         return group
 
     def ungroup_selected(self) -> int:
@@ -398,6 +412,7 @@ class GraphicsScene(QGraphicsScene):
         self.refresh_movable()   # 解组后成员重新可独立拖动
         if removed:
             self.mark_modified()
+            self.emit_structure_changed()
         return count
 
     # ------------------------------------------------------------------
@@ -429,6 +444,18 @@ class GraphicsScene(QGraphicsScene):
             mid_owners.extend([it.item_id] * len(m))
         return ends, mids, end_owners + mid_owners
 
+    def snap_points_for(self, iid: int) -> tuple[list[QPointF], list[QPointF]]:
+        """单个图元的端点 / 中点；隐藏或已删除时返回空表。
+
+        供视图按 owner 增量刷新吸附点表使用：口径与
+        ``snap_points_with_owners`` 对同一个图元完全一致（包括可见性判断），
+        保证「增量结果 == 全量结果」这条对拍红线。
+        """
+        it = self.index.by_id.get(int(iid))
+        if it is None or not it.isVisible():
+            return [], []
+        return it.snap_points()
+
     def fit_rect(self, margin: float = 40.0) -> QRectF:
         """所有图元的可见包围盒（视图坐标），供 QGraphicsView.fitInView。"""
         rect = QRectF()
@@ -453,11 +480,41 @@ class GraphicsScene(QGraphicsScene):
     def mark_saved(self) -> None:
         self._modified = False
 
-    def notify_edit(self, item: BaseItem | None = None) -> None:
-        """属性面板改完字段后调用：标脏 + 广播几何/外观刷新。"""
-        self.mark_modified()
-        self.geometryChanged.emit(item)
+    # ------------------------------------------------------------------
+    # 变更广播：所有写操作都从这里出口，保证粗 / 细信号永远成对出现
+    # ------------------------------------------------------------------
+    def emit_structure_changed(self) -> None:
+        """图元集合 / 层级 / 排序变化，订阅方需整表重建。"""
+        self.structureChanged.emit()
         self.contentChanged.emit()
+
+    def emit_items_changed(self, ids) -> None:
+        """仅 ``ids`` 这些图元的字段 / 几何变化。
+
+        空集合表示「页面级改动」（背景色等）：只发粗信号刷状态栏，不惊动
+        图层树与吸附点表。
+        """
+        ids = [int(i) for i in (ids or ()) if i is not None]
+        if ids:
+            self.itemChanged.emit(ids)
+        self.contentChanged.emit()
+
+    def notify_edit(self, item: BaseItem | None = None,
+                    ids=None) -> None:
+        """属性面板改完字段后调用：标脏 + 广播几何/外观刷新。
+
+        ``ids`` 可显式给出本次真正改动的图元 id（批量显隐、多选编辑时用）；
+        不给时按 ``item`` 或当前选中集合推断。旧调用点只传 ``item`` 的语义
+        完全不变。
+        """
+        self.mark_modified()
+        if ids is None:
+            if item is not None:
+                ids = [item.item_id]
+            else:
+                ids = [it.item_id for it in self.selected_items()]
+        self.geometryChanged.emit(item)
+        self.emit_items_changed(ids)
         # 改了 widgetType / widgetText / 样式时，运行预览里的真实控件要重建
         if self._widget_layer_on:
             self._sync_widget_proxies()
@@ -474,7 +531,8 @@ class GraphicsScene(QGraphicsScene):
         self._widget_layer_on = run
         if run:
             self._sync_widget_proxies()
-        self.contentChanged.emit()
+        # 撤销 / 重做会 clear_page() 重建全部图元，包装对象全部失效
+        self.emit_structure_changed()
 
     def set_scene_mode(self, run: bool) -> None:
         self.is_run_mode = bool(run)
@@ -675,7 +733,7 @@ class GraphicsScene(QGraphicsScene):
             self.index.rebuild_links()
             if commit:
                 self.mark_modified()
-                self.contentChanged.emit()
+                self.emit_structure_changed()
         return item
 
     # ==================================================================
@@ -790,7 +848,7 @@ class GraphicsScene(QGraphicsScene):
         item._draw_preview = None
         self._draw_item = None
         self._modified = True
-        self.contentChanged.emit()
+        self.emit_structure_changed()
         self.drawFinished.emit(item)
 
     def cancel_draw(self) -> None:
@@ -867,7 +925,7 @@ class GraphicsScene(QGraphicsScene):
         self.index.rebuild_links()
         self.refresh_movable()   # 成员被删后解除父对象的图元恢复可拖动
         self.mark_modified()
-        self.contentChanged.emit()
+        self.emit_structure_changed()
         return len(ids)
 
     # ------------------------------------------------------------------
@@ -1172,7 +1230,7 @@ class GraphicsScene(QGraphicsScene):
         if made:
             self.index.rebuild_links()
             self.mark_modified()
-            self.contentChanged.emit()
+            self.emit_structure_changed()
         wanted = {id_map[o] for o in top_ids}
         return [it for it in made if it.item_id in wanted]
 
@@ -1305,7 +1363,8 @@ class GraphicsScene(QGraphicsScene):
             it.set_page_field("zValue", z)
         if items:
             self.mark_modified()
-            self.contentChanged.emit()
+            # 图层顺序视图按 zValue 排序，行序会变，必须整树重建
+            self.emit_structure_changed()
 
     def align_selected(self, direction: str) -> None:
         sel = self.selected_items()
@@ -1334,6 +1393,7 @@ class GraphicsScene(QGraphicsScene):
             it.set_page_center(nx, ny)
         self.mark_modified()
         self.geometryChanged.emit(None)
+        self.emit_items_changed([it.item_id for it in sel])
 
     def distribute_selected(self, horizontal: bool = True) -> None:
         sel = self.selected_items()
@@ -1349,6 +1409,7 @@ class GraphicsScene(QGraphicsScene):
             it.set_page_center(target, cy) if horizontal else it.set_page_center(cx, target)
         self.mark_modified()
         self.geometryChanged.emit(None)
+        self.emit_items_changed([it.item_id for it in sel])
 
     def set_selected_origin(self, x: float, y: float) -> int:
         """把选中图元的旋转支点设到同一个 page 场景点（按住 O + 右键「旋转中心设到此处」）。
@@ -1365,7 +1426,8 @@ class GraphicsScene(QGraphicsScene):
         if n:
             self.mark_modified()
             self.geometryChanged.emit(None)
-            self.contentChanged.emit()
+            self.emit_items_changed(
+                [it.item_id for it in self.selected_items()])
         return n
 
     def reset_selected_origin(self) -> int:
@@ -1379,7 +1441,8 @@ class GraphicsScene(QGraphicsScene):
         if n:
             self.mark_modified()
             self.geometryChanged.emit(None)
-            self.contentChanged.emit()
+            self.emit_items_changed(
+                [it.item_id for it in self.selected_items()])
         return n
 
     def select_items(self, items, *, append: bool = False) -> None:

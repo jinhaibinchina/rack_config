@@ -129,7 +129,7 @@ class RackConfigWindow(LoadMainWindow):
         print(ui_file_path)
         # self.setWindowIcon(QIcon('ico/box_1.ico'))  # 设置图标
         self.setWindowTitle(f"{APP_TITLE} {VERSION}")
-        self.setGeometry(100, 100, 1600, 900)
+        self.setGeometry(100, 100, 1800, 900)
         # self.setFixedSize(900,800)
 
         self._timer = QTimer(self)

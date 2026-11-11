@@ -8,3 +8,6 @@ python-snap7==2.0.2
 # OPC UA 客户端/服务端（common.com.opcua）。会带上 cryptography，
 # 打包体积约 +38 MB；没上 OPC UA 的项目可以不装。
 asyncua==2.1.0
+# ASCII 字符画生成（common.com.ascii_art.make_banner）。只有「生成」需要它，
+# AsciiArtPanel 显示控件本身是纯 Qt 实现，不依赖此包。
+pyfiglet==1.0.4

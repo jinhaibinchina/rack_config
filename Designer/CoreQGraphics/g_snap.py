@@ -59,6 +59,22 @@ class SnapSystem:
         # 但同一个坐标可能被多个图元共享，所以这里存列表，由视图挑可抓的那个。
         # 网格点是解析算出来的，不会进这份表，也就自然「不来自任何图元」。
         self._owners: dict[tuple[float, float], list[int]] = {}
+        # ---- owner 反向表（增量更新用）--------------------------------
+        # points / _index / _owners 都是「按坐标去重」的派生数据，多个图元可能
+        # 共享同一个坐标。要按 owner 增量刷新，必须记住每个 owner 贡献了哪些
+        # 条目，以及每个条目还被哪些 owner 引用（引用计数），否则删一个图元
+        # 的点会顺带把别人共享的点一起删掉。
+        #   条目 = (kind, x, y)，kind 为 "endpoint" / "midpoint"。
+        self._by_owner: dict[int, set[tuple[str, float, float]]] = {}
+        self._entry_owners: dict[tuple[str, float, float], set[int]] = {}
+        # 只有带 owners 的 update_points 才建得齐反向表；老口径（不传 owners）
+        # 或 clear() 之后增量不可用，调用方须回退到全量重建。
+        self._indexed_owners = False
+
+    @property
+    def is_incremental(self) -> bool:
+        """当前点表是否带完整 owner 归属、可以走增量更新。"""
+        return self._indexed_owners
 
     # ------------------------------------------------------------------
     def clear(self) -> None:
@@ -66,6 +82,9 @@ class SnapSystem:
         self.points["midpoints"].clear()
         self._index.clear()
         self._owners.clear()
+        self._by_owner.clear()
+        self._entry_owners.clear()
+        self._indexed_owners = False
 
     def update_points(self, ends, mids, owners=None) -> None:
         """重建点集；``owners`` 与 ``list(ends) + list(mids)`` 同序，给出每个
@@ -81,17 +100,129 @@ class SnapSystem:
         e.clear()
         m.clear()
         self._owners.clear()
+        self._by_owner.clear()
+        self._entry_owners.clear()
+        owners = None if owners is None else list(owners)
+        self._indexed_owners = owners is not None
         if owners is not None:
             for p, oid in zip(ends + mids, owners):
-                bucket = self._owners.setdefault(
-                    (float(p.x()), float(p.y())), [])
+                coord = (float(p.x()), float(p.y()))
+                oid = int(oid)
+                bucket = self._owners.setdefault(coord, [])
                 if oid not in bucket:
                     bucket.append(oid)
+            # 反向表：owner -> 条目、条目 -> owner 集合（引用计数）
+            for kind, seq, oseq in (
+                    ("endpoint", ends, owners[:len(ends)]),
+                    ("midpoint", mids, owners[len(ends):])):
+                for p, oid in zip(seq, oseq):
+                    entry = (kind, float(p.x()), float(p.y()))
+                    self._by_owner.setdefault(int(oid), set()).add(entry)
+                    self._entry_owners.setdefault(entry, set()).add(int(oid))
         for p in ends:
             e.add((float(p.x()), float(p.y())))
         for p in mids:
             m.add((float(p.x()), float(p.y())))
         self._rebuild_index()
+
+    # ------------------------------------------------------------------
+    # 按 owner 增量更新
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _entry_of(kind: str, p) -> tuple[str, float, float]:
+        return (kind, float(p.x()), float(p.y()))
+
+    def _add_entry(self, entry: tuple[str, float, float], oid: int) -> None:
+        """登记一条 (kind, x, y)；第一次出现时才真正加进点集 / 空间哈希。"""
+        kind, x, y = entry
+        refs = self._entry_owners.setdefault(entry, set())
+        first = not refs
+        refs.add(oid)
+        if first:
+            self.points["endpoints" if kind == "endpoint" else "midpoints"].add((x, y))
+            cell = (int(math.floor(x / self._cell)), int(math.floor(y / self._cell)))
+            self._index.setdefault(cell, []).append(entry)
+        bucket = self._owners.setdefault((x, y), [])
+        if oid not in bucket:
+            bucket.append(oid)
+
+    def _remove_entry(self, entry: tuple[str, float, float], oid: int) -> None:
+        """撤销一条登记；最后一个 owner 撤走后才从点集 / 空间哈希移除。"""
+        kind, x, y = entry
+        refs = self._entry_owners.get(entry)
+        if refs is None or oid not in refs:
+            return
+        refs.discard(oid)
+        if not refs:
+            del self._entry_owners[entry]
+            self.points["endpoints" if kind == "endpoint" else "midpoints"].discard((x, y))
+            cell = (int(math.floor(x / self._cell)), int(math.floor(y / self._cell)))
+            bucket = self._index.get(cell)
+            if bucket:
+                try:
+                    bucket.remove(entry)
+                except ValueError:
+                    pass
+                if not bucket:
+                    del self._index[cell]
+        # 同一坐标可能同时是别的 owner 的端点 / 中点，或者本 owner 的另一类
+        # 点；按「还活着的引用集合」逐项过滤归属，不能一刀切 pop。
+        remaining = (self._entry_owners.get(("endpoint", x, y), set())
+                     | self._entry_owners.get(("midpoint", x, y), set()))
+        bucket = self._owners.get((x, y))
+        if bucket is not None:
+            kept = [i for i in bucket if i in remaining]
+            if kept:
+                self._owners[(x, y)] = kept
+            else:
+                self._owners.pop((x, y), None)
+
+    def update_owner(self, oid: int, ends=(), mids=()) -> bool:
+        """只重算一个图元的捕捉点，返回是否走成了增量路径。
+
+        ``ends`` / ``mids`` 为该图元当前的视图场景坐标点（一般由
+        ``item.snap_points()`` 提供）；隐藏 / 已删除的图元传空序列即可把它
+        的点全部撤掉。点表不是带 owner 归属的全量表时返回 ``False``，由调用
+        方回退到 ``update_points`` 全量重建，保证行为不漂移。
+        """
+        if not self._indexed_owners:
+            return False
+        oid = int(oid)
+        new = {self._entry_of("endpoint", p) for p in ends}
+        new |= {self._entry_of("midpoint", p) for p in mids}
+        old = self._by_owner.get(oid, set())
+        for entry in old - new:
+            self._remove_entry(entry, oid)
+        for entry in new - old:
+            self._add_entry(entry, oid)
+        if new:
+            self._by_owner[oid] = new
+        else:
+            self._by_owner.pop(oid, None)
+        return True
+
+    def update_owners(self, updates) -> bool:
+        """批量增量：``updates`` 为 ``(oid, ends, mids)`` 三元组序列。
+
+        任一项走不成增量就整体回退（返回 ``False``），避免半新半旧的表。
+        """
+        updates = list(updates)
+        if not self._indexed_owners:
+            return False
+        for oid, ends, mids in updates:
+            if not self.update_owner(oid, ends, mids):
+                return False
+        return True
+
+    def remove_owners(self, oids) -> bool:
+        """批量撤掉若干图元的全部捕捉点（删除图元 / 隐藏图元时用）。"""
+        if not self._indexed_owners:
+            return False
+        for oid in oids:
+            oid = int(oid)
+            for entry in tuple(self._by_owner.pop(oid, ())):
+                self._remove_entry(entry, oid)
+        return True
 
     def _rebuild_index(self) -> None:
         """把端点 / 中点塞进空间哈希，查询时只扫光标附近的格子。"""

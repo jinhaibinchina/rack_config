@@ -519,7 +519,8 @@ class DesignerWindow(QMainWindow):
             item = self.scene.find_item(iid)
             if item is not None:
                 item.set_visibility(not item.get_visibility())
-        self.scene.notify_edit(None)
+        # 显式带上 ids：隐藏图元不在 scene.selected_items() 里，按选中推断会漏
+        self.scene.notify_edit(None, ids)
         self._after_edit()
 
     def _rename(self, ids: list[int]) -> None:
@@ -546,9 +547,11 @@ class DesignerWindow(QMainWindow):
         self._refresh()
 
     def _after_edit(self) -> None:
+        # 只记撤销点。图层树 / 状态栏的刷新已经由 scene 的细粒度变更广播
+        # 在写操作发生的当下做过了；这里再 refresh 一遍会重复重建整棵树
+        # （一次属性编辑 = contentChanged 一次 + _after_edit 一次）。
+        # history.commit() 自身发 changed -> _update_history_actions()。
         self.history.commit()
-        self.layers.refresh()
-        self._refresh()
 
     # ------------------------------------------------------------------
     # 图元创建 / 拖放

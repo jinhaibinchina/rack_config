@@ -84,6 +84,10 @@ class GraphicsView(QGraphicsView):
         super().__init__(parent)
         # 状态先就位：setScene() 里要用到 snap / show_grid
         self.snap = SnapSystem()
+        # 吸附点表是否已与场景同步。结构变化（增删 / 分组 / 撤销 / 换页）只
+        # 置脏，真正全量重建推迟到下一次需要新鲜点表的时刻（按 T / fit /
+        # 交互收尾）；纯属性 / 几何变化则由 itemChanged 立即按 owner 增量修。
+        self._snap_full_dirty = True
         self._panning = False
         self._pan_start = QPoint()
         self._space_held = False
@@ -183,17 +187,19 @@ class GraphicsView(QGraphicsView):
         self._follow_dragged = False
         old = self.scene()
         if old is not None:
-            try:
-                old.selectionChanged.disconnect(self._on_scene_selection_changed)
-            except (RuntimeError, TypeError):
-                pass
-            geo = getattr(old, "geometryChanged", None)
-            if geo is not None:
-                try:
-                    geo.disconnect(self._invalidate_own_points)
-                except (RuntimeError, TypeError):
-                    pass
+            for name, slot in (
+                    ("selectionChanged", self._on_scene_selection_changed),
+                    ("geometryChanged", self._invalidate_own_points),
+                    ("structureChanged", self._on_structure_changed),
+                    ("itemChanged", self._on_items_changed)):
+                sig = getattr(old, name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect(slot)
+                    except (RuntimeError, TypeError):
+                        pass
         self._invalidate_own_points()
+        self._snap_full_dirty = True
         super().setScene(scene)
         if scene is not None:
             scene.selectionChanged.connect(self._on_scene_selection_changed)
@@ -201,6 +207,12 @@ class GraphicsView(QGraphicsView):
             if geo is not None:
                 # 图元被改位姿（跟手 / 属性面板 / 撤销）后，自身捕捉点缓存必须失效
                 geo.connect(self._invalidate_own_points)
+            st = getattr(scene, "structureChanged", None)
+            if st is not None:
+                st.connect(self._on_structure_changed)
+            ic = getattr(scene, "itemChanged", None)
+            if ic is not None:
+                ic.connect(self._on_items_changed)
             self._sync_grid_origin()
         self._sync_view_metrics()
 
@@ -274,6 +286,7 @@ class GraphicsView(QGraphicsView):
             self.fit_content()
 
     def refresh_snap_points(self) -> None:
+        """全量重建吸附点表（保留给 fit / 换页 / 回归 / 结构变化兜底）。"""
         scene = self.scene()
         self._invalidate_own_points()
         if scene is not None and hasattr(scene, "snap_points_with_owners"):
@@ -283,6 +296,80 @@ class GraphicsView(QGraphicsView):
             # 外部自定义场景只有老接口：点集照建，只是没有归属信息
             ends, mids = scene.snap_points()
             self.snap.update_points(ends, mids)
+        self._snap_full_dirty = False
+
+    # ------------------------------------------------------------------
+    # 吸附点表：按 owner 增量维护
+    # ------------------------------------------------------------------
+    def _on_structure_changed(self) -> None:
+        """图元集合 / 层级变了：点表标脏，等真正要用时再全量重建。"""
+        self._snap_full_dirty = True
+        self._invalidate_own_points()
+
+    def _on_items_changed(self, ids) -> None:
+        """仅这些图元变了：立刻按 owner 增量重算，点表始终与场景一致。"""
+        self.refresh_snap_owners(ids)
+
+    def _expanded_owner_ids(self, ids) -> set[int]:
+        """把 ids 的后代一并纳入：父图元移动 / 改尺寸时子图元会被刚体带动，
+        它们的捕捉点同样变了，只重算父会漏掉。"""
+        scene = self.scene()
+        index = getattr(scene, "index", None) if scene is not None else None
+        out = {int(i) for i in (ids or ()) if i is not None}
+        if index is None:
+            return out
+        for iid in list(out):
+            try:
+                for child in index.descendants(iid):
+                    out.add(child.item_id)
+            except (KeyError, RuntimeError):
+                pass
+        return out
+
+    def refresh_snap_owners(self, ids) -> None:
+        """按 owner 增量刷新：只对这些图元调 ``snap_points()``。
+
+        表未建 / 已标脏 / 不是带归属的全量表时回退到全量重建，保证任何
+        情况下「增量结果 == 全量结果」。
+        """
+        scene = self.scene()
+        if scene is None or not hasattr(scene, "snap_points_for"):
+            self._snap_full_dirty = True
+            return
+        if self._snap_full_dirty or not self.snap.is_incremental:
+            self.refresh_snap_points()
+            return
+        todo = self._expanded_owner_ids(ids)
+        if not todo:
+            return
+        self._invalidate_own_points()
+        ok = True
+        for iid in todo:
+            ends, mids = scene.snap_points_for(iid)
+            ok = self.snap.update_owner(iid, ends, mids) and ok
+        if not ok:
+            self.refresh_snap_points()
+
+    def sync_snap_points(self) -> None:
+        """需要一份新鲜点表时调用；表已由增量维护好则零成本。"""
+        if self._snap_full_dirty:
+            self.refresh_snap_points()
+
+    def _emit_changes(self, ids=None, *, structural: bool = False) -> None:
+        """交互收尾统一广播（兼容只有老 ``contentChanged`` 的自定义场景）。"""
+        scene = self.scene()
+        if scene is None:
+            return
+        if structural:
+            if hasattr(scene, "emit_structure_changed"):
+                scene.emit_structure_changed()
+            elif hasattr(scene, "contentChanged"):
+                scene.contentChanged.emit()
+        else:
+            if hasattr(scene, "emit_items_changed"):
+                scene.emit_items_changed(ids)
+            elif hasattr(scene, "contentChanged"):
+                scene.contentChanged.emit()
 
     # ------------------------------------------------------------------
     # 绘制模式：激活工具后点击画布落点（矩形/线/圆两击，三角三击，
@@ -683,9 +770,12 @@ class GraphicsView(QGraphicsView):
                     scene.mark_modified()
                 if hasattr(scene, "geometryChanged"):
                     scene.geometryChanged.emit(items[0] if items else None)
-                if hasattr(scene, "contentChanged"):
-                    scene.contentChanged.emit()
-            self.refresh_snap_points()
+                # 跟手落定：只重算这些图元的捕捉点，不再整页 1618 次
+                self._emit_changes([it.item_id for it in items])
+            else:
+                # Esc 回原位：不标脏、不记编辑，但整组位置变了，点表标脏
+                self._snap_full_dirty = True
+            self.sync_snap_points()
         self._notify_drag_done()
         self.viewport().update()
 
@@ -887,14 +977,16 @@ class GraphicsView(QGraphicsView):
             event.accept()
             return
         if self._resize_state is not None:
+            st = self._resize_state
             self._resize_state = None
             self.unsetCursor()
             scene = self.scene()
-            if scene is not None and hasattr(scene, "contentChanged"):
+            if scene is not None:
                 # 属性面板 / 图层树刷新一次即可，不在拖动中每帧广播
-                scene.geometryChanged.emit(None)
-                scene.contentChanged.emit()
-            self.refresh_snap_points()
+                if hasattr(scene, "geometryChanged"):
+                    scene.geometryChanged.emit(None)
+                self._emit_changes([st["item"].item_id])
+            self.sync_snap_points()
             self.viewport().update()
             self._notify_drag_done()
             event.accept()
@@ -1051,12 +1143,14 @@ class GraphicsView(QGraphicsView):
             return
         self._nudge_active = False
         scene = self.scene()
-        self.refresh_snap_points()
+        ids = [it.item_id for it in self._nudge_targets()]
         if scene is not None:
             if hasattr(scene, "geometryChanged"):
                 scene.geometryChanged.emit(None)
-            if hasattr(scene, "contentChanged"):
-                scene.contentChanged.emit()
+            self._emit_changes(ids)
+        if not ids:
+            self._snap_full_dirty = True
+        self.sync_snap_points()
         self.viewport().update()
         # 主窗口的 "drag_done" 分支走 history.commit()：整段连续移动合并成
         # 一个撤销步，不会每 80ms 深拷贝一次 1618 图元的整页快照。
@@ -1494,10 +1588,11 @@ class GraphicsView(QGraphicsView):
             scene.mark_modified()
         if hasattr(scene, "geometryChanged"):
             scene.geometryChanged.emit(item)
-        if hasattr(scene, "contentChanged"):
-            scene.contentChanged.emit()
-        # 图元挪了，捕捉点表 / 自身点缓存 / 归属表都要重建
-        self.refresh_snap_points()
+        if hasattr(scene, "geometryChanged"):
+            scene.geometryChanged.emit(item)
+        self._emit_changes([it.item_id for it in movers])
+        # 图元挪了：只重算这些 owner 的捕捉点 / 自身点缓存 / 归属表
+        self.sync_snap_points()
         self.actionTriggered.emit("drag_done")   # 记一个撤销点
 
     def _snap_action(self) -> None:
@@ -1533,7 +1628,13 @@ class GraphicsView(QGraphicsView):
         self.snap.enabled = True
         if not cursor_on_canvas:
             self.snap.hover = QPointF(hover)
-        self.refresh_snap_points()
+        # 点表由 itemChanged / structureChanged 持续维护；只有标脏（换页 /
+        # 增删图元）时才需要在这里全量重建，平时按 T 是零成本。绘制中的临时
+        # 图元不进编辑广播，仍按老口径每次全量收点，避免自我牵引。
+        if getattr(scene, "_draw_item", None) is not None:
+            self.refresh_snap_points()
+        else:
+            self.sync_snap_points()
         hover = QPointF(hover)
         target, kind = self.snap.aim(
             hover, exclude=self._snap_scan_exclude(), always=True)

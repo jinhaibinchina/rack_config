@@ -1,0 +1,1207 @@
+{
+  "0": {
+    "size": 129,
+    "module": "设计器·核心图元场景",
+    "share": 0.46
+  },
+  "1": {
+    "size": 127,
+    "module": "设计器·CoreQGraphics",
+    "share": 0.23
+  },
+  "10": {
+    "size": 74,
+    "module": "打包脚本",
+    "share": 1.0
+  },
+  "100": {
+    "size": 29,
+    "module": "公共·通信层",
+    "share": 1.0
+  },
+  "101": {
+    "size": 29,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "102": {
+    "size": 28,
+    "module": "辅助脚本",
+    "share": 0.69
+  },
+  "103": {
+    "size": 28,
+    "module": "料仓配置·运行层",
+    "share": 0.62
+  },
+  "104": {
+    "size": 28,
+    "module": "安全车",
+    "share": 0.63
+  },
+  "105": {
+    "size": 28,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "106": {
+    "size": 27,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "107": {
+    "size": 27,
+    "module": "公共·Modbus通信",
+    "share": 0.75
+  },
+  "108": {
+    "size": 27,
+    "module": "料仓配置",
+    "share": 0.58
+  },
+  "109": {
+    "size": 26,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "11": {
+    "size": 73,
+    "module": "PopPick·HMI界面",
+    "share": 0.47
+  },
+  "111": {
+    "size": 25,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "112": {
+    "size": 25,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "115": {
+    "size": 25,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "116": {
+    "size": 24,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "117": {
+    "size": 24,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "118": {
+    "size": 24,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "12": {
+    "size": 72,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "120": {
+    "size": 23,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "122": {
+    "size": 23,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "123": {
+    "size": 23,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "125": {
+    "size": 23,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "126": {
+    "size": 22,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "127": {
+    "size": 22,
+    "module": "资源与UI模板",
+    "share": 1.0
+  },
+  "128": {
+    "size": 22,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "129": {
+    "size": 21,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "13": {
+    "size": 70,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "130": {
+    "size": 21,
+    "module": "设计器·核心图元场景",
+    "share": 0.9
+  },
+  "131": {
+    "size": 21,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "135": {
+    "size": 20,
+    "module": "公共·通信层",
+    "share": 0.94
+  },
+  "136": {
+    "size": 20,
+    "module": "辅助脚本",
+    "share": 0.89
+  },
+  "137": {
+    "size": 19,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "138": {
+    "size": 19,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "139": {
+    "size": 19,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "14": {
+    "size": 68,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "142": {
+    "size": 19,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "144": {
+    "size": 18,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "145": {
+    "size": 18,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "146": {
+    "size": 18,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "147": {
+    "size": 18,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "148": {
+    "size": 18,
+    "module": "资源与UI模板",
+    "share": 1.0
+  },
+  "149": {
+    "size": 18,
+    "module": "资源与UI模板",
+    "share": 1.0
+  },
+  "15": {
+    "size": 68,
+    "module": "设计器·CoreQGraphics",
+    "share": 0.98
+  },
+  "150": {
+    "size": 18,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "151": {
+    "size": 18,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "152": {
+    "size": 17,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "154": {
+    "size": 17,
+    "module": "设计器·UI窗口层",
+    "share": 0.94
+  },
+  "155": {
+    "size": 16,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "157": {
+    "size": 16,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "159": {
+    "size": 15,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "16": {
+    "size": 65,
+    "module": "设计器·CoreQGraphics",
+    "share": 0.75
+  },
+  "160": {
+    "size": 15,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "161": {
+    "size": 15,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "164": {
+    "size": 14,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "167": {
+    "size": 14,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "17": {
+    "size": 65,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "170": {
+    "size": 13,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "171": {
+    "size": 13,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "172": {
+    "size": 13,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "173": {
+    "size": 13,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "177": {
+    "size": 12,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "179": {
+    "size": 11,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "18": {
+    "size": 64,
+    "module": "日志绘图",
+    "share": 0.5
+  },
+  "180": {
+    "size": 11,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "182": {
+    "size": 11,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "183": {
+    "size": 11,
+    "module": "公共·Modbus通信",
+    "share": 1.0
+  },
+  "186": {
+    "size": 10,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "188": {
+    "size": 10,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "19": {
+    "size": 62,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "190": {
+    "size": 10,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "193": {
+    "size": 10,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "194": {
+    "size": 10,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "196": {
+    "size": 9,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "2": {
+    "size": 98,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "20": {
+    "size": 61,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "203": {
+    "size": 7,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "204": {
+    "size": 7,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "208": {
+    "size": 7,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "209": {
+    "size": 7,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "21": {
+    "size": 59,
+    "module": "设计器·核心图元场景",
+    "share": 0.87
+  },
+  "210": {
+    "size": 7,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "211": {
+    "size": 6,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "212": {
+    "size": 6,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "215": {
+    "size": 6,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "216": {
+    "size": 6,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "217": {
+    "size": 6,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "218": {
+    "size": 5,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "219": {
+    "size": 5,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "22": {
+    "size": 58,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "221": {
+    "size": 5,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "222": {
+    "size": 5,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "223": {
+    "size": 4,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "224": {
+    "size": 4,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "225": {
+    "size": 4,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "226": {
+    "size": 4,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "227": {
+    "size": 4,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "228": {
+    "size": 4,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "229": {
+    "size": 4,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "231": {
+    "size": 4,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "233": {
+    "size": 3,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "234": {
+    "size": 3,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "235": {
+    "size": 3,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "236": {
+    "size": 3,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "24": {
+    "size": 58,
+    "module": "辅助脚本",
+    "share": 0.83
+  },
+  "25": {
+    "size": 57,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "26": {
+    "size": 57,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "27": {
+    "size": 57,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "28": {
+    "size": 56,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "29": {
+    "size": 56,
+    "module": "程序入口",
+    "share": 0.81
+  },
+  "3": {
+    "size": 97,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "30": {
+    "size": 55,
+    "module": "日志绘图",
+    "share": 0.98
+  },
+  "31": {
+    "size": 55,
+    "module": "日志绘图",
+    "share": 0.69
+  },
+  "32": {
+    "size": 55,
+    "module": "公共·通信层",
+    "share": 1.0
+  },
+  "33": {
+    "size": 55,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "34": {
+    "size": 54,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "35": {
+    "size": 54,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "36": {
+    "size": 53,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "37": {
+    "size": 53,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "38": {
+    "size": 53,
+    "module": "设计器·核心图元场景",
+    "share": 0.89
+  },
+  "39": {
+    "size": 53,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "4": {
+    "size": 97,
+    "module": "设计器·CoreQGraphics",
+    "share": 0.91
+  },
+  "40": {
+    "size": 52,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "41": {
+    "size": 52,
+    "module": "辅助脚本",
+    "share": 0.91
+  },
+  "42": {
+    "size": 51,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "43": {
+    "size": 50,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "44": {
+    "size": 50,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "45": {
+    "size": 48,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "46": {
+    "size": 47,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "47": {
+    "size": 47,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "49": {
+    "size": 47,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "5": {
+    "size": 90,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "50": {
+    "size": 47,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "51": {
+    "size": 46,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "52": {
+    "size": 45,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "53": {
+    "size": 45,
+    "module": "公共·通信层",
+    "share": 1.0
+  },
+  "54": {
+    "size": 44,
+    "module": "公共·Modbus通信",
+    "share": 0.65
+  },
+  "55": {
+    "size": 43,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "57": {
+    "size": 41,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "58": {
+    "size": 41,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "6": {
+    "size": 88,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "60": {
+    "size": 41,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "61": {
+    "size": 40,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "62": {
+    "size": 39,
+    "module": "日志绘图",
+    "share": 0.97
+  },
+  "63": {
+    "size": 39,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "64": {
+    "size": 39,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "65": {
+    "size": 39,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "66": {
+    "size": 38,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "67": {
+    "size": 38,
+    "module": "料仓配置",
+    "share": 0.77
+  },
+  "68": {
+    "size": 38,
+    "module": "料仓配置·运行层",
+    "share": 0.8
+  },
+  "69": {
+    "size": 37,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "7": {
+    "size": 79,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "70": {
+    "size": 37,
+    "module": "安全车",
+    "share": 0.92
+  },
+  "71": {
+    "size": 37,
+    "module": "设计器·UI窗口层",
+    "share": 0.78
+  },
+  "72": {
+    "size": 36,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "73": {
+    "size": 36,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "74": {
+    "size": 35,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "76": {
+    "size": 35,
+    "module": "辅助脚本",
+    "share": 0.88
+  },
+  "77": {
+    "size": 35,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "78": {
+    "size": 34,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "79": {
+    "size": 33,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "8": {
+    "size": 76,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "80": {
+    "size": 32,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "81": {
+    "size": 32,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "82": {
+    "size": 32,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "84": {
+    "size": 31,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "85": {
+    "size": 31,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "86": {
+    "size": 31,
+    "module": "公共·通信层",
+    "share": 0.96
+  },
+  "87": {
+    "size": 31,
+    "module": "设计器·核心图元场景",
+    "share": 0.52
+  },
+  "88": {
+    "size": 31,
+    "module": "设计器·CoreQGraphics",
+    "share": 0.97
+  },
+  "9": {
+    "size": 74,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "90": {
+    "size": 30,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "91": {
+    "size": 30,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "92": {
+    "size": 30,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "93": {
+    "size": 30,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "96": {
+    "size": 30,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "97": {
+    "size": 29,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "98": {
+    "size": 29,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "99": {
+    "size": 29,
+    "module": "料仓配置",
+    "share": 1.0
+  },
+  "121": {
+    "size": 23,
+    "module": "设计器·CoreQGraphics",
+    "share": 0.62
+  },
+  "176": {
+    "size": 12,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "119": {
+    "size": 24,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "124": {
+    "size": 23,
+    "module": "设计器·核心图元场景",
+    "share": 0.95
+  },
+  "143": {
+    "size": 19,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "197": {
+    "size": 8,
+    "module": "PopPick·HMI界面",
+    "share": 1.0
+  },
+  "83": {
+    "size": 32,
+    "module": "辅助脚本",
+    "share": 0.81
+  },
+  "132": {
+    "size": 21,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "168": {
+    "size": 13,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "95": {
+    "size": 30,
+    "module": "设计器·核心图元场景",
+    "share": 0.96
+  },
+  "192": {
+    "size": 10,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "94": {
+    "size": 30,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "89": {
+    "size": 31,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "174": {
+    "size": 12,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "48": {
+    "size": 47,
+    "module": "辅助脚本",
+    "share": 0.69
+  },
+  "75": {
+    "size": 35,
+    "module": "辅助脚本",
+    "share": 0.79
+  },
+  "220": {
+    "size": 5,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "113": {
+    "size": 25,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "114": {
+    "size": 25,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "134": {
+    "size": 21,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "140": {
+    "size": 19,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "153": {
+    "size": 17,
+    "module": "PopPick",
+    "share": 1.0
+  },
+  "185": {
+    "size": 11,
+    "module": "设计器·CoreQGraphics",
+    "share": 1.0
+  },
+  "191": {
+    "size": 10,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "230": {
+    "size": 4,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "59": {
+    "size": 41,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "206": {
+    "size": 7,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "214": {
+    "size": 6,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "141": {
+    "size": 19,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "110": {
+    "size": 26,
+    "module": "辅助脚本",
+    "share": 0.52
+  },
+  "133": {
+    "size": 21,
+    "module": "辅助脚本",
+    "share": 1.0
+  },
+  "156": {
+    "size": 16,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "158": {
+    "size": 15,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "162": {
+    "size": 14,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "163": {
+    "size": 14,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "165": {
+    "size": 14,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "166": {
+    "size": 14,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "169": {
+    "size": 13,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "175": {
+    "size": 12,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "178": {
+    "size": 11,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "181": {
+    "size": 11,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "184": {
+    "size": 11,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "187": {
+    "size": 10,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "189": {
+    "size": 10,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "195": {
+    "size": 9,
+    "module": "设计器·CoreQGraphics",
+    "share": 0.56
+  },
+  "198": {
+    "size": 8,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "199": {
+    "size": 8,
+    "module": "设计器·核心图元场景",
+    "share": 1.0
+  },
+  "200": {
+    "size": 7,
+    "module": "日志绘图",
+    "share": 1.0
+  },
+  "201": {
+    "size": 7,
+    "module": "PopPick·HMI界面",
+    "share": 0.71
+  },
+  "202": {
+    "size": 7,
+    "module": "PopPick·3D运动编辑",
+    "share": 1.0
+  },
+  "205": {
+    "size": 7,
+    "module": "料仓配置·运行层",
+    "share": 1.0
+  },
+  "207": {
+    "size": 7,
+    "module": "设计器·核心图元场景",
+    "share": 0.83
+  },
+  "213": {
+    "size": 6,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "23": {
+    "size": 58,
+    "module": "辅助脚本",
+    "share": 0.94
+  },
+  "232": {
+    "size": 4,
+    "module": "其他",
+    "share": 1.0
+  },
+  "237": {
+    "size": 3,
+    "module": "设计器·UI窗口层",
+    "share": 1.0
+  },
+  "56": {
+    "size": 42,
+    "module": "设计器·CoreQGraphics",
+    "share": 0.98
+  },
+  "238": {
+    "size": 1,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "239": {
+    "size": 1,
+    "module": "安全车",
+    "share": 1.0
+  },
+  "240": {
+    "size": 1,
+    "module": "公共组件",
+    "share": 1.0
+  }
+}

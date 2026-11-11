@@ -2,7 +2,36 @@ from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ModbusException
 from pymodbus.pdu import ExceptionResponse
 from typing import Any, Generic, TypeVar, List,Union
+import struct
 
+
+MODBUS_WORD_ORDER = "big"
+
+def swap_bytes(value: int) -> int:
+    """Swap the bytes of a 16-bit integer."""
+    return ((value & 0xFF) << 8) | ((value >> 8) & 0xFF)
+
+def get_float(data_: list, word_index: int) -> float:
+    if data_ and len(data_)>0:
+        word1 = data_[word_index]
+        word2 = data_[word_index + 1]
+        # Combine the two words into a single 32-bit integer
+        combined = (word1 << 16) | word2
+        # Convert the combined integer to a float
+        return float.fromhex(hex(combined))
+    return 0.0
+
+def get_double(data_: list, word_index: int) -> float:
+    if data_ and len(data_)>0:
+        word1 = data_[word_index]
+        word2 = data_[word_index + 1]
+        word3 = data_[word_index + 2]
+        word4 = data_[word_index + 3]
+        # Combine the four words into a single 64-bit integer
+        combined = (word1 << 48) | (word2 << 32) | (word3 << 16) | word4
+        # Convert the combined integer to a double
+        return float.fromhex(hex(combined))
+    return 0.0
 
 def get_int(data_: list, word_index: int) ->int:
     if data_ and len(data_)>0:
@@ -31,7 +60,63 @@ def get_bool(data_: list, word_index: int, bool_index: int) -> bool:
             word_value = data_[word_index]
             current_value = word_value & index_value
             return current_value == index_value
+
+def set_int(data_: list, word_index: int, value: int):
+    """Set integer value on location in bytearray.
+
+    Args:
+        bytearray_: buffer to write to.
+        byte_index: byte index to write to.
+        value: value to write.  
+    """
+    if data_ and len(data_)>0:
+        data_[word_index] = value           
+
+
+def set_float(data_: list, word_index: int, value: float):
+    """Set float value on location in bytearray.
+
+    Args:
+        bytearray_: buffer to write to.
+        byte_index: byte index to write to.
+        value: value to write.  
+    """
+    if data_ and len(data_)>0:
+        # Convert the float to a 32-bit integer representation
+        int_value = int.from_bytes(bytearray(struct.pack('f', value)), MODBUS_WORD_ORDER)
+        # Split the integer into two 16-bit words
+        word1 = (int_value >> 16) & 0xFFFF
+        word2 = int_value & 0xFFFF
+        # Store the words in the data list
+        data_[word_index] = swap_bytes(word1)
+        data_[word_index + 1] = swap_bytes(word2)
+
+def set_double(data_: list, word_index: int, value: float):
+    """Set double value on location in bytearray.
+
+    Args:
+        bytearray_: buffer to write to.
+        byte_index: byte index to write to.
+        value: value to write.  
+    """
+    if data_ and len(data_)>0:
+        # Convert the double to a 64-bit integer representation
+        int_value = int.from_bytes(bytearray(struct.pack('d', value)), MODBUS_WORD_ORDER)
         
+        # Split the integer into four 16-bit words
+        word1 = (int_value >> 48) & 0xFFFF
+        word2 = (int_value >> 32) & 0xFFFF
+        word3 = (int_value >> 16) & 0xFFFF
+        word4 = int_value & 0xFFFF
+        # Store the words in the data list
+        data_[word_index]     = swap_bytes(word1)
+        data_[word_index + 1] = swap_bytes(word2)
+        data_[word_index + 2] = swap_bytes(word3)
+        data_[word_index + 3] = swap_bytes(word4)
+      
+
+
+
 def set_bool(data_: list, word_index: int, bool_index: int, value: bool):
     """Set boolean value on location in bytearray.
 

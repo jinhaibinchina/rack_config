@@ -150,7 +150,12 @@ def create_control(record: dict, host: QWidget | None = None) -> QWidget:
         w.setText(text or DEFAULT_TITLES["checkbox"])
     elif variant == "combobox":
         w = QComboBox(host) if host is not None else QComboBox()
-        w.addItems(widget_options(text))
+
+        
+        w.addItems(widget_options(text) )
+        w.addItem('选项2')
+        w.addItem('选项3')
+
     elif variant == "pushbutton":
         w = QPushButton(host) if host is not None else QPushButton()
         w.setText(text or DEFAULT_TITLES["pushbutton"])

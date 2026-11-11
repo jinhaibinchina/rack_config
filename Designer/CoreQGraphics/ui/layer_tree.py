@@ -32,6 +32,9 @@ class LayerTreeDock(QDockWidget):
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.scene = None
         self._syncing = False
+        # 记录「本树实际连过」的 (signal, slot)，换场景时只断这些。
+        # 盲目 disconnect 未连接的槽会让 PySide6 打 RuntimeWarning。
+        self._bound: list[tuple] = []
 
         root = QWidget(self)
         layout = QVBoxLayout(root)
@@ -62,10 +65,28 @@ class LayerTreeDock(QDockWidget):
 
     # ------------------------------------------------------------------
     def set_scene(self, scene) -> None:
+        # 换场景必须先解绑，否则旧场景的图元被编辑时还会回调到这棵树，
+        # 而旧场景里的 QGraphicsItem 可能已经销毁（文档 D-6）。
+        for sig, slot in self._bound:
+            try:
+                sig.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
+        self._bound = []
         self.scene = scene
         if scene is not None:
-            scene.contentChanged.connect(self.refresh)
-            scene.selectionChanged.connect(self.sync_selection)
+            fine = hasattr(scene, "structureChanged") and hasattr(scene, "itemChanged")
+            pairs = []
+            if fine:
+                pairs.append((scene.structureChanged, self.refresh))
+                pairs.append((scene.itemChanged, self.update_items))
+            else:
+                # 老 / 自定义场景只有粗信号，退回全量刷新
+                pairs.append((scene.contentChanged, self.refresh))
+            pairs.append((scene.selectionChanged, self.sync_selection))
+            for sig, slot in pairs:
+                sig.connect(slot)
+                self._bound.append((sig, slot))
         self.refresh()
 
     def _label(self, item) -> str:
@@ -115,6 +136,54 @@ class LayerTreeDock(QDockWidget):
             node.setExpanded(True)
         self.tree.blockSignals(False)
         self.sync_selection()
+
+    def update_items(self, ids) -> None:
+        """只重画 ``ids`` 对应的行（名称 / 显隐灰字），不整树 clear 重建。
+
+        属性面板改一个字段、批量显隐、对齐移动都只走这里，避免每次编辑都
+        重建 1618 个 QTreeWidgetItem。下列情况无法安全增量，退化到全量：
+        有名称过滤、树还没建、ids 里出现新增 / 已删除的图元。
+        """
+        if self.scene is None or self._syncing:
+            return
+        wanted = {int(i) for i in (ids or ()) if i is not None}
+        if not wanted:
+            return
+        if self.filter_edit.text().strip() or self.tree.topLevelItemCount() == 0:
+            self.refresh()
+            return
+        nodes: dict[int, QTreeWidgetItem] = {}
+        stack = [self.tree.topLevelItem(i)
+                 for i in range(self.tree.topLevelItemCount())]
+        while stack:
+            node = stack.pop()
+            stack.extend(node.child(i) for i in range(node.childCount()))
+            raw = node.data(0, ID_ROLE)
+            if raw is not None:
+                nodes[int(raw)] = node
+        if not wanted <= set(nodes):
+            self.refresh()          # 有新增图元：结构变了
+            return
+        items: dict[int, object] = {}
+        for iid in wanted:
+            it = self.scene.find_item(iid)
+            if it is None:
+                self.refresh()      # 有图元被删：结构变了
+                return
+            items[iid] = it
+        self.tree.blockSignals(True)
+        try:
+            for iid, it in items.items():
+                node = nodes[iid]
+                label = self._label(it)
+                if it.get_visibility():
+                    node.setText(0, label)
+                    node.setData(0, Qt.ForegroundRole, None)
+                else:
+                    node.setText(0, label + "  （隐藏）")
+                    node.setForeground(0, QColor("#999999"))
+        finally:
+            self.tree.blockSignals(False)
 
     def selected_ids(self) -> list[int]:
         return [int(n.data(0, ID_ROLE)) for n in self.tree.selectedItems()

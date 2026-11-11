@@ -35,3 +35,7 @@ def collect_directory(source_dir,target_dir):
 
 if __name__ == '__main__':
     print(0 or '测试收集目录' )
+
+    text = "abc"
+    print(text)
+    print(text+'1')
