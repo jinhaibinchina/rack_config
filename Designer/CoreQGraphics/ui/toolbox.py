@@ -1,7 +1,7 @@
-"""图元工具箱 Dock：12 类图元 + 7 种 widget 变体 + 可复用的「组合模板」。
+"""图元工具箱 Dock：12 类图元 + 7 种 widget 变体 + 可复用模板。
 
 矩形/线/圆=两击，三角=三击，多边形/路径=多击+右键闭合，其余=单击放置。
-组合模板按钮点一下插到视图中心、拖到画布落在指定位置，右键可重命名 / 删除。
+单图元 / 组合模板按钮点一下插到视图中心、拖到画布落在指定位置，右键可重命名 / 删除。
 
 对齐 ``Designer/Core/ui/element_toolbox_dock.py`` 的分组与交互（缩略图也是
 代码自绘，无资源文件依赖）。两种拖放 MIME 分开：
@@ -323,7 +323,7 @@ class TemplateToolButton(ToolButton):
         self.setIcon(_template_icon(template))
         self.setToolTip(
             f"{template.name}\n"
-            f"组合模板 · {template.node_count} 个图元\n"
+            f"可复用模板 · {template.node_count} 个图元\n"
             "拖拽到画布，或点击添加到视图中心\n"
             "右键可重命名或删除"
         )
@@ -377,13 +377,13 @@ class ElementToolboxDock(QDockWidget):
         self.setMinimumWidth(190)
 
     def _build_template_group(self, holder: QWidget, column: QVBoxLayout) -> None:
-        group = QGroupBox("组合模板", holder)
+        group = QGroupBox("图元 / 组合模板", holder)
         layout = QVBoxLayout(group)
         layout.setContentsMargins(6, 10, 6, 6)
         layout.setSpacing(4)
 
         self._template_hint = QLabel(
-            "在画布上选中一个组，保存后即可在这里重复使用。", group)
+            "选中一个图元或组，保存后即可在这里重复使用。", group)
         self._template_hint.setObjectName("coreQgTemplateHint")
         self._template_hint.setWordWrap(True)
         layout.addWidget(self._template_hint)
@@ -394,10 +394,10 @@ class ElementToolboxDock(QDockWidget):
         self._template_layout.setSpacing(3)
         layout.addWidget(self._template_container)
 
-        self._capture_button = QPushButton("将所选组保存为模板", group)
+        self._capture_button = QPushButton("将所选图元存为模板", group)
         self._capture_button.setObjectName("coreQgTemplateCapture")
         self._capture_button.setEnabled(False)
-        self._capture_button.setToolTip("选中画布上的一个组后即可保存为模板")
+        self._capture_button.setToolTip("选中一个图元或组后即可保存；布尔结果可直接保存")
         self._capture_button.clicked.connect(
             lambda checked=False: self.captureGroupRequested.emit()
         )
@@ -431,7 +431,7 @@ class ElementToolboxDock(QDockWidget):
 
         self._template_hint.setText(
             "点击模板添加到视图中心，或拖拽到画布指定位置。" if templates
-            else "在画布上选中一个组，保存后即可在这里重复使用。"
+            else "在画布上选中一个图元或组，保存后即可在这里重复使用。"
         )
 
     def set_capture_enabled(self, enabled: bool) -> None:

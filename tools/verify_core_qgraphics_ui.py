@@ -360,6 +360,7 @@ def main() -> int:
     app.processEvents()
     count_before = len(scene.all_items())
     sel_count = len(scene.selected_items())
+    orig_sel_ids = sorted(it.item_id for it in scene.selected_items())
     window._do("duplicate")
     check("复制按选中数增加图元",
           len(scene.all_items()) == count_before + sel_count,
@@ -370,6 +371,59 @@ def main() -> int:
     window._do("redo")
     check("重做恢复数量", len(scene.all_items()) == count_before + sel_count,
           f"n={len(scene.all_items())}")
+
+    # 撤销/重做要连同「选中 + 脏标记」一起回退：restore() 会重建全部图元，
+    # 只恢复页面数据的话属性面板会跳回「页面属性」、标题的 * 也会错。
+    hist = window.history
+    dup_ids = sorted(it.item_id for it in scene.selected_items())
+    window._do("undo")
+    undone_ids = sorted(it.item_id for it in scene.selected_items())
+    check("撤销后恢复操作前的选中（不是清空）",
+          undone_ids == orig_sel_ids,
+          f"want={orig_sel_ids} got={undone_ids}")
+    panel_target = window.property_panel._target
+    if isinstance(panel_target, (list, tuple)):
+        panel_ids = sorted(it.item_id for it in panel_target)
+    else:
+        panel_ids = [getattr(panel_target, "item_id", None)]
+    check("撤销后属性面板仍绑定选中的图元",
+          panel_target is not None and panel_ids == orig_sel_ids,
+          f"target_ids={panel_ids} want={orig_sel_ids}")
+    window._do("redo")
+    check("重做后恢复副本选中",
+          sorted(it.item_id for it in scene.selected_items()) == dup_ids,
+          f"want={dup_ids}")
+    # 保存点与撤销点的「是否已存盘」必须随历史状态走，不能一律沿用当前值
+    scene.mark_saved()
+    hist.mark_saved()
+    window._do("undo")
+    check("保存后撤销应重新标脏（内容与磁盘不同）", scene.is_modified())
+    window._do("redo")
+    check("重做回保存点应恢复未标脏", not scene.is_modified())
+
+    # 独立小场景：连续撤销到栈底，名称 / 选中 / 脏标记都回到初始状态
+    from Designer.CoreQGraphics.g_scene import GraphicsScene  # noqa: E402
+    from Designer.CoreQGraphics.ui.history import PageHistory  # noqa: E402
+
+    hs = GraphicsScene()
+    ha = hs.create_item("rect", center=(1000.0, 1000.0))
+    hs.create_item("rect", center=(1300.0, 1000.0))
+    hh = PageHistory(hs)
+    name0 = ha.get_name()
+    hs.select_items([ha])
+    ha.set_page_field("name", "改过")
+    hh.commit()
+    ha.set_page_field("name", "又改过")
+    hh.commit()
+    while hh.can_undo():
+        hh.undo()
+    check("连续撤销到栈底：名称 / 选中 / 脏标记回到初始",
+          hs.find_item(ha.item_id).get_name() == name0
+          and [it.item_id for it in hs.selected_items()] == [ha.item_id]
+          and not hs.is_modified(),
+          f"name={hs.find_item(ha.item_id).get_name()} "
+          f"sel={[it.item_id for it in hs.selected_items()]} "
+          f"modified={hs.is_modified()}")
 
     print("\n=== 7. 保存 round-trip ===")
     scene.save_page(TMP_SAVED)

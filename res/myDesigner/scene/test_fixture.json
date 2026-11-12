@@ -710,12 +710,12 @@
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 17305.119,
-                "y": 7508.733
+                "x": 17295.369,
+                "y": 7484.358
             },
             "origin_pos": {
-                "x": 17294.199,
-                "y": 7494.174
+                "x": 17277.025,
+                "y": 7440.102
             },
             "width": 90.0625,
             "height": 150.625,
@@ -839,7 +839,7 @@
             },
             "origin_pos": {
                 "x": 17329.097,
-                "y": 8890.341
+                "y": 8882.917
             },
             "width": 2434.375195208071,
             "height": 3607.301425626508,
@@ -850,7 +850,7 @@
                 "fill": false,
                 "fill_color": "#919191",
                 "opacity": 255,
-                "cornerRadius": 0.0,
+                "cornerRadius": 200.0,
                 "font_size": 10
             },
             "zValue": -1.0
@@ -863,11 +863,11 @@
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 18213.001,
+                "x": 18217.876,
                 "y": 7468.501
             },
             "origin_pos": {
-                "x": 18213.001,
+                "x": 18217.876,
                 "y": 7468.501
             },
             "width": 157.0625,
@@ -875,11 +875,11 @@
             "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
-                "strokeWidth": 2,
+                "strokeWidth": 0,
                 "fill": true,
-                "fill_color": "#919191",
+                "fill_color": "#aaaaff",
                 "opacity": 255,
-                "cornerRadius": 0.0,
+                "cornerRadius": 34.0,
                 "font_size": 21
             },
             "zValue": 110.0,

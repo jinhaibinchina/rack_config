@@ -312,25 +312,38 @@ def main() -> int:
     )
     check("副本 parent_id / children_ids 全部重映射到新 id", ok_links)
 
+    # 偏移参数 (50, 60) 是**视图坐标**；写进 page 记录的应是反投影后的增量。
+    dx, dy = mini.projection.inverse_delta(50.0, 60.0)
     ok_offset = True
     for sid, src in orig.items():
         sp, sv, _ = _geo(src)
         cp, cv, _ = _geo(copies[sid])
         for k, (x, y) in sp.items():
             if k in cp:
-                ok_offset &= (abs(cp[k][0] - x - 50.0) < 1e-3
-                              and abs(cp[k][1] - y - 60.0) < 1e-3)
+                ok_offset &= (abs(cp[k][0] - x - dx) < 1e-3
+                              and abs(cp[k][1] - y - dy) < 1e-3)
         ok_offset &= len(sv) == len(cv)
         for (x, y), (nx, ny) in zip(sv, cv):
-            ok_offset &= (abs(nx - x - 50.0) < 1e-3
-                          and abs(ny - y - 60.0) < 1e-3)
-    check("整棵树（含后代顶点）统一偏移 +50/+60", ok_offset)
+            ok_offset &= (abs(nx - x - dx) < 1e-3
+                          and abs(ny - y - dy) < 1e-3)
+    check("整棵树（含后代顶点）统一按视图 +50/+60 反投影偏移", ok_offset,
+          f"page delta=({dx:.1f}, {dy:.1f})")
 
-    mini.clearSelection()
-    for it in tree:
-        it.setSelected(True)
-    check("父子同时选中只按顶层剪一次", mini.copy_selected() == 4,
-          str(len(mini._clipboard)))
+    # 黑盒：把副本和原件都投回视图坐标，位移必须恰好 (50, 60)。用正向投影
+    # 校验反向换算，符号 / 轴交换写反会立刻暴露，而不是跟着公式自证。
+    def view_center(it):
+        v = mini.projection.point(*it.page_center())
+        return v.x(), v.y()
+
+    ok_view = True
+    for sid, src in orig.items():
+        ax, ay = view_center(src)
+        bx, by = view_center(copies[sid])
+        ok_view &= abs(bx - ax - 50.0) < 1e-3 and abs(by - ay - 60.0) < 1e-3
+    check("粘贴后每个图元在视图里恰好偏移 +50/+60（不是场景单位）", ok_view)
+
+    # 连续粘贴（中途不改选区）按次数阶梯偏移。改选 / 重新复制会清零计数，
+    # 那部分单独放到下面，别把两件事混进同一批粘贴。
     second = mini.paste_clipboard((50.0, 60.0))
     check("连续粘贴各自独立且关系完整",
           len(mini.all_items()) == n0 + 8 and len(second) == 1
@@ -338,8 +351,59 @@ def main() -> int:
           f"n={len(mini.all_items())}")
     d = (second[0].page_center()[0] - first[0].page_center()[0],
          second[0].page_center()[1] - first[0].page_center()[1])
-    check("连续粘贴阶梯偏移不重叠",
-          abs(d[0] - 50.0) < 1e-3 and abs(d[1] - 60.0) < 1e-3, str(d))
+    check("连续粘贴阶梯偏移不重叠（按视图坐标累加）",
+          abs(d[0] - dx) < 1e-3 and abs(d[1] - dy) < 1e-3, str(d))
+
+    # 「父子同时选中只按顶层剪一次」原本夹在两次粘贴中间，它调用的
+    # copy_selected() 会清零阶梯；挪到这里，顺带验证归零语义。
+    mini.clearSelection()
+    for it in tree:
+        it.setSelected(True)
+    check("父子同时选中只按顶层剪一次", mini.copy_selected() == 4,
+          str(len(mini._clipboard)))
+    check("重新复制后粘贴计数归零", mini._paste_count == 0,
+          str(mini._paste_count))
+
+    print("\n=== 6.5b 粘贴阶梯：改选 / 重新复制归零，连续 Ctrl+V 不受影响 ===")
+    ps = GraphicsScene()
+    pa = ps.create_item("rect", center=(1000.0, 1000.0))
+    pb = ps.create_item("rect", center=(1300.0, 1000.0))
+
+    def _paste_view(it):
+        v = ps.projection.point(*it.page_center())
+        return v.x(), v.y()
+
+    ps.clearSelection()
+    pa.setSelected(True)
+    ps.copy_selected()
+    q1 = ps.paste_clipboard((20.0, 30.0))[0]
+    ps.select_items([q1])          # 主窗口 Ctrl+V 后自动选中副本
+    check("粘贴后自动选中副本不清零（连续 Ctrl+V 仍阶梯）",
+          ps._paste_count == 1, str(ps._paste_count))
+    q2 = ps.paste_clipboard((20.0, 30.0))[0]
+    d12 = (_paste_view(q2)[0] - _paste_view(q1)[0],
+           _paste_view(q2)[1] - _paste_view(q1)[1])
+    check("连续第二次粘贴仍是 +20/+30 阶梯",
+          abs(d12[0] - 20.0) < 1e-3 and abs(d12[1] - 30.0) < 1e-3,
+          str(d12))
+    ps.select_items([q2])
+    ps.clearSelection()
+    pb.setSelected(True)
+    check("用户改选图元后粘贴计数归零", ps._paste_count == 0,
+          str(ps._paste_count))
+    q3 = ps.paste_clipboard((20.0, 30.0))[0]
+    d13 = (_paste_view(q3)[0] - _paste_view(q1)[0],
+           _paste_view(q3)[1] - _paste_view(q1)[1])
+    check("改选后第一批副本回到 1× 起点（不继承 3×）",
+          abs(d13[0]) < 1e-3 and abs(d13[1]) < 1e-3, str(d13))
+    ps.copy_selected()
+    check("重新复制后粘贴计数归零", ps._paste_count == 0,
+          str(ps._paste_count))
+    q4 = ps.paste_clipboard((20.0, 30.0))[0]
+    d4 = (_paste_view(q4)[0] - _paste_view(pb)[0],
+          _paste_view(q4)[1] - _paste_view(pb)[1])
+    check("换内容后首批副本只偏移 1×（+20/+30）",
+          abs(d4[0] - 20.0) < 1e-3 and abs(d4[1] - 30.0) < 1e-3, str(d4))
 
     anchor = grp.page_origin()
     before = {it.item_id: (it.page_center(), it.page_size()) for it in tree}
@@ -379,6 +443,33 @@ def main() -> int:
                 it.page_bounding_rect(), other.page_bounding_rect(), 1e-2):
             drift.append(iid)
     check("缩放后保存 / 重载逐图元包围盒一致", not drift, str(drift[:4]))
+
+    # Ctrl+D 走同一套视图偏移口径；用独立小场景避免干扰上面的组缩放对拍。
+    from Designer.CoreQGraphics.g_projection import SceneProjection  # noqa: E402
+
+    ds = GraphicsScene()
+    dsrc = ds.create_item("rect", center=(3000.0, 3000.0), size=(200.0, 100.0))
+    ds.clearSelection()
+    dsrc.setSelected(True)
+    dcpy = ds.duplicate_selected((20.0, 30.0))[0]
+    dv0 = ds.projection.point(*dsrc.page_center())
+    dv1 = ds.projection.point(*dcpy.page_center())
+    check("Ctrl+D 副本在视图里偏移 +20/+30（与粘贴同口径）",
+          abs(dv1.x() - dv0.x() - 20.0) < 1e-3
+          and abs(dv1.y() - dv0.y() - 30.0) < 1e-3,
+          f"({dv1.x() - dv0.x():.1f}, {dv1.y() - dv0.y():.1f})")
+
+    # 反投影增量必须与正向 point 严格互逆：AGV 轴交换 / 取反、非 AGV 只取
+    # 反 y，两种投影都查，别让公式只在默认参数下碰巧成立。
+    inv_ok = True
+    for pr in (SceneProjection(), SceneProjection(agv=False)):
+        o = pr.point(0.0, 0.0)
+        for dvx, dvy in ((50.0, 60.0), (-12.5, 7.25), (0.0, 100.0)):
+            sx, sy = pr.inverse_delta(dvx, dvy)
+            q = pr.point(sx, sy)
+            inv_ok &= (abs(q.x() - o.x() - dvx) < 1e-9
+                       and abs(q.y() - o.y() - dvy) < 1e-9)
+    check("视图位移反投影与正向投影互逆（AGV / 非 AGV）", inv_ok)
 
     print("\n=== 6.6 组名前缀体系 / 拖角改尺寸（独立小场景） ===")
     nm = GraphicsScene()
@@ -584,6 +675,54 @@ def main() -> int:
                                 ts2.find_item(iid).page_bounding_rect(), 1e-2)]
     check("字号 / 文本编辑后保存重载逐图元包围盒一致", not drift3,
           str(drift3[:4]))
+
+    print("\n=== 6.7b 文本图元：style.cornerRadius 真正生效（离屏渲染） ===")
+    from Designer.CoreQGraphics.g_elements import RectItem  # noqa: E402
+
+    def _round_rec(typ: str, radius: float, stroke_width: float) -> dict:
+        # 直接构造存量记录，绕开 create_item 的「文字度量 -> 边框」联动：
+        # width/height 固定 400×240（AGV 投影后即 60×100 视图像素）。
+        return {
+            "id": 99100, "type": typ, "name": "圆角文本", "context": "",
+            "width": 400.0, "height": 240.0,
+            "center_pos": {"x": 0.0, "y": 0.0},
+            "origin_pos": {"x": 0.0, "y": 0.0},
+            "rotate": 0.0, "zValue": 1.0,
+            "style": {"fill": True, "fill_color": "#ff0000",
+                      "stroke": "#000000", "strokeWidth": stroke_width,
+                      "cornerRadius": radius, "opacity": 255,
+                      "font_size": 12},
+        }
+
+    def _paint_item(item) -> QImage:
+        img = QImage(240, 240, QImage.Format_ARGB32)
+        img.fill(Qt.white)
+        p = QPainter(img)
+        p.translate(120, 120)
+        item.paint(p, None)
+        p.end()
+        return img
+
+    img_round = _paint_item(TextItem(_round_rec("text", 40.0, 0), ts.projection))
+    img_square = _paint_item(TextItem(_round_rec("text", 0.0, 0), ts.projection))
+    # 局部矩形 (-30,-50,60,100)，圆角 rx=ry=10；左上角内缩 2px 的圆外点
+    px, py = 120 - 30 + 2, 120 - 50 + 2
+    check("text 圆角=场景40：四角被切掉而内部仍填充（圆角真正生效）",
+          img_round.pixelColor(px, py) == QColor(Qt.white)
+          and img_round.pixelColor(120, 120) == QColor("#ff0000"),
+          f"corner={img_round.pixelColor(px, py).name()} "
+          f"center={img_round.pixelColor(120, 120).name()}")
+    check("text 圆角=0 仍是直角填充（存量页面逐像素不变）",
+          img_square.pixelColor(px, py) == QColor("#ff0000"),
+          img_square.pixelColor(px, py).name())
+    # 描边分支与 RectItem 同口径：空文本下两者画的是同一个圆角矩形。
+    img_text_stroke = _paint_item(
+        TextItem(_round_rec("text", 40.0, 2), ts.projection))
+    img_rect_stroke = _paint_item(
+        RectItem(_round_rec("rect", 40.0, 2), ts.projection))
+    check("text 描边圆角与 RectItem 逐像素一致",
+          pixel_diff(img_text_stroke, img_rect_stroke) == 0,
+          str(pixel_diff(img_text_stroke, img_rect_stroke)))
 
     print("\n=== 6.8 文本图元：改边框反算字号（双向联动，独立小场景） ===")
 

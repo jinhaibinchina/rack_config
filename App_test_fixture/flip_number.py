@@ -326,7 +326,7 @@ class FlipNumberDisplay(QWidget):
     def __init__(self, digits: int = 6, *, size_factor: float = 1.0,
                  digit_size: tuple[int, int] | None = None,
                  gap: int = BASE_GAP, leading_zeros: bool = True,
-                 signed: bool = False, duration_ms: int = 320,
+                 signed: bool = False, duration_ms: int = 920,
                  bg: Any = DEFAULT_BG, fg: Any = DEFAULT_FG,
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)

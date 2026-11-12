@@ -21,6 +21,9 @@ from PySide6.QtWidgets import (
     QToolBar,
 )
 
+from ..g_boolean import (
+    BOOL_INTERSECT, BOOL_SUBTRACT, BOOL_UNION, BOOL_XOR, BOOLEAN_LABELS,
+)
 from ..g_scene import (
     DEFAULT_SIZES, ORTHO_DRAW_TYPES, TYPE_LABELS, WIDGET_TOOL_LABELS,
     GraphicsScene,
@@ -137,9 +140,17 @@ class DesignerWindow(QMainWindow):
         self._make("ungroup", "解组", "Ctrl+Shift+G")
         self._make("rename", "重命名…", "F2")
         self._make("toggle_visible", "显示 / 隐藏", "Ctrl+H")
-        self._make("save_template", "将所选组添加到工具箱…")
+        self._make("save_template", "将所选图元存为模板…")
         self.actions["save_template"].setToolTip(
-            "把选中的组（含全部成员）保存为可复用的组合模板")
+            "把选中的单个图元或组保存为可复用模板；布尔结果可直接保存")
+        for operation in (BOOL_UNION, BOOL_INTERSECT, BOOL_SUBTRACT, BOOL_XOR):
+            title = BOOLEAN_LABELS[operation]
+            if operation == BOOL_SUBTRACT:
+                title += "（首个减其余）"
+            action = self._make(f"boolean_{operation}", title)
+            action.setToolTip(
+                f"对至少两个闭合基本图元求{BOOLEAN_LABELS[operation]}，"
+                "生成可继续编辑的路径图元；差集按页面顺序取首个图元")
         for entry in (
             ("align_left", "左对齐"), ("align_right", "右对齐"),
             ("align_top", "顶对齐"), ("align_bottom", "底对齐"),
@@ -183,6 +194,9 @@ class DesignerWindow(QMainWindow):
                     "group", "ungroup", "rename", "toggle_visible"):
             edit.addAction(self.actions[key])
         edit.addSeparator()
+        boolean_menu = edit.addMenu("布尔运算")
+        for operation in (BOOL_UNION, BOOL_INTERSECT, BOOL_SUBTRACT, BOOL_XOR):
+            boolean_menu.addAction(self.actions[f"boolean_{operation}"])
         edit.addAction(self.actions["save_template"])
 
         arrange = bar.addMenu("排列")
@@ -253,6 +267,9 @@ class DesignerWindow(QMainWindow):
     def _do(self, key: str, payload=None) -> None:
         scene, view = self.scene, self.view
         sel = scene.selected_items()
+        # duplicate / paste / group 等命令会先改选中再提交历史。先把本次操作
+        # 前的选中交给撤销栈，撤销回上一状态时才能恢复用户当时选中的图元。
+        self.history.note_pre_edit_selection([it.item_id for it in sel])
         if key == "open":
             self._open_page()
         elif key == "save":
@@ -374,7 +391,9 @@ class DesignerWindow(QMainWindow):
                 "直线的宽或高设为 0 即水平 / 竖直线，两者不能同时为 0。\n"
                 "方向键：选中图元后按一下挪一格，按住连续挪；Shift 加速 10 倍，\n"
                 "画布有焦点时生效（无选中时方向键仍用于滚动画布）。\n"
-                "组合模板：选中组后保存进工具箱，点击 / 拖放即可重复实例化，\n"
+                "布尔运算：多选矩形、圆、三角形、多边形或路径，可做并 / 交 / 差 / 异或；\n"
+                "结果保留多轮廓、孔洞和精确曲线，可继续编辑或再次布尔。\n"
+                "模板：选中单个图元或组后保存进工具箱，点击 / 拖放即可重复实例化，\n"
                 "模板文件与旧设计器共用 toolbox_templates.json。\n"
                 "不含 PLC / 料仓状态绑定。",
             )
@@ -385,6 +404,17 @@ class DesignerWindow(QMainWindow):
             self._toggle_visible(targets)
         elif key == "rename":
             self._rename(payload or [it.item_id for it in sel])
+        elif key.startswith("boolean_"):
+            operation = key.removeprefix("boolean_")
+            try:
+                result = scene.apply_boolean(operation)
+            except ValueError as exc:
+                self.status_bar.showMessage(f"布尔运算失败：{exc}", 4500)
+            else:
+                self._after_edit()
+                self.status_bar.showMessage(
+                    f"已生成布尔{BOOLEAN_LABELS[operation]}路径；"
+                    "可继续编辑，或选择「将所选图元存为模板」", 5000)
         elif key == "save_template":
             self._capture_group_as_template(None)
         self._refresh()
@@ -394,36 +424,38 @@ class DesignerWindow(QMainWindow):
     # ------------------------------------------------------------------
     def _refresh_template_dock(self) -> None:
         self.toolbox.set_templates(self.template_store.templates)
-        has_group = self._selected_group() is not None
-        self.toolbox.set_capture_enabled(has_group)
-        self.actions["save_template"].setEnabled(has_group)
+        can_capture = self._selected_template_item() is not None
+        self.toolbox.set_capture_enabled(can_capture)
+        self.actions["save_template"].setEnabled(can_capture)
 
     def _selected_group(self):
-        sel = self.scene.selected_items()
-        if len(sel) == 1 and getattr(sel[0], "TYPE", "") == "group":
-            return sel[0]
-        return None
+        item = self._selected_template_item()
+        return item if item is not None and item.TYPE == "group" else None
 
-    def _capture_group_as_template(self, group=None) -> None:
-        group = group or self._selected_group()
-        if group is None:
+    def _selected_template_item(self):
+        sel = self.scene.selected_items()
+        return sel[0] if len(sel) == 1 else None
+
+    def _capture_group_as_template(self, item=None) -> None:
+        item = item or self._selected_template_item()
+        if item is None:
             self.status_bar.showMessage(
-                "请先选中一个组（多个图元请先「成组」）", 3000)
+                "请先选中一个图元或组；多选图元可先成组或做布尔运算", 3000)
             return
         default_name = self.template_store.unique_name(
-            group.get_name() or "组合模板")
+            item.get_name() or "图元模板")
         name, ok = QInputDialog.getText(
             self, "添加到控件工具箱", "模板名称：", text=default_name)
         if not ok:
             return
         try:
-            template = self.template_store.add_from_group(self.scene, group, name)
+            template = self.template_store.add_from_item(self.scene, item, name)
         except (OSError, ValueError) as exc:
             QMessageBox.warning(self, "添加到控件工具箱", str(exc))
             return
         self._refresh_template_dock()
         self.status_bar.showMessage(
-            f"已添加组合模板「{template.name}」（{template.node_count} 个图元）",
+            f"已添加模板「{template.name}」（{template.node_count} 个图元）",
             3500)
 
     def _rename_template(self, template_id: str) -> None:
@@ -625,6 +657,8 @@ class DesignerWindow(QMainWindow):
         if not path:
             return
         self.scene.save_page(path)
+        # 当前历史状态已与磁盘一致：撤销再重做回来不该重新标脏
+        self.history.mark_saved()
         self._refresh()
 
     def _save_page(self) -> None:
@@ -633,6 +667,7 @@ class DesignerWindow(QMainWindow):
         except ValueError:
             self._save_as()
             return
+        self.history.mark_saved()
         self.status_bar.showMessage("已保存", 2500)
         self._refresh()
 
@@ -650,6 +685,11 @@ class DesignerWindow(QMainWindow):
                 return
             if reply == QMessageBox.Save:
                 self._save_page()
+        # 析构期 Qt 会先销毁 C++ GraphicsScene，若此时还留着选中项，
+        # scene.clear() 会补发 selectionChanged，图层树 / 属性面板的槽就会
+        # 访问已删除对象（stderr 冒 RuntimeError）。关窗前先清干净选中，
+        # 销毁过程便不会再回调 Python 侧。
+        self.scene.clearSelection()
         event.accept()
 
     # ------------------------------------------------------------------
@@ -691,8 +731,11 @@ class DesignerWindow(QMainWindow):
         for key in ("delete", "duplicate", "group", "ungroup", "z_front",
                     "z_back", "z_raise", "z_lower"):
             self.actions[key].setEnabled(has_sel)
-        has_group = self._selected_group() is not None
-        self.actions["save_template"].setEnabled(has_group)
-        self.toolbox.set_capture_enabled(has_group)
+        can_capture = self._selected_template_item() is not None
+        self.actions["save_template"].setEnabled(can_capture)
+        self.toolbox.set_capture_enabled(can_capture)
+        can_boolean = len(self.scene.boolean_items()) >= 2
+        for operation in (BOOL_UNION, BOOL_INTERSECT, BOOL_SUBTRACT, BOOL_XOR):
+            self.actions[f"boolean_{operation}"].setEnabled(can_boolean)
 
 

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QApplication, QGraphicsItem, QGraphicsView, QMenu, QRubberBand,
 )
 
+from .g_boolean import BOOLEAN_LABELS, BOOLEAN_OPERATIONS, BOOL_SUBTRACT
 from .g_scene import ORTHO_DRAW_TYPES
 from .g_snap import GRID_MAJOR_EVERY, GRID_STEP, SnapSystem
 
@@ -2019,14 +2020,31 @@ class GraphicsView(QGraphicsView):
             action.triggered.connect(
                 lambda checked=False, k=key: self.actionTriggered.emit(k)
             )
-        # 「组合模板」只在单选一个组时出现：命令名与菜单 / 工具箱按钮共用
-        # 同一个入口，主窗口自己再从场景里取这个组，避免把图元对象塞进信号。
+        # 布尔与模板入口同主窗口命令表共用，操作后只记一个撤销点。
         scene = self.scene()
         sel = scene.selected_items() if hasattr(scene, "selected_items") else []
-        if len(sel) == 1 and getattr(sel[0], "TYPE", "") == "group":
+        boolean_items = (scene.boolean_items()
+                         if hasattr(scene, "boolean_items") else [])
+        if len(boolean_items) >= 2:
+            menu.addSeparator()
+            boolean_menu = QMenu("布尔运算", menu)
+            menu.addMenu(boolean_menu)
+            # PySide 对 addMenu(QString) 返回值的归属在不同版本表现不一致；
+            # 显式 parent + Python 引用，避免菜单构建返回后子菜单被 GC。
+            menu._boolean_menu = boolean_menu
+            for operation in BOOLEAN_OPERATIONS:
+                label = BOOLEAN_LABELS[operation]
+                if operation == BOOL_SUBTRACT:
+                    label += "（首个减其余）"
+                action = boolean_menu.addAction(label)
+                action.triggered.connect(
+                    lambda checked=False, op=operation:
+                        self.actionTriggered.emit(f"boolean_{op}")
+                )
+        if len(sel) == 1:
             menu.addSeparator()
             action = menu.addAction("添加到控件工具箱")
-            action.setToolTip("把选中的组（含全部成员）保存为可复用的组合模板")
+            action.setToolTip("把选中的图元或组保存为可复用模板")
             action.triggered.connect(
                 lambda checked=False: self.actionTriggered.emit("save_template")
             )

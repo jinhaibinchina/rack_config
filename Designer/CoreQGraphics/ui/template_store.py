@@ -1,4 +1,4 @@
-"""可复用的「组合模板」：把设计态的一个组（含全部后代）存成工具箱控件。
+"""可复用的图元 / 组合模板：把设计态的单图元或组存成工具箱控件。
 
 参考 ``Designer/Core/ui/template_store.py``，但按 CoreQGraphics 的平铺结构重写：
 组不是 Qt 父链，而是 ``parent_id`` / ``children_ids``；图元记录直接取
@@ -7,7 +7,7 @@
 （``Designer/Core/data.json/datas/design/toolbox_templates.json``），两边
 互相打开对方保存的模板都能用。
 
-本模块只负责存取与「从组捕获」；实例化在 ``GraphicsScene.instantiate_template``，
+本模块只负责存取与「从图元 / 组捕获」；实例化在 ``GraphicsScene.instantiate_template``，
 不在这里 import 任何旧 Core 的图元类。
 """
 
@@ -24,6 +24,7 @@ from PySide6.QtCore import QPointF
 
 # MIME 与视图层共用一份常量（g_view 不依赖 ui 包，避免循环导入）；
 # 这里 re-export 一下，外部脚本按旧路径 import 也不会断。
+from ..g_path import shift_segments
 from ..g_view import TEMPLATE_MIME_TYPE  # noqa: F401
 
 TEMPLATE_FILE_NAME = "toolbox_templates.json"
@@ -161,40 +162,47 @@ class TemplateStore:
     # 增删改
     # ------------------------------------------------------------------
     def add_from_group(self, scene, group, name: Optional[str] = None) -> ToolboxTemplate:
-        """把 ``group`` 及整棵后代子树捕获成新模板（几何整体平移到原点）。
-
-        ``scene`` 是 ``GraphicsScene``。平铺结构没有 Qt 父链，所以从
-        ``SceneIndex.children_of`` 做父在子前的 DFS，而不是 ``childItems()``；
-        记录一律走 ``to_page_record()``，保证未存盘的旋转也烘焙进模板。
-        """
+        """把 ``group`` 及整棵后代子树捕获成新模板（几何整体平移到原点）。"""
         if getattr(group, "TYPE", "") != "group":
             raise ValueError("只能把组保存为控件模板")
         root_id = int(group.item_id)
         ids = _collect_tree_ids(scene, root_id)
         if len(ids) < 2:
             raise ValueError("该组内没有可保存的图元")
-
         records = {
             iid: copy.deepcopy(scene.index.by_id[iid].to_page_record())
             for iid in ids
         }
+        return self._add_records(
+            root_id, records, name or group.get_name() or "组合模板",
+            fallback_center=group.page_center())
+
+    def add_from_item(self, scene, item, name: Optional[str] = None) -> ToolboxTemplate:
+        """把单个图元存为模板；布尔结果由此直接进入现有工具箱模板库。"""
+        if getattr(item, "TYPE", "") == "group":
+            return self.add_from_group(scene, item, name)
+        root_id = int(item.item_id)
+        records = {root_id: copy.deepcopy(item.to_page_record())}
+        return self._add_records(
+            root_id, records, name or item.get_name() or "图元模板",
+            fallback_center=item.page_center())
+
+    def _add_records(self, root_id: int, records: dict[int, dict],
+                     name: str, fallback_center=None) -> ToolboxTemplate:
         root_data = records[root_id]
         center = _read_point(root_data.get("center_pos"))
+        if center is None and fallback_center is not None:
+            center = QPointF(float(fallback_center[0]), float(fallback_center[1]))
         if center is None:
-            x, y = group.page_center()
-            center = QPointF(x, y)
+            raise ValueError("图元缺少有效的中心坐标")
         delta = QPointF(-center.x(), -center.y())
-
         items = []
-        for iid in ids:
-            record = records[iid]
+        for record in records.values():
             _shift_item_positions(record, delta)
             items.append(record)
-
-        wanted_name = (name or "").strip() or group.get_name() or "组合模板"
         template = ToolboxTemplate(
             id=self._next_template_id(),
-            name=self.unique_name(wanted_name),
+            name=self.unique_name((name or "").strip() or "图元模板"),
             root_id=root_id,
             width=float(root_data.get("width", 0.0) or 0.0),
             height=float(root_data.get("height", 0.0) or 0.0),
@@ -294,6 +302,7 @@ def _shift_item_positions(data: dict, delta: QPointF) -> None:
             point["y"] = round(float(point["y"]) + delta.y(), 3)
         except (KeyError, TypeError, ValueError):
             continue
+    shift_segments(data.get("path_segments") or (), delta.x(), delta.y())
 
 
 def _read_point(value) -> Optional[QPointF]:

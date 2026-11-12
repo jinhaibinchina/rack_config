@@ -72,6 +72,9 @@ UI 外壳在子包 ``Designer.CoreQGraphics.ui``：属性面板 / 工具箱 / �
 * 粘贴时统一重发 id，并重映射 ``parent_id`` / ``group_id`` / ``children_ids``；
   快照外引用一律断开。平铺结构没有 Qt 父链，**偏移必须施加到树里每个几何点**
   （center / origin / head / end / vertices），否则只有顶层动、后代留在原地。
+  偏移量按**视图坐标**给出（旧 Core ``paste`` 的 ``item.pos()`` 口径），先经
+  ``SceneProjection.inverse_delta`` 反投影成 page 增量再逐点施加；模板实例化的
+  target 本来就是 page 坐标，直接传 ``_instantiate``，不受这层换算影响。
   剪贴板快照深拷贝后再改写，连续粘贴按 ``_paste_count`` 阶梯偏移。
 * 组改宽高（布局页 W/H 或 ``+`` / ``-``）会**递归改变组内成员尺寸与位置**：
   ``GroupItem.set_page_size`` 委托 ``GraphicsScene.resize_group``，把整棵子树
@@ -328,20 +331,28 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
   操作，不改图元几何；缩放后 ``_follow_cursor`` 同步到光标实际场景点，下一次
   移动仍是纯鼠标位移。
 
-组合模板（工具箱里的可复用组，对照 ``Core/ui/template_store.py``）：
+布尔运算与可复用模板（对照 ``Core/ui/template_store.py``）：
+* 多选矩形 / 圆 / 三角形 / 多边形 / 路径后可做并集、交集、差集、异或；结果
+  替换源图元并自动选中，继承首个图元样式，只需一个撤销步。差集按页面顺序
+  以首个图元依次减去其余图元；空结果不删源图元，也不消耗新 id。
+* 结果仍是 ``path``：``path_segments`` 保存精确 move/line/curve 与填充规则，
+  ``vertices`` 同步保存旧 Core 可读的折线兜底，多子路径、孔洞和圆角不会丢；
+  移动、旋转、非等比缩放、复制、再次布尔与模板实例化均走同一套控制点变换。
+
+图元 / 组合模板（工具箱里的可复用图元或组）：
 * 模板文件 ``toolbox_templates.json`` 与旧设计器**共用同一份**、格式逐字同构：
   ``ToolboxTemplate.items`` 就是 page 记录列表，捕获时把整棵子树的几何点
   统一平移到「根组中心 = 原点」，宽高 / 半径 / 旋转一律不动。目录默认取
   页面所在的 ``.../datas/design/``，可用 ``DesignerWindow(template_dir=…)`` 改。
 * 捕获走平铺结构：``SceneIndex.children_of`` 做父在子前的 DFS（``parent_id`` /
   ``children_ids``，不是 Qt 父链），每个成员取 ``to_page_record()``，未存盘的
-  旋转会先烘焙。空组 / 非组图元直接拒绝。
+  旋转会先烘焙。单图元直接捕获；组捕获整棵子树，空组直接拒绝。
 * 实例化 ``GraphicsScene.instantiate_template`` 复用 ``_instantiate`` 的重发 id、
   重映射关系、组名前缀命名与整树偏移；额外做三件事：从 root 做可达性 DFS
   （防手工编辑模板的悬空 id）、按记录里的 ``zValue`` 稳定排序再交给
   ``_instantiate``（它按快照下标写 z，154 成员的料架模板按 id 排会打乱层级）、
   预校验类型并在异常时删掉本次新建的图元。
-* UI 入口四处：编辑菜单 / 画布右键（单选组时才有）/ 工具箱「将所选组保存为模板」
+* UI 入口四处：编辑菜单 / 画布右键（单选图元或组时）/ 工具箱「将所选图元存为模板」
   按钮 / 模板按钮点一下插到视口中心或拖到画布指定位置；模板按钮右键可重命名、
   删除。拖放 MIME 与图元工具分开（``application/x-design-template`` 带模板 id）。
   模板操作只写模板文件，**不改页面、不进撤销栈**；插入模板走 ``_after_edit()``。

@@ -147,11 +147,11 @@
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": 3010.125,
+                "x": 2995.428,
                 "y": -4105.289
             },
             "origin_pos": {
-                "x": 2411.981,
+                "x": 2397.284,
                 "y": -2604.497
             },
             "width": 4000.0,
@@ -165,7 +165,7 @@
                 "opacity": 255,
                 "cornerRadius": 0.0
             },
-            "zValue": 1,
+            "zValue": 1.0,
             "widgetText": "00000000000000",
             "widgetType": "textedit",
             "widgetFontSize": 12,
@@ -234,6 +234,40 @@
             "zValue": 0,
             "widgetText": "00000000000000",
             "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 15,
+            "name": "背景",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3107.2,
+                "y": -5713.867
+            },
+            "origin_pos": {
+                "x": 3107.2,
+                "y": -5713.867
+            },
+            "width": 6336.69032190422,
+            "height": 9076.242385483969,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": -1.0,
+            "widgetType": "textedit",
+            "widgetText": "",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
             "widgetBackground": "#ffffff"

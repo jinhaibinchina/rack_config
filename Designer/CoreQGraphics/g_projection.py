@@ -94,5 +94,22 @@ class SceneProjection:
     def inverse_size(self, w_view: float, h_view: float) -> tuple[float, float]:
         return h_view / self.kx, w_view / self.ky
 
+    def inverse_delta(self, dvx: float, dvy: float) -> tuple[float, float]:
+        """视图位移 -> 场景位移（纯增量，含 AGV 轴交换与取反）。
+
+        ``inverse_point`` 里带 origin 常量，虽然两点相减也能得到增量，但复制
+        / 粘贴要的是「位移」而不是「点」：单独给一个方法，避免调用方去凑原点。
+        旧 Core ``paste`` 是 ``item.setPos(item.pos() + paste_offset)``，
+        ``pos()`` 是 ``sceneToView`` 之后的**视图坐标**，所以那个 100 是视图
+        单位。平铺结构的偏移只能逐点写进 page 记录，必须先反投影。
+
+        AGV 下是轴交换：视图 x 偏移来自场景 y（除 kx）、视图 y 偏移来自场景
+        x（除 ky），两轴都带负号；非 AGV 下只有 y 取反。注意别用
+        ``inverse_size`` 代替——那是无量纲尺寸换算，符号与轴配对都不同。
+        """
+        if self.agv:
+            return (-float(dvy) / self.ky, -float(dvx) / self.kx)
+        return (float(dvx) / self.kx, -float(dvy) / self.ky)
+
     def signature(self) -> tuple:
         return (self.kx, self.ky, self.agv, self.ox, self.oy)

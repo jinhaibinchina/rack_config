@@ -26,8 +26,10 @@ from PySide6.QtWidgets import (
     QGraphicsItem, QGraphicsProxyWidget, QGraphicsScene,
 )
 
+from .g_boolean import BOOLEAN_OPERATIONS, make_boolean_record, supports_boolean
 from .g_element import BaseItem, rotate_xy
 from .g_elements import ITEM_TYPES
+from .g_path import shift_segments
 from .g_projection import SceneProjection
 from .g_widgets import (
     WIDGET_DEFAULTS, WIDGET_VARIANT_LABELS, create_control, normalize_variant,
@@ -169,6 +171,12 @@ class GraphicsScene(QGraphicsScene):
         # 剪贴板存的是「(原 id, page 记录)」快照，粘贴时统一重发 id 与父子关系
         self._clipboard: list[tuple[int, dict]] = []
         self._paste_count = 0
+        # 粘贴阶梯归零的两个哨兵：_paste_in_progress 放过「粘贴过程内部」的
+        # selectionChanged；_paste_keep_selection 放过粘贴返回后主窗口
+        # select_items(made) 自动选中副本 —— 那不是用户改选，否则连续 Ctrl+V
+        # 每次都从 1 重新计数，副本会全叠在同一处。
+        self._paste_in_progress = False
+        self._paste_keep_selection: set[int] | None = None
         # 组缩放链路重入保护：apply_scale_about 会回到 GroupItem.set_page_size，
         # 不能再委托一次「默认锚点」的 resize_group，否则整棵子树被缩放两遍。
         self._resizing_group = False
@@ -189,6 +197,8 @@ class GraphicsScene(QGraphicsScene):
         # 运行预览下，属性面板 / 批量变换改了图元的位姿或尺寸后要立刻重排
         # 真实控件；控件内容本身是否重建仍由 _sync_widget_proxies 按签名判断。
         self.geometryChanged.connect(self._on_geometry_changed)
+        # 用户改选图元 = 新一批粘贴的起点，阶梯计数归零（见下方槽的实现）
+        self.selectionChanged.connect(self._on_paste_selection_changed)
 
     # ------------------------------------------------------------------
     # 加载 / 保存
@@ -198,6 +208,9 @@ class GraphicsScene(QGraphicsScene):
             data = json.load(f)
         self._page_path = path
         n = self.load_data(data)
+        # 从磁盘打开的新页面是干净的：别把上一页的脏标记带过来，否则关窗
+        # 会误问保存。撤销走 load_data / restore，不经过这里。
+        self.mark_saved()
         # 整页换掉：图层树要按新页重建（旧版只能靠 fit_content 顺带刷吸附点，
         # 树里还挂着上一页的行）。撤销走 load_data + restore 自己的广播。
         self.emit_structure_changed()
@@ -523,7 +536,12 @@ class GraphicsScene(QGraphicsScene):
         return self.page_data()
 
     def restore(self, data: dict) -> None:
-        """从快照重建（撤销/重做）。保留当前文件路径与脏状态。"""
+        """从快照重建（撤销/重做）。保留文件路径与运行预览开关。
+
+        ``clear_page()`` 会销毁全部图元对象，选中必然清空；脏标记与选中由
+        ``PageHistory._apply()`` 在返回后按历史状态回填。这里保留调用前的
+        脏标记，作为非撤销调用方（直接 restore 的脚本）的合理默认。
+        """
         was_modified = self._modified
         run = self._widget_layer_on
         self.load_data(data)
@@ -735,6 +753,38 @@ class GraphicsScene(QGraphicsScene):
                 self.mark_modified()
                 self.emit_structure_changed()
         return item
+
+    # ------------------------------------------------------------------
+    # 基本图元布尔：结果替换源图元，并自动选中，可继续布尔或存为模板
+    # ------------------------------------------------------------------
+    def boolean_items(self) -> list[BaseItem]:
+        """选区中可参与面域运算的顶层图元，按页面顺序确定差集首个图元。"""
+        selected = set(it.item_id for it in self.top_level_items(self.selected_items()))
+        return [self.index.by_id[iid] for iid in self.index.order
+                if iid in selected and supports_boolean(self.index.by_id[iid])]
+
+    def apply_boolean(self, operation: str) -> BaseItem | None:
+        """并 / 交 / 差 / 异或；任一失败都在删源图元之前抛出。"""
+        if operation not in BOOLEAN_OPERATIONS:
+            raise ValueError(f"不支持的布尔运算类型: {operation}")
+        items = self.boolean_items()
+        if len(items) < 2:
+            raise ValueError("请先选中至少 2 个矩形、圆、三角形、多边形或路径")
+        top_z = max((it.zValue() for it in self.all_items()), default=0.0)
+        # 先在候选 id 上完成全部几何校验；空结果不能消耗正式 id。
+        candidate_id = self.index._next_id
+        record = make_boolean_record(
+            items, operation, self.projection, candidate_id, top_z + 1.0)
+        allocated_id = self.index.allocate_id()
+        if allocated_id != candidate_id:
+            raise RuntimeError("图元 id 分配状态异常")
+        result = self._spawn(record)
+        if result is None:
+            raise ValueError("无法创建布尔结果图元，源图元未改动")
+        self.delete_items(items)
+        self.select_items([result])
+        self.mark_modified()
+        return result
 
     # ==================================================================
     # 手动绘制（CAD 式分点落点，参考 Designer/Core 的 begin_draw 流程）
@@ -1139,6 +1189,7 @@ class GraphicsScene(QGraphicsScene):
         for v in rec.get("vertices") or []:
             v["x"] = float(v.get("x", 0.0)) + dx
             v["y"] = float(v.get("y", 0.0)) + dy
+        shift_segments(rec.get("path_segments") or (), dx, dy, digits=6)
 
     @staticmethod
     def _snapshot_descendants(snapshot, root: int) -> list[int]:
@@ -1197,7 +1248,12 @@ class GraphicsScene(QGraphicsScene):
         return names
 
     def _instantiate(self, snapshot, offset) -> list[BaseItem]:
-        """从快照造一棵新子树：重发 id、重映射关系、整树统一偏移。"""
+        """从快照造一棵新子树：重发 id、重映射关系、整树统一偏移。
+
+        ``offset`` 是 **page 场景坐标** 的增量（逐点施加到 center / origin /
+        head / end / vertices）。复制 / 粘贴入口负责把视图坐标偏移换算成这个
+        口径；``instantiate_template`` 的 target 本来就是 page 坐标，直接传。
+        """
         if not snapshot:
             return []
         # 剪贴板快照必须留着连续粘贴，绝不能原地改写
@@ -1235,7 +1291,7 @@ class GraphicsScene(QGraphicsScene):
         return [it for it in made if it.item_id in wanted]
 
     def instantiate_template(self, template, target: QPointF) -> BaseItem | None:
-        """把工具箱模板实例化到 ``target``（page 坐标），返回新的根组图元。
+        """把工具箱模板实例化到 ``target``（page 坐标），返回新的根图元。
 
         模板文件与旧设计器共用（``ToolboxTemplate.items`` 就是 page 记录，
         捕获时根组中心已平移到原点）。这里复用 ``_instantiate`` 的重发 id /
@@ -1326,24 +1382,76 @@ class GraphicsScene(QGraphicsScene):
             raise
         return made[0] if made else None
 
+    def _on_paste_selection_changed(self) -> None:
+        """用户改选图元时把粘贴阶梯归零。
+
+        复制 A 连按三次 Ctrl+V（偏移 1×/2×/3×），再改选 B 重新复制粘贴，
+        若计数不清零，新一批的第一份就会带着 4× 偏移被甩到很远。粘贴过程
+        内部、以及粘贴后主窗口自动选中副本，都不算「用户改选」，由两个
+        哨兵放过，保证连续 Ctrl+V 的阶梯仍然成立。
+        """
+        if self._paste_in_progress:
+            return
+        if self._paste_keep_selection is not None:
+            try:
+                ids = {it.item_id for it in self.selected_items()}
+            except RuntimeError:
+                return          # 析构期 C++ 场景已删，别再访问
+            if ids == self._paste_keep_selection:
+                return
+            self._paste_keep_selection = None
+        self._paste_count = 0
+
     def copy_selected(self) -> int:
         """Ctrl+C：只剪顶层，但递归带整棵子树。"""
         self._clipboard = self._capture_subtree(self.selected_items())
+        # 换了剪贴板内容就是新一批粘贴，阶梯从头开始
+        self._paste_count = 0
+        self._paste_keep_selection = None
         return len(self._clipboard)
 
-    def paste_clipboard(self, offset=(100.0, 100.0)) -> list[BaseItem]:
-        """Ctrl+V：连续粘贴按次数阶梯偏移，避免副本叠在一起。"""
+    def _view_offset_to_page(self, offset) -> tuple[float, float]:
+        """复制 / 粘贴的偏移量按**视图坐标**解释，换成 page 场景增量。
+
+        旧 Core ``paste`` 是 ``item.setPos(item.pos() + paste_offset)``，
+        ``pos()`` 为 ``sceneToView`` 之后的视图坐标，那个 100 因此是视图单位。
+        这里平铺结构没有 Qt 父链，偏移只能逐点写进 page 记录；若把 100 直接
+        加到场景坐标上，屏幕上的实际位移只有 100·k（AGV 下还会轴交换、取反），
+        投影比例一变副本就几乎叠在原图上，方向也和旧编辑器相反。
+        """
+        return self.projection.inverse_delta(float(offset[0]), float(offset[1]))
+
+    def paste_clipboard(self, offset=(10.0, 10.0)) -> list[BaseItem]:
+        """Ctrl+V：连续粘贴按次数阶梯偏移，避免副本叠在一起。
+
+        ``offset`` 是**视图坐标**增量（与旧 Core ``paste_offset`` 同口径），
+        第 k 次粘贴先放大 k 倍，再整体反投影成 page 增量。改选图元或重新
+        复制会把 ``_paste_count`` 归零，新一批从 1× 重新开始。
+        """
         if not self._clipboard:
             return []
-        self._paste_count += 1
-        k = self._paste_count
-        return self._instantiate(self._clipboard,
-                                 (offset[0] * k, offset[1] * k))
+        self._paste_in_progress = True
+        try:
+            self._paste_count += 1
+            k = self._paste_count
+            made = self._instantiate(
+                self._clipboard,
+                self._view_offset_to_page((offset[0] * k, offset[1] * k)))
+            # 主窗口随后 select_items(made)：这批 id 的选中变化不算用户改选
+            self._paste_keep_selection = (
+                {it.item_id for it in made} if made else None)
+            return made
+        finally:
+            self._paste_in_progress = False
 
     def duplicate_selected(self, offset=(100.0, 100.0)) -> list[BaseItem]:
-        """Ctrl+D：等价于「复制 + 立即粘贴」，递归带上整棵子树。"""
+        """Ctrl+D：等价于「复制 + 立即粘贴」，递归带上整棵子树。
+
+        ``offset`` 同样是**视图坐标**增量，见 ``_view_offset_to_page``。
+        """
         return self._instantiate(
-            self._capture_subtree(self.selected_items()), offset)
+            self._capture_subtree(self.selected_items()),
+            self._view_offset_to_page(offset))
 
     def set_item_z(self, items, mode: str) -> None:
         """``front`` / ``back`` / ``raise`` / ``lower``。"""

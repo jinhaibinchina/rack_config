@@ -21,6 +21,10 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QPainter, QPainterPath, QPixmap
 
 from .g_element import BaseItem, _page_xy, norm_deg, rotate_xy
+from .g_path import (
+    PATH_FILL_RULE_KEY, PATH_SEGMENTS_KEY, fill_rule_value, map_path,
+    path_to_segments, path_to_vertices, segments_to_path,
+)
 from .g_style import (
     HOVER_COLOR, TEXT_PAD_X, TEXT_PAD_Y, dashed_pen_for, font_for, parse_color,
     text_metrics,
@@ -236,15 +240,38 @@ class TextItem(BaseItem):
         r = self._local_rect
         painter.save()
         painter.setFont(font_for("Arial", s.font_size, True))
+        # 圆角与 RectItem / 旧 Core rect_element 同口径：cornerRadius 是场景
+        # 单位，AGV 投影交换了轴（场景 y -> 画笔 x、场景 x -> 画笔 y），所以
+        # rx 乘 ky、ry 乘 kx，且各自夹在对应边的一半以内。属性面板本来就给
+        # text 提供了「圆角」输入框，这里必须真的读到它。
+        radius = s.corner_radius
+        rx = ry = 0.0
+        if radius > 0:
+            rx = min(radius * self._proj.ky, r.width() / 2.0)
+            ry = min(radius * self._proj.kx, r.height() / 2.0)
+        rounded = rx > 0 and ry > 0
         if s.stroke_width > 0:
             painter.setPen(s.pen(self.stroke_color()))
             if s.fill:
                 painter.setBrush(s.brush())
-            painter.drawRect(r)
+            if rounded:
+                painter.drawRoundedRect(r, rx, ry)
+            else:
+                painter.drawRect(r)
         else:
             painter.setPen(s.pen(self.stroke_color(), 1.0))
             if s.fill:
-                painter.fillRect(r, s.fill_color)
+                if rounded:
+                    # fillRect 没有圆角版本：临时切到 NoPen + 画刷只填圆角底，
+                    # 再 restore 回文字用的笔（strokeWidth=0 时不画边框，文字
+                    # 颜色仍走 stroke_color，与无圆角时逐像素一致）。
+                    painter.save()
+                    painter.setPen(Qt.NoPen)
+                    painter.setBrush(s.brush())
+                    painter.drawRoundedRect(r, rx, ry)
+                    painter.restore()
+                else:
+                    painter.fillRect(r, s.fill_color)
         text_rect = painter.boundingRect(r, Qt.AlignCenter, self.context or "")
         painter.drawText(text_rect, Qt.AlignCenter, self.context or "")
         painter.restore()
@@ -899,16 +926,16 @@ class PathItem(_PointBasedItem):
     TYPE = "path"
 
     def __init__(self, record, projection) -> None:
+        # 老页面只有 vertices；布尔结果另有 path_segments 精确曲线表示。
+        self._segment_mode = bool(record.get(PATH_SEGMENTS_KEY))
         super().__init__(record, projection)
-        self._build_path(record.get("vertices") or [])
+        if self._segment_mode:
+            self._build_segments(record.get(PATH_SEGMENTS_KEY) or [])
+        else:
+            self._build_path(record.get("vertices") or [])
 
     def _build_path(self, vertices, center=None) -> None:
-        """按顶点记录（含 ``move`` 标记）重建 path 与局部包围盒。
-
-        ``center`` 是局部原点（page 坐标），不传就落在顶点包围盒中心——构造 /
-        改顶点时如此；旋转烘焙、父级刚体运动、缩放要传中心，否则重建会把支点
-        连同图元一起按「新包围盒中心」挪位（三角形/多边形转一次中心就跳）。
-        """
+        """按旧版折线顶点记录（含 ``move`` 标记）重建 path。"""
         pts = [(float(v["x"]), float(v["y"])) for v in vertices]
         if not pts:
             return
@@ -944,18 +971,112 @@ class PathItem(_PointBasedItem):
         path.closeSubpath()
         self._path_local = path
 
+    def _build_segments(self, segments, center=None) -> None:
+        """按精确 move/line/curve 段重建；曲线控制点也参与坐标投影。"""
+        if not segments:
+            return
+        if center is None:
+            if "center_pos" in self._page:
+                # 非对称路径旋转后，逻辑中心通常不再是旋转几何的 AABB 中心；
+                # 加载必须尊重持久化位姿，不能仅读取一次就把它改掉。
+                cx, cy = _page_xy(self._page, "center_pos")
+            else:
+                page_path = segments_to_path(
+                    segments,
+                    fill_rule=fill_rule_value(self._page.get(PATH_FILL_RULE_KEY)))
+                bounds = page_path.boundingRect()
+                cx, cy = bounds.center().x(), bounds.center().y()
+        else:
+            cx, cy = float(center[0]), float(center[1])
+        p = self._proj
+        center_v = p.point(cx, cy)
+        path = segments_to_path(
+            segments,
+            point_map=lambda pt: p.point(pt.x(), pt.y()) - center_v,
+            fill_rule=fill_rule_value(self._page.get(PATH_FILL_RULE_KEY)),
+        )
+        self._suppress_geo = True
+        try:
+            self.setPos(center_v)
+            self.setRotation(0.0)
+            self.setTransformOriginPoint(QPointF(0.0, 0.0))
+        finally:
+            self._suppress_geo = False
+        # 不能用控制点的 AABB：贝塞尔实际极值可能严格小于控制点包围盒。
+        self._local_rect = path.boundingRect()
+        self._w_view = self._local_rect.width()
+        self._h_view = self._local_rect.height()
+        self._path_local = path
+
     def _local_points(self) -> list[QPointF]:
-        """path 的局部顶点：``closeSubpath()`` 会在末尾补一个重复首点，按顶点表截断。"""
+        """可视端点；曲线控制点不当顶点吸附，曲线末端仍保留。"""
         path = self._path_local
         if path is None:
             return []
+        if self._segment_mode:
+            out: list[QPointF] = []
+            index = 0
+            while index < path.elementCount():
+                element = path.elementAt(index)
+                if element.isCurveTo() and index + 2 < path.elementCount():
+                    end = path.elementAt(index + 2)
+                    out.append(QPointF(end.x, end.y))
+                    index += 3
+                else:
+                    out.append(QPointF(element.x, element.y))
+                    index += 1
+            return out
         recs = self._page.get("vertices") or []
         n = min(len(recs), path.elementCount()) if recs else path.elementCount()
         return [QPointF(path.elementAt(i).x, path.elementAt(i).y) for i in range(n)]
 
     def _snap_vertices_local(self) -> list[QPointF]:
-        """路径类没有 ``_points_local``，顶点在 ``_path_local`` 元素里。"""
         return self._local_points()
+
+    def snap_closed(self) -> bool:
+        # 布尔结果是闭合面域；旧手绘路径保持既有吸附点集合不变。
+        return self._segment_mode
+
+    def _live_page_path(self) -> QPainterPath:
+        """当前实时路径（含 Qt 旋转 / 拖动），反投影为 page 绝对坐标。"""
+        if self._path_local is None:
+            return QPainterPath()
+        scene_path = self.sceneTransform().map(self._path_local)
+
+        def inverse(point: QPointF) -> QPointF:
+            return QPointF(*self._proj.inverse_point(point.x(), point.y()))
+
+        return map_path(scene_path, inverse)
+
+    def to_page_record(self) -> dict:
+        if self._segment_mode and self._path_local is not None:
+            # 与普通顶点不同，曲线还有控制点；即使只平移、Qt rotation == 0，
+            # 也必须把整份实时几何写回，不能只更新 center_pos。
+            cx, cy, _qt, ox, oy = self.live_page_pose()
+            self._baked_angle = norm_deg(self._baked_angle - float(self.rotation()))
+            previous = self._suppress_propagate
+            self._suppress_propagate = True
+            try:
+                self._replace_path(self._live_page_path(), center=(cx, cy),
+                                   pivot=(ox, oy))
+            finally:
+                self._suppress_propagate = previous
+        return super().to_page_record()
+
+    def page_size(self) -> tuple[float, float]:
+        if self._segment_mode and self._path_local is not None:
+            # 旋转可已烘焙进绝对路径，局部 AABB 因而可能是旋转后的外框；
+            # 与其它顶点类一致，先反转到自身坐标系再量宽高。
+            cx, cy = self.page_center()
+            angle = self.page_angle()
+            path = self._live_page_path()
+            if abs(angle) > 1e-9:
+                path = map_path(
+                    path,
+                    lambda pt: QPointF(*rotate_xy(pt.x(), pt.y(), cx, cy, -angle)))
+            bounds = path.boundingRect()
+            return bounds.width(), bounds.height()
+        return super().page_size()
 
     def _records_from_points(self, points: list[QPointF]) -> list[dict]:
         """按旧记录的 ``move`` 分段标记重排顶点表。"""
@@ -972,17 +1093,57 @@ class PathItem(_PointBasedItem):
             out[0]["move"] = True
         return out
 
+    def _replace_path(self, page_path: QPainterPath, center=None,
+                      pivot=None) -> None:
+        """精确路径统一写回：曲线段 + 旧版折线兜底 + 中心 / 支点。"""
+        if page_path.isEmpty():
+            return
+        self.prepareGeometryChange()
+        old_center = self.page_center()
+        self._segment_mode = True
+        self._page[PATH_SEGMENTS_KEY] = path_to_segments(page_path)
+        self._page[PATH_FILL_RULE_KEY] = (
+            "winding" if page_path.fillRule() == Qt.WindingFill else "odd_even")
+        self._page["vertices"] = path_to_vertices(page_path)
+        if pivot is None:
+            self._baked_angle = 0.0
+        bounds = page_path.boundingRect()
+        if "width" in self._page:
+            self._page["width"] = round(bounds.width(), 3)
+            self._page["height"] = round(bounds.height(), 3)
+        if center is None:
+            cx, cy = bounds.center().x(), bounds.center().y()
+        else:
+            cx, cy = float(center[0]), float(center[1])
+        self._write_center(cx, cy)
+        self._suppress_geo = True
+        try:
+            self._build_segments(self._page[PATH_SEGMENTS_KEY], center=(cx, cy))
+        finally:
+            self._suppress_geo = False
+        if pivot is None:
+            self._rebase_pivot(old_center, (cx, cy))
+        else:
+            self._write_origin(float(pivot[0]), float(pivot[1]))
+        self._sync_baked_angle()
+        self._dirty = True
+        self._geo_dirty = True
+        self.update()
+
     def _replace_points(self, points: list[QPointF], center=None,
                         pivot=None) -> None:
-        """path 的统一重建入口：写顶点表、定位、同步中心 / 支点。"""
+        """手绘 / 顶点编辑是显式折线化：移除精确段，保留旧版路径语义。"""
         if len(points) < 3:
             return
+        self._segment_mode = False
+        self._page.pop(PATH_SEGMENTS_KEY, None)
+        self._page.pop(PATH_FILL_RULE_KEY, None)
         self.prepareGeometryChange()
         old_center = self.page_center()
         rec = self._records_from_points(points)
         self._page["vertices"] = rec
         if pivot is None:
-            self._baked_angle = 0.0     # 新形状：朝向以落点为准
+            self._baked_angle = 0.0
         xs = [p.x() for p in points]
         ys = [p.y() for p in points]
         if "width" in self._page:
@@ -1008,23 +1169,82 @@ class PathItem(_PointBasedItem):
         self._geo_dirty = True
         self.update()
 
-    def apply_rigid_pose(self, px: float, py: float, dangle: float,
-                         dx: float, dy: float) -> None:
-        """父级刚体运动烘焙进顶点（保留 ``move`` 分段标记）。"""
-        pts = self._live_page_points()
-        if len(pts) < 3:
+    def set_page_size(self, w: float, h: float) -> None:
+        if not self._segment_mode:
+            return super().set_page_size(w, h)
+        if w <= 0 and h <= 0:
+            return
+        current = self._live_page_path()
+        if current.isEmpty():
             return
         cx, cy = self.page_center()
         ox, oy = self.page_origin()
-        moved = []
-        for x, y in pts:
-            nx, ny = rotate_xy(x, y, px, py, dangle)
-            moved.append(QPointF(nx + dx, ny + dy))
-        ncx, ncy = rotate_xy(cx, cy, px, py, dangle)
-        nox, noy = rotate_xy(ox, oy, px, py, dangle)
+        angle = self.page_angle()
+        local = current.boundingRect()
+        if angle:
+            local_path = map_path(
+                current,
+                lambda pt: QPointF(*rotate_xy(pt.x(), pt.y(), cx, cy, -angle)))
+            local = local_path.boundingRect()
+        else:
+            local_path = current
+        cur_w, cur_h = local.width(), local.height()
+        fx = float(w) / cur_w if cur_w > 1e-6 and w > 0 else 1.0
+        fy = float(h) / cur_h if cur_h > 1e-6 and h > 0 else 1.0
+        if abs(fx - 1.0) < 1e-12 and abs(fy - 1.0) < 1e-12:
+            return
+
+        def scale(point: QPointF) -> QPointF:
+            x = cx + (point.x() - cx) * fx
+            y = cy + (point.y() - cy) * fy
+            return QPointF(*rotate_xy(x, y, cx, cy, angle)) if angle else QPointF(x, y)
+
+        scaled = map_path(local_path, scale)
+        uox, uoy = (rotate_xy(ox, oy, cx, cy, -angle) if angle else (ox, oy))
+        nox, noy = cx + (uox - cx) * fx, cy + (uoy - cy) * fy
+        if angle:
+            nox, noy = rotate_xy(nox, noy, cx, cy, angle)
+        self._baked_angle = norm_deg(angle)
+        self._replace_path(scaled, center=(cx, cy), pivot=(nox, noy))
+
+    def apply_scale_about(self, anchor, sx: float, sy: float) -> None:
+        if not self._segment_mode:
+            return super().apply_scale_about(anchor, sx, sy)
+        ax, ay = float(anchor[0]), float(anchor[1])
+
+        def transform(point: QPointF) -> QPointF:
+            return QPointF(ax + (point.x() - ax) * sx,
+                           ay + (point.y() - ay) * sy)
+
+        cx, cy = self.page_center()
+        ox, oy = self.page_origin()
+        previous = self._suppress_propagate
+        self._suppress_propagate = True
+        try:
+            # _live_page_path 含尚未烘焙的 Qt 旋转，而 _replace_path 会清零
+            # rotation；先把这段角度入账，否则拖角后几何还转着、rotate 却变 0。
+            self._account_bake()
+            self._replace_path(map_path(self._live_page_path(), transform),
+                               center=transform(QPointF(cx, cy)).toTuple(),
+                               pivot=transform(QPointF(ox, oy)).toTuple())
+        finally:
+            self._suppress_propagate = previous
+
+    def apply_rigid_pose(self, px: float, py: float, dangle: float,
+                         dx: float, dy: float) -> None:
+        if not self._segment_mode:
+            return super().apply_rigid_pose(px, py, dangle, dx, dy)
+        cx, cy = self.page_center()
+        ox, oy = self.page_origin()
+
+        def transform(point: QPointF) -> QPointF:
+            x, y = rotate_xy(point.x(), point.y(), px, py, dangle)
+            return QPointF(x + dx, y + dy)
+
         self._account_bake(dangle)
-        self._replace_points(moved, center=(ncx + dx, ncy + dy),
-                             pivot=(nox + dx, noy + dy))
+        self._replace_path(map_path(self._live_page_path(), transform),
+                           center=transform(QPointF(cx, cy)).toTuple(),
+                           pivot=transform(QPointF(ox, oy)).toTuple())
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         if self._path_local is None:
@@ -1038,12 +1258,13 @@ class PathItem(_PointBasedItem):
 
     def _apply_scaled_points(self, points: list[QPointF], center=None,
                              pivot=None) -> None:
-        """路径类：缩放后的顶点重建 path，保留 ``move`` 分段标记。"""
         self._replace_points(points, center=center, pivot=pivot)
 
     def _bake_live_geometry(self, center=None, pivot=None) -> None:
-        """把实时折线（已含 Qt 旋转）写成绝对顶点，保留 ``move`` 分段标记。"""
         if self._path_local is None:
+            return
+        if self._segment_mode:
+            self._replace_path(self._live_page_path(), center=center, pivot=pivot)
             return
         pts = self._live_page_points()
         if len(pts) >= 3:
@@ -1052,13 +1273,7 @@ class PathItem(_PointBasedItem):
 
     def set_page_vertices(self, vertices: list[QPointF], center=None,
                           pivot=None) -> None:
-        """路径类：把落点当作闭合折线的顶点重建 path（绘制落子走这里）。
-
-        ``_path_local`` 存的是**相对可视中心**的局部坐标（与 ``_build_path``
-        一致），所以这里不能在绝对坐标上直接建路径，否则整条折线会被再平移一次
-        包围盒中心；重建后还要 ``prepareGeometryChange`` 并同步 ``_local_rect``，
-        否则 ``boundingRect`` 仍停在旧尺寸上（选中框、吸附点、命中测试全错）。
-        """
+        """手绘 / 属性面板顶点编辑走旧版折线格式。"""
         self._replace_points(vertices, center=center, pivot=pivot)
 
 

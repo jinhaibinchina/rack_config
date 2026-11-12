@@ -293,11 +293,12 @@ stage.tags.update_many({...}); stage.tags.flush_now()
 
 ### 阶段 3：PopPick（最后，风险最高）
 
-`PageDeck` 的动画链路、`HmiPagesHost` 的位图快照缓存、最大化 refit、`_DeferredNativeClose` 都是 PopPick 特有的，不要一次搬：
+**已完成（2026-11-12），见 §14 `App_PopPick_V2`。** 实际执行：
 
-1. 先让 `PageDeck` / `HmiPagesHost` 接 `stage.pages_manager`（接口已对齐），`RuntimeView` 的 `sceneToView` / `window_to_page` / `set_view_scene_rect` 已提供。
-2. `set_widget_factory` / `fit_widget_size` / `sync_widget_geometry` / `set_zValue` 在 `RuntimeElement` 上都有对应实现。
-3. **位图快照缓存与动画期精确标脏暂不迁移**（见 §10），先保留 `qgraphics_runtime.py` 的 `RuntimeWidgetLayer`，等框架补上 `SnapshotPolicy` 再切。
+1. `PageDeck` / `HmiPagesHost` 接 `stage.pages_manager`（接口本来就对齐，只有渲染策略加了一个钩子）。
+2. `set_widget_factory` / `fit_widget_size` / `sync_widget_geometry` / `set_zValue` 直接用 `RuntimeElement` 的同名实现。
+3. 位图快照缓存改为**业务侧**实现（`PageSnapshots`），框架一行未改；`qgraphics_runtime.py` 在 V2 里已删除。
+
 
 ---
 
@@ -333,13 +334,14 @@ stage.tags.update_many({...}); stage.tags.flush_now()
 
 | 能力 | 现状 | 影响 |
 |---|---|---|
-| 位图快照缓存 / 后台页静态化 | `set_motion_cache` / `set_widget_fast_paint` 是明示的 no-op 记账钩子 | PopPick 后台页仍是真实控件；7 张 750×1000 同时刷新会掉帧 |
-| 动画期精确标脏 | `set_exact_repaint()` 是兼容钩子，不吞 `update()` | PageDeck 动画每帧可能整视口重绘 |
+| 位图快照缓存 / 后台页静态化 | 框架只留 no-op 钩子；**业务侧** `App_PopPick_V2.page_snapshots.PageSnapshots` 已实现（§14） | 用 PopPick 那套做法需自行接策略；不接则后台页仍是真实控件，7 张 750×1000 同时刷新会掉帧 |
+| 动画期整窗重绘门控 | `set_exact_repaint()` 是兼容钩子；PopPick 由渲染策略的 `suppresses_full_repaint()` + `PageDeck._repaint()` 门控 | 别的业务要自己提供等价开关 |
 | `HmiClient`（snap7 / OPC UA 客户端） | 只提供 `TagBus` 合流入口 | 业务自己把值推进来 |
 | 活跃页订阅 / 消息缓存 / 时钟页 | 未实现 | `HmiPagesHost` 仍需保留或自行移植 |
 | safety 的 SceneMode 双形态载荷信号 | 未提供代理 | `SafetySceneView` 的薄代理层要保留 |
 | C++ / Qt6 运行态窗口嵌入 | 无关（纯 PySide6） | 独立议题 |
 | 撤销 / 设计态编辑 | 运行态只读，不提供 | 仍走设计器 |
+| `set_factory` 是否立刻建控件 | **不立刻建**，等下一次 `rebuild()` | 逐张登记工厂的场景（PopPick）必须自己补一次 `widgets.rebuild()`，否则一张控件都挂不上（§14） |
 
 ---
 
@@ -420,3 +422,129 @@ stage.tags.update_many({...}); stage.tags.flush_now()
 
 门禁 `tools/verify_test_fixture.py`（8 组，0 失败），入口
 `python -m App_test_fixture.fixture_app --source demo|none|modbus`。
+
+---
+
+## 14. 第二个落地项目：App_PopPick_V2（2026-11-12）
+
+`App_PopPick_V2/` 是把 `App_PopPick` 复制出来后按**本文档的口径重装运行态**的
+版本。原包一行未动，两个包可以并存跑（老包仍在 `main.py` 的工具列表里）。
+V2 的验收口径是「画面与交互和旧包等价，装配方式换成统一模板」。
+
+### 14.1 文件变动
+
+| 文件 | 变动 | 说明 |
+|---|---|---|
+| `pop_pick_config.py` | 新增 | 常量层（窗口 / 页面 / 快照 / 刷新 / 取景边距），不 import Qt |
+| `page_snapshots.py` | 新增 | 业务侧 `SnapshotPolicy`：动画期 + 后台页的位图顶替、预热、分片补烘 |
+| `pop_pick_runtime.py` | 新增 | 装配体：`RuntimeStage` + `PageSnapshots` + `HmiPagesHost` + 生命周期 |
+| `pop_pick_entry.py` | 重写 | 只剩窗口职责（工具栏 / 鼠标 / 取景 / 关闭，`PopPickWindow` 536 行）；装配与数据链路移到 runtime |
+| `page_deck.py` | 小改 | 加 `set_render_policy()` / `_follow()` / `_repaint()`，其余未动 |
+| `hmi/binding.py` | 小改 | `static_policy` 参数：后台页位图交给业务策略 |
+| `qgraphics_runtime.py` | **删除** | 1056 行手工适配层（`RuntimeWidgetLayer` / `RuntimeCard` / 旧 `RuntimeView` / `RuntimeSceneManager`） |
+| `__init__.py` / `__main__.py` | 小改 | 包名改 `App_PopPick_V2`，默认按设计工程 `page_9` 起 |
+
+框架 `Designer/CoreQGraphics/runtime/**` **零改动**。
+
+### 14.2 装配顺序
+
+```text
+PopPickRuntime.__init__
+  └─ RuntimeStage(widget_mode="host", fit_mode="none",
+                  geometry_profile="strict", provider=NoControlProvider())
+  └─ PageSnapshots(stage)
+  └─ view.on_viewport_resized = snapshots.schedule_prewarm
+
+PopPickRuntime.load(path)      stage.load() → schedule_prewarm()
+PopPickRuntime.bind_deck(deck) deck.set_render_policy(snapshots) + busy_changed 收尾
+PopPickRuntime.install_hmi()   attach_hmi_pages(pages_manager, static_policy=snapshots)
+                               → widgets.rebuild()   ← 必须补，见 14.4
+```
+
+`NoControlProvider` 是刻意加的：`RuntimeStage` 默认的 `DefaultControlProvider`
+会按 `widgetType` 造 `QTextEdit`，PopPick 的每张卡必须由 `set_widget_factory`
+提供整页 HMI，多造一个文本框就会盖在页面上。
+
+`fit_mode="none"`：取景由窗口驱动（`showEvent` / `resizeEvent` → 合并 80ms →
+`_maximize_view`）。用 `"fit"` 会在每次 resize 先按 `sceneRect` 铺一遍全场景、
+80ms 后再被最大视图盖掉，肉眼可见一次跳动。
+
+### 14.3 位图顶替（业务侧 SnapshotPolicy）
+
+框架的 `set_motion_cache` / `set_widget_fast_paint` 是明示的 no-op 钩子，
+所以能力落在业务侧，类名 `PageSnapshots`。三本账必须分开记：
+
+| 账 | 含义 | 谁写 |
+|---|---|---|
+| `_animating` | PageDeck 的动画窗口：全部卡片位图化 | `deck.busy_changed` → `set_animating` |
+| `_static` | **长期意图**：后台 5 页平时就是位图 | `HmiPagesHost.apply_static_pages` → `set_static` |
+| `_items` | 实际存在的位图项（就地更新，item 只建一次） | 惰性 `_rebuild` |
+
+`_showing(iid)` =（动画窗口 or 长期意图）**且**位图有像素，是「谁在显示」的
+唯一真值；烘不出图就老实显示真实控件，绝不留一张空白位图。
+动画窗口内**不得**改写 `_static` —— 早期实现用「动画前的分布」当恢复依据，
+结果动画结束后的 `apply_static_pages` 被旧分布覆盖，槽位大卡永久停在陈旧位图上。
+
+**位姿跟随只有一个入口** `follow(element)`：直接抄 proxy 已经落好的
+`pos / rotation / zValue`，不自己算几何（口径唯一来自 `WidgetHost.align`）。
+调用点三个：`PageDeck._apply_pose`（每帧，动到的 2 张）、`_lift_top`（换层）、
+`_restack`（收尾全量）。不做定时轮询、不监听场景信号。
+
+整窗重绘由 `PageDeck._repaint()` 门控：动画窗口内 `suppresses_full_repaint()`
+为真就跳过 `scene.update()`（旧 Core 里 scene 是 QWidget，那是局部重绘；
+换成 `QGraphicsView` 后等于整视口重画一遍）。
+
+### 14.4 两个必须知道的坑
+
+1. **`WidgetHost.set_factory` 不立刻建控件。** 它只登记工厂，等下一次
+   `rebuild()`；`set_mapping()`（fixture / demo 用的那条）内部会 rebuild，
+   所以不容易发现。PopPick 是逐张卡 `set_widget_factory`，必须自己补一次
+   `stage.widgets.rebuild()`，否则 7 个 proxy 全是 0、画面全白、位图也烘不出来
+   （现象容易误判成"页面工厂没生效"）。顺序也不能反：`_fit_card` 先把卡片
+   校正到 750×1000，rebuild 造出的 proxy 才是最终尺寸。
+2. **卡片尺寸的"4000×3000"是 page 单位，不是像素。** AGV 投影 k=0.25 且轴交换，
+   `proj.size(4000, 3000) = (750, 1000)` 正好是页面像素尺寸，所以
+   `fit_widget_size(750, 1000)` 是**恒等变换**（旧包日志里那句"尺寸未变"是正常的）。
+   `RuntimeElement.getSize()` 返回 page 尺寸，与 `PageDeck._local_rect` /
+   `mapFromScene` 同一套口径，别拿它当像素。
+
+### 14.5 与旧适配层的差异（已确认的、可接受的）
+
+* **视口大 2px**：框架 `RuntimeView` 关掉了 view 的 1px 边框
+  （`setFrameShape(NoFrame)`），视口从 1278×765 变成 1280×767，同样的取景
+  缩放比差 0.26%，整幅画面对齐到亚像素——逐像素对比的差异**全部是文字/边线
+  重采样**（几何对拍 0.000000）。
+* **代理与位图都是场景项**：旧包每张卡一个独立顶层子窗口 + `raise_()`；
+  新包按 `zValue` 参与 `QGraphicsScene` 绘制排序，`_restack` 只剩"重落位姿"。
+* **不再有 `_page_models`**：旧窗口那段循环本来就是空列表，未承接任何业务。
+
+### 14.6 验证
+
+```bash
+.venv/Scripts/python.exe tools/verify_pop_pick_v2.py     # 51/51 passed
+```
+
+8 组断言：
+
+| 组 | 内容 |
+|---|---|
+| 1 | 装载 7 图元 / 7 widget、`page_data` 与磁盘逐字相等（挂 HMI 前）、`pages_manager` 只暴露卡片 |
+| 2 | **与旧 `App_PopPick.qgraphics_runtime` 对拍**：7 张卡中心 / 角度 / 尺寸 / 包围盒 / `mapFromScene` 偏差 < 0.01（实测 0.000000） |
+| 3 | 7 个 proxy 的尺寸 / 位置 / Z / 支点；只读 ↔ 最大视图放开两页 |
+| 4 | 槽位判定、Z 规范化 1..7、命中测试（含旋转卡片角点不误判）、交换后位姿与 Z 互换、重置 |
+| 5 | 动画期 7 张全位图 + proxy 全隐藏 + 重绘门控；结束后 5 张静态、前台 2 张真实控件、位图与 proxy 位姿同步 |
+| 6 | QTest 真实点击 → eventFilter → 交换；最大视图下点最前页不误交换 |
+| 7 | resize 后最前面两页重新铺满（短边方向偏差 < 6%） |
+| 8 | 关窗回收 proxy / 位图 / 场景（门面全部 detached），重复释放安全 |
+
+既有回归复查：`verify_unified_runtime.py` 0 失败、`verify_test_fixture.py`
+0 失败、`verify_pop_pick_qgraphics.py` 70/70（老包未动）。
+
+### 14.7 未做 / 后续
+
+* `App_PopPick`（老包）没有切换：`main.py` 的工具入口仍指老包；要换只需把那
+  一行改成 `from App_PopPick_V2 import PopPickWindow`。
+* 目录里 `test.py` / `rack_global_parameters_model.py` 是复制过来的历史文件，
+  不被本包任何模块 import，按「原样保留旧文件」的约定没删。
+* 换页（`runtime.load()` 第二次调用）没有接 HMI 重建：`HmiPagesHost._pages`
+  会累积旧页面实例。运行态目前不做换页，需要时按 `pageLoaded` 重建 HMI。

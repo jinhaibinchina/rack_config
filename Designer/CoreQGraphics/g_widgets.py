@@ -152,9 +152,7 @@ def create_control(record: dict, host: QWidget | None = None) -> QWidget:
         w = QComboBox(host) if host is not None else QComboBox()
 
         
-        w.addItems(widget_options(text) )
-        w.addItem('选项2')
-        w.addItem('选项3')
+        w.addItems(widget_options(text))
 
     elif variant == "pushbutton":
         w = QPushButton(host) if host is not None else QPushButton()
