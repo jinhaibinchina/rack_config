@@ -600,6 +600,30 @@ class BaseItem(QGraphicsItem):
     def set_selectable(self, value: bool) -> None:
         self.setFlag(QGraphicsItem.ItemIsSelectable, bool(value))
 
+    # ------------------------------------------------------------------
+    # 图元锁定：设计模式下禁止移动 / 旋转 / 缩放（选中与其余属性仍可编辑）
+    # ------------------------------------------------------------------
+    # 注意别和 ``translate_locked()`` / ``pose_locked()`` 混淆：那两个是
+    # 「有父对象时不能自行平移」的旧位姿锁，与本功能无关。
+    #
+    # ``locked`` 是**可选顶层字段**：存量 page 没有这个键，缺省即未锁定；
+    # 解锁时把键整个删掉，回到存量记录的原始形态，保证 JSON round-trip
+    # 零改动，也避免给 1618 个图元凭空多写一个字段。旧 Core 的
+    # ``from_dict`` 只读已知键，遇到 locked 会忽略，不会加载失败。
+    def is_locked(self) -> bool:
+        return bool(self._page.get("locked", False))
+
+    def set_locked(self, value: bool) -> None:
+        value = bool(value)
+        if value == self.is_locked():
+            return
+        if not value:
+            self._page.pop("locked", None)
+            self._dirty = True
+            self.update()
+            return
+        self.set_page_field("locked", True)
+
     def style_value(self, key: str, default=None):
         return (self._page.get("style") or {}).get(key, default)
 

@@ -45,6 +45,9 @@ class PropertyPanel(QWidget):
         self._target = None
         self._updating = False
         self._geo_bindings: list[tuple[object, object]] = []
+        # 位姿输入框 + 「未锁定时是否可用」的快照：勾选锁定后立刻置灰，
+        # 解锁时按原状态还原（parented 的 X/Y、零宽高的 W/H 本来就是灰的）。
+        self._pose_widgets: list[tuple[object, bool]] = []
         # 字号在「文本内容」页和「外观」页各有一个输入，跨页保持同步
         self._font_boxes: list = []
         self._last_page: dict[str, str] = {}
@@ -88,6 +91,7 @@ class PropertyPanel(QWidget):
         self._target = target
         self._clear()
         self._geo_bindings.clear()
+        self._pose_widgets.clear()
         self._font_boxes.clear()
         if isinstance(target, (list, tuple)):
             self._build_multi(target)
@@ -177,6 +181,21 @@ class PropertyPanel(QWidget):
         if self.scene is not None:
             self.scene.notify_edit(self._target)
         self.itemEdited.emit(self._target)
+
+    def _pose_readonly(self, it) -> bool:
+        """布局页是否该置灰：本图元锁定，或组里有锁定的成员。"""
+        if self.scene is not None and hasattr(self.scene, "pose_blocked"):
+            return bool(self.scene.pose_blocked(it))
+        return bool(it.is_locked())
+
+    def _sync_pose_widgets(self, readonly: bool) -> None:
+        """同步位姿输入框的可用状态，不重建面板（避免销毁正在发信号的控件）。"""
+        for widget, enabled in self._pose_widgets:
+            widget.setEnabled((not readonly) and enabled)
+
+    def _toggle_lock(self, it, value: bool) -> None:
+        self._commit(lambda: it.set_locked(bool(value)))
+        self._sync_pose_widgets(self._pose_readonly(it))
 
     def refresh_geometry(self, _item=None) -> None:
         """画布上移动/缩放后，把 X/Y/W/H 显示同步回来（不发信号）。"""
@@ -329,7 +348,13 @@ class PropertyPanel(QWidget):
         zbox.valueChanged.connect(
             lambda value: self._commit(lambda: it.set_page_field("zValue", float(value)))
         )
-        state.add_row(("Z 值", zbox))
+        lock = make_check(
+            "锁定", it.is_locked(),
+            tooltip="锁定后画布左下角显示同心圆，不能移动 / 旋转 / 缩放；仍可选中并改其它属性")
+        lock.toggled.connect(lambda value: self._toggle_lock(it, bool(value)))
+        state.add_row(("Z 值", zbox), ("状态", lock))
+        state.add_hint("锁定只在设计模式生效：图元仍可改名、改外观、复制和删除，"
+                       "运行预览不受影响。组内只要有锁定成员，整组位姿也一起保护。")
         return page
 
     def _page_appearance(self, it) -> PropertyPage:
@@ -454,6 +479,15 @@ class PropertyPanel(QWidget):
         )
         card.add_row(("旋转", angle))
         self._geo_bindings.append((angle, lambda: it.page_local_angle()))
+        # 锁定：位姿输入框置灰。快照记录「未锁定时本来的可用状态」，
+        # 这样解锁不会把 parented 的 X/Y、零宽高的 W/H 误开成可编辑。
+        # 复选框在「常规」页，切换时由 _sync_pose_widgets 同步这里的状态。
+        self._pose_widgets = [(box, box.isEnabled())
+                              for box in (x_box, y_box, w_box, h_box, angle)]
+        if self._pose_readonly(it):
+            self._sync_pose_widgets(True)
+            card.add_hint("该图元已锁定：位置 / 尺寸 / 旋转在设计模式下只读，"
+                          "到「常规」页取消勾选「锁定」即可恢复编辑。")
 
         ox, oy = it.page_local_origin()
         ox_box = make_double(ox, decimals=3,
@@ -599,6 +633,11 @@ class PropertyPanel(QWidget):
                 "label": "文本是标签文字，留空显示「标签」。",
                 "spinbox": "每行一个 key=value：min= / max= / value=；"
                            "缺省 0 / 99 / min，超出范围自动收敛。",
+                "progressbar": "每行一个 key=value：min= / max= / value= / "
+                               "orientation=horizontal|vertical；"
+                               "缺省 0 / 100 / 中值 / 横向。",
+                "slider": "同进度条，可加 orientation=；运行态可拖动，"
+                          "标签推值会调用控件的 setValue。",
             }
             card.add_hint(hints.get(cur, "") +
                           " 这 5 个字段都在 page JSON 顶层，与旧 Core 完全同构；"
@@ -618,18 +657,24 @@ class PropertyPanel(QWidget):
             card.add_widget(listing)
             return "members", "组成员", page
 
-        if it.TYPE in ("line", "triangle", "polygon", "path"):
+        if it.TYPE in ("line", "triangle", "polygon", "path", "bezier"):
             page = PropertyPage()
             card = self._card(page, "顶点几何")
             verts = it.page_record().get("vertices") or []
             if it.TYPE == "line":
                 text = (f"起点 {it.page_record().get('head_pos')}  "
                         f"终点 {it.page_record().get('end_pos')}")
+            elif it.TYPE == "bezier":
+                text = "4 个控制点 P0 / C1 / C2 / P3（场景绝对坐标）"
             else:
                 text = f"{len(verts)} 个顶点（场景绝对坐标）"
             card.add_row(("几何", make_value_label(text)))
             card.add_hint("顶点在 page JSON 里已烘焙 rotate，"
                           "属性面板不提供逐点编辑（避免与 Qt 几何不同步）。")
+            if it.TYPE == "bezier":
+                card.add_hint("贝塞尔曲线在画布上四击落子；path_segments 是含 "
+                              "c1/c2 的精确真值，vertices 只是旧 Core 的折线兜底。"
+                              "移动 / 旋转 / 缩放会同步变换全部控制点。")
             return "vertices", "顶点", page
         return None
 

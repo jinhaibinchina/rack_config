@@ -1,6 +1,7 @@
-"""图元工具箱 Dock：12 类图元 + 7 种 widget 变体 + 可复用模板。
+"""图元工具箱 Dock：12 类图元 + 9 种 widget 变体 + 可复用模板。
 
-矩形/线/圆=两击，三角=三击，多边形/路径=多击+右键闭合，其余=单击放置。
+矩形/线/圆=两击，三角=三击，贝塞尔=四击（起点+两控制点+终点），
+多边形/路径=多击+右键闭合，其余=单击放置。
 单图元 / 组合模板按钮点一下插到视图中心、拖到画布落在指定位置，右键可重命名 / 删除。
 
 对齐 ``Designer/Core/ui/element_toolbox_dock.py`` 的分组与交互（缩略图也是
@@ -25,7 +26,8 @@ from ..g_view import ELEMENT_MIME_TYPE, TEMPLATE_MIME_TYPE
 from .template_store import ToolboxTemplate
 
 CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("基本图元", ("rect", "circle", "line", "triangle", "polygon", "path")),
+    ("基本图元", ("rect", "circle", "line", "triangle", "polygon", "path",
+                "bezier")),
     ("文本与素材", ("text", "image")),
     ("功能控件", ("checkbox", "widget", "group")),
     ("控件变体", WIDGET_TOOL_KEYS),
@@ -77,6 +79,16 @@ def _icon(key: str) -> QIcon:
         else:
             for a, b in zip(pts, pts[1:]):
                 p.drawLine(a, b)
+    if key == "bezier":
+        curve = QPainterPath(QPointF(4, 22))
+        curve.cubicTo(QPointF(9, 3), QPointF(19, 3), QPointF(24, 22))
+        p.setPen(QPen(QColor("#3d5a80"), 1.8))
+        p.drawPath(curve)
+        p.setPen(QPen(QColor("#2a9d8f"), 1.4))
+        p.setBrush(QColor("#2a9d8f"))
+        p.drawEllipse(QPointF(4, 22), 1.8, 1.8)
+        p.drawEllipse(QPointF(24, 22), 1.8, 1.8)
+        p.setBrush(Qt.NoBrush)
     if key == "text":
         p.drawLine(8, 14, 20, 14)
         p.drawLine(8, 18, 17, 18)
@@ -117,6 +129,14 @@ def _icon(key: str) -> QIcon:
             p.drawPolygon([QPointF(20, 19), QPointF(24, 19), QPointF(22, 22)])
         elif v == "pushbutton":
             p.drawRect(6, 7, 16, 14)
+        elif v == "progressbar":
+            p.drawRect(6, 10, 16, 8)
+            p.fillRect(7, 11, 9, 6, QColor("#3d5a80"))
+        elif v == "slider":
+            p.drawLine(6, 14, 22, 14)
+            p.fillRect(12, 10, 5, 9, QColor("#3d5a80"))
+            p.drawLine(7, 19, 7, 21)
+            p.drawLine(21, 19, 21, 21)
     p.end()
     return QIcon(pix)
 

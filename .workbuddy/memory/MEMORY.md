@@ -10,17 +10,20 @@
 - **平铺层级**：`parent_id/children_ids`+SceneIndex，**不用 setParentItem**；`translate_locked()` 只锁平移；删组递归删后代
 - **支点** `scene(q)=pos+o+R(q-o)`；**平移用 `pos()` 不用 `scenePos()`**（自定义支点恒差 `o-R·o`）；中心标识只画红点
 - 顶点类旋转烘焙进顶点，`page_angle()=_baked_angle-rotation()`，`closeSubpath()` elementCount 多 1
-- 网格步长 2 的幂（屏幕 18~90px）；`aim(always=True)` 退格点；唯一**红十字**（描深色底），T=offset target-hover
-- 捕捉点取真实顶点：`frame_corners()`=包围盒四角（拖角专用）；线/三角/多边形/路径走 `_PointBasedItem.snap_points()`；自身点只画细十字不吸附
-- `_selection_own_points()` **必须缓存**（全选 1.4 万点、逐帧 60ms）；按选中 id 缓存，`geometryChanged`/`refresh` 失效
+- 网格步长 2 的幂（屏幕 18~90px）；`aim(always=True)` 退格点；唯一**红十字**（描深色底），T 一次性开门控并对齐
+- 捕捉点取真实顶点：`frame_corners()`=包围盒四角（拖角专用）；线/三角/多边形/路径走 `_PointBasedItem.snap_points()`；非绘制态排除选中项自身点，**绘制态只排临时图元自身点**
+- `_selection_own_points()` **必须缓存**（全选 1.4 万点、逐帧 60ms）；按选中 id 缓存，`geometryChanged`/`refresh` 失效；绘制落点/预览/红十字共用 `_draw_page_point` 的同一份 `aim`
 - **交互**：左键不拖图元（含 CTRL）；移动只走双击=跟手（增量、单击落定、Esc 回原位、抓根父）；右键自接管；CAD 分点落子
 - 缩放走 `_zoom_at()`（NoAnchor+补滚动条），别依赖 `AnchorUnderMouse`；导航门控只拦中键/空格/滚轮，左键永不参与
 - 递归复制/组缩放 `_capture_subtree`/`_instantiate` 深拷贝重发 id，组 `F(p)=A+(p-A)·(sx,sy)`；成组 prepend `<组名>_`、解组剥一层
 - **复制偏移口径**：`duplicate_selected`/`paste_clipboard` 的 offset 是**视图坐标**（旧 Core `item.pos()+paste_offset` 口径），经 `SceneProjection.inverse_delta()` 反投影成 page 增量再逐点写几何；`_instantiate`/`instantiate_template` 仍吃 page 增量，别改。text 圆角与 RectItem 同口径：`rx=radius*ky`、`ry=radius*kx` 夹半边，`strokeWidth=0` 用 `NoPen+brush+drawRoundedRect` 填底，radius=0 逐像素不变
 - 文本双向：`style.font_size` 真值；改字号→改框；改框→`_fit_font_size()` 二分；加载/撤销不重算
-- widget 7 类、5 顶层字段；`QFont()` 同族、**别按框高缩**；proxy 独立顶层不进索引：`resize`+`setTransformOriginPoint(中心)`+`setPos(mapToScene(0,0)-半尺寸)`，别 setGeometry 再 setPos
+- widget 9 类（旧 7 + `progressbar`/`slider`）、5 顶层字段；`QFont()` 同族、**别按框高缩**；proxy 独立顶层不进索引：`resize`+`setTransformOriginPoint(中心)`+`setPos(mapToScene(0,0)-半尺寸)`，别 setGeometry 再 setPos
 - **增量刷新**：`structureChanged`/`itemChanged(ids)` 细信号（`contentChanged` 照常发）；写操作走 `emit_structure_changed()`/`emit_items_changed(ids)`，空 ids=页面级。吸附表 `_by_owner`+`_entry_owners` 引用计数、`update_owner()` 增量，未建/标脏回退全量；图层树 `update_items(ids)` 按行更新、异常退化全量、`_bound` 记录实际连接再解绑。`_after_edit()` 只剩 `history.commit()`（~43ms 瓶颈，P0-1 未做）。验证几何变化**必须用 `moveBy`**（`set_page_center` 对带父项被拒 → 假绿）
+- **进度条 / 滑动条**：`widgetText` 里 `min=/max=/value=/orientation=` 是唯一配置真值（`widget_range_config`，缺省 0/100/中值/横向），别加第 6 个顶层字段；`widget_style_sheet` 必须补 `QProgressBar::chunk` / `QSlider` groove+handle，否则主题可能把填充/滑块画没；设计态竖向从下往上，百分比文字按填充/未填充分段着色，别直接 clip 裁半边。旧 Core 未知变体安全退化 `QTextEdit`
 - **布尔/精确路径**：rect/circle/triangle/polygon/path 在场景坐标做并交差，异或=并集−交集；空结果原子失败且不占 ID，结果继承首图元样式并一步撤销。`path_segments+path_fill_rule` 保留曲线/孔洞/多子路径，`vertices` 给旧 Core 兜底；所有几何/模板变换必须同步 c1/c2。非对称路径加载优先 `center_pos`，清 rotation 前 `_account_bake()`，`page_size()` 先反旋再测。单图元和组均可存 `toolbox_templates.json`；专项门禁 `verify_core_qgraphics_boolean.py`
+- **图元锁定** `locked` 是可选顶层字段（缺省 False、**解锁直接删键**，别写成 false，否则脏 round-trip）；`is_locked()` 别和 `translate_locked()`（父子平移锁）混。拦截**只在交互层**（`pose_blocked()`/`editable_pose()` 含后代检查，组整体保护），绝不动 `set_page_center`/`moveBy`（组联动、撤销、运行态零污染都要用）。标记画在 `g_view.drawForeground` 视口像素层（`sceneBoundingRect().bottomLeft()`+(7,-7)，外6/内3/点1.1），运行态不画；Ctrl+L / Ctrl+Shift+U；属性面板用 `_pose_widgets` 快照同步置灰，别在 toggled 里重建面板
+- **贝塞尔图元** `bezier` 继承 `PathItem`，真值是 `path_segments` 的 `move+curve`（含 c1/c2），`vertices` 只作旧 Core 折线兜底；四击落子 P0/C1/C2/P3、开放不填充、不参与布尔、选中画控制点手柄。`map_path`/`shift_segments` 已保证所有变换同步 c1/c2，**别改回折线化**；`set_page_vertices` 覆写成重建 cubicTo
 
 # 适配层硬规则（rack / safety 共用）
 - 几何一律 page 坐标；`change_position(pos)` 对齐左上角：`delta=pos-tl` 后 `setPos(item.pos()+proj.delta(delta))`；线图元 head/end ≠ bbox 角

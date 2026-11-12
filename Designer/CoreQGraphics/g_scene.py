@@ -21,7 +21,7 @@ import math
 import os
 
 from PySide6.QtCore import QPointF, QRectF, Signal
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QBrush, QColor, QPainterPath
 from PySide6.QtWidgets import (
     QGraphicsItem, QGraphicsProxyWidget, QGraphicsScene,
 )
@@ -29,7 +29,10 @@ from PySide6.QtWidgets import (
 from .g_boolean import BOOLEAN_OPERATIONS, make_boolean_record, supports_boolean
 from .g_element import BaseItem, rotate_xy
 from .g_elements import ITEM_TYPES
-from .g_path import shift_segments
+from .g_path import (
+    PATH_FILL_RULE_KEY, PATH_SEGMENTS_KEY, path_to_segments, path_to_vertices,
+    shift_segments,
+)
 from .g_projection import SceneProjection
 from .g_widgets import (
     WIDGET_DEFAULTS, WIDGET_VARIANT_LABELS, create_control, normalize_variant,
@@ -72,15 +75,17 @@ DEFAULT_SIZES: dict[str, tuple[float, float]] = {
     "checkbox": (120.0, 120.0), "widget": (100.0, 360.0),
     "group": (600.0, 400.0), "line": (400.0, 240.0),
     "triangle": (300.0, 260.0), "polygon": (320.0, 260.0),
-    "path": (320.0, 260.0),
+    "path": (320.0, 260.0), "bezier": (320.0, 260.0),
 }
 TYPE_LABELS: dict[str, str] = {
     "rect": "矩形", "circle": "圆", "text": "文本", "image": "图片",
     "checkbox": "复选框", "widget": "控件", "group": "组", "line": "直线",
     "triangle": "三角形", "polygon": "多边形", "path": "路径",
+    "bezier": "贝塞尔曲线",
 }
-# 工具箱里 7 个 widget 变体共用 ``widget:<key>`` 形式的伪类型；真正的
-# ``type`` 仍写 ``widget``，变体只落在顶层 ``widgetType`` 字段（旧 Core 口径）。
+# 工具箱里 9 个 widget 变体（旧 7 + 进度条 / 滑动条）共用 ``widget:<key>``
+# 形式的伪类型；真正的 ``type`` 仍写 ``widget``，变体只落在顶层
+# ``widgetType`` 字段（旧 Core 口径）。工具箱按钮/标签由此字典自动派生。
 WIDGET_TOOL_KEYS: tuple[str, ...] = tuple(
     f"widget:{key}" for key in WIDGET_VARIANT_LABELS
 )
@@ -512,6 +517,51 @@ class GraphicsScene(QGraphicsScene):
             self.itemChanged.emit(ids)
         self.contentChanged.emit()
 
+    # ------------------------------------------------------------------
+    # 图元锁定：设计模式下位姿（移动 / 旋转 / 缩放）只读
+    # ------------------------------------------------------------------
+    def pose_blocked(self, item) -> bool:
+        """这个图元的位姿是否被锁定。
+
+        自身锁定，或**整棵子树里任一成员锁定**都算：后者防止「锁定了组
+        成员，却通过拖动 / 缩放父组把那个成员一起带走」，组必须整体保护。
+        运行态只做显示，不介入锁定语义（运行态有自己的零污染改图元口径）。
+        """
+        if self.is_run_mode or item is None:
+            return False
+        if getattr(item, "is_locked", lambda: False)():
+            return True
+        return any(getattr(d, "is_locked", lambda: False)()
+                   for d in self.index.descendants(item.item_id))
+
+    def editable_pose(self, items) -> list[BaseItem]:
+        """从一批图元里挑出位姿仍可编辑的（跳过锁定项及受保护的父）。"""
+        return [it for it in items if not self.pose_blocked(it)]
+
+    def set_items_locked(self, items, value: bool) -> int:
+        """批量上锁 / 解锁；``items`` 可传图元对象或 id 列表。
+
+        只写图元记录里的可选 ``locked`` 字段，不触碰几何，因此 page 的
+        sceneBoundingRect / 逐图元对拍完全不受影响；返回真正改动的个数。
+        """
+        changed: list[int] = []
+        for entry in items or ():
+            it = (self.index.by_id.get(int(entry))
+                  if isinstance(entry, (int, float)) else entry)
+            if it is None or not hasattr(it, "set_locked"):
+                continue
+            if bool(it.is_locked()) == bool(value):
+                continue
+            it.set_locked(bool(value))
+            changed.append(it.item_id)
+        if changed:
+            self.mark_modified()
+            self.emit_items_changed(changed)
+            # ItemIsMovable 只给外部脚本显式开过 gate 时才有意义，这里顺带
+            # 刷新，避免「设计器交互拦住了、Qt 原生拖动却还能挪」。
+            self.refresh_movable()
+        return len(changed)
+
     def notify_edit(self, item: BaseItem | None = None,
                     ids=None) -> None:
         """属性面板改完字段后调用：标脏 + 广播几何/外观刷新。
@@ -559,7 +609,8 @@ class GraphicsScene(QGraphicsScene):
         for it in self.all_items():
             it.set_selectable(not run)
             it.setFlag(QGraphicsItem.ItemIsMovable,
-                       (not run) and self._movable_gate and not it.parent_id)
+                       (not run) and self._movable_gate and not it.parent_id
+                       and not self.pose_blocked(it))
         self._sync_widget_proxies()
         self.update()
 
@@ -661,7 +712,9 @@ class GraphicsScene(QGraphicsScene):
     def refresh_movable(self) -> None:
         movable = (not self.is_run_mode) and self._movable_gate
         for it in self.all_items():
-            it.setFlag(QGraphicsItem.ItemIsMovable, movable and not it.parent_id)
+            it.setFlag(QGraphicsItem.ItemIsMovable,
+                       movable and not it.parent_id
+                       and not self.pose_blocked(it))
 
     def _spawn(self, record: dict) -> BaseItem | None:
         cls = ITEM_TYPES.get(record.get("type"))
@@ -671,7 +724,8 @@ class GraphicsScene(QGraphicsScene):
         self.addItem(item)
         item.setFlag(QGraphicsItem.ItemIsMovable,
                      (not self.is_run_mode) and self._movable_gate
-                     and not item.parent_id)
+                     and not item.parent_id
+                     and not bool(record.get("locked", False)))
         self.index.register(item)
         self._last_pose[item.item_id] = item.live_page_pose()[:3]
         return item
@@ -689,7 +743,7 @@ class GraphicsScene(QGraphicsScene):
         ``commit=False`` 用于手动绘制：先创建但不标脏/不广播，待绘制完成
         （``_finish_draw``）再统一标脏并通知历史，取消时可直接删除不留痕。
 
-        工具箱的 7 个控件变体用 ``widget:<key>`` 伪类型传入；真正的 ``type``
+        工具箱的 9 个控件变体用 ``widget:<key>`` 伪类型传入；真正的 ``type``
         仍是 ``widget``，变体只写进顶层 ``widgetType``（与旧 Core 完全一致）。
         """
         variant = ""
@@ -732,6 +786,19 @@ class GraphicsScene(QGraphicsScene):
             if type_key == "path":
                 pts[0]["move"] = True
             record["vertices"] = pts
+        elif type_key == "bezier":
+            # 默认给一段 S 形三次曲线：path_segments 是精确真值（含 c1/c2），
+            # vertices 是旧 Core 能读的折线兜底；曲线是开放线，不填充。
+            p0 = QPointF(cx - w / 2, cy + h / 2)
+            c1 = QPointF(cx - w / 6, cy - h / 2)
+            c2 = QPointF(cx + w / 6, cy + h / 2)
+            p3 = QPointF(cx + w / 2, cy - h / 2)
+            curve = QPainterPath(p0)
+            curve.cubicTo(c1, c2, p3)
+            record[PATH_SEGMENTS_KEY] = path_to_segments(curve)
+            record[PATH_FILL_RULE_KEY] = "odd_even"
+            record["vertices"] = path_to_vertices(curve)
+            record["style"]["fill"] = False
         elif type_key == "text":
             record["context"] = fields.pop("context", "文本")
         elif type_key == "image":
@@ -789,9 +856,10 @@ class GraphicsScene(QGraphicsScene):
     # ==================================================================
     # 手动绘制（CAD 式分点落点，参考 Designer/Core 的 begin_draw 流程）
     # ==================================================================
-    # 落点次数：box/circle/line 两击，triangle 三击，polygon/path 多击 + 右键闭合
+    # 落点次数：box/circle/line 两击，triangle 三击，bezier 四击（起点 /
+    # 两个控制点 / 终点），polygon/path 多击 + 右键闭合
     _DRAW_CLICKS = {
-        "rect": 2, "circle": 2, "line": 2, "triangle": 3,
+        "rect": 2, "circle": 2, "line": 2, "triangle": 3, "bezier": 4,
         "polygon": -1, "path": -1,
     }
     def constrain_ortho(self, anchor: QPointF, point: QPointF) -> tuple[QPointF, str]:
@@ -1110,6 +1178,8 @@ class GraphicsScene(QGraphicsScene):
         每帧传的是 ``本次总比例 / 上次总比例``，仿射变换可复合，不会累积漂移。
         """
         if sx <= 0 or sy <= 0:
+            return False
+        if self.pose_blocked(item):
             return False
         if item.TYPE == "group":
             w, h = item.page_size()
@@ -1475,10 +1545,12 @@ class GraphicsScene(QGraphicsScene):
             self.emit_structure_changed()
 
     def align_selected(self, direction: str) -> None:
-        sel = self.selected_items()
-        if len(sel) < 2:
+        # 锁定图元仍参与「对齐基准」的包围盒计算，但不被移动。
+        all_sel = self.selected_items()
+        sel = self.editable_pose(all_sel)
+        if len(all_sel) < 2 or not sel:
             return
-        rects = {it.item_id: it.page_bounding_rect() for it in sel}
+        rects = {it.item_id: it.page_bounding_rect() for it in all_sel}
         union = QRectF()
         for r in rects.values():
             union = union.united(r)
@@ -1504,20 +1576,27 @@ class GraphicsScene(QGraphicsScene):
         self.emit_items_changed([it.item_id for it in sel])
 
     def distribute_selected(self, horizontal: bool = True) -> None:
-        sel = self.selected_items()
-        if len(sel) < 3:
+        # 锁定项仍占位（决定首尾与步长），但自己不会被挪动。
+        all_sel = self.selected_items()
+        if len(all_sel) < 3:
             return
         key = (lambda it: it.page_center()[0]) if horizontal else (lambda it: it.page_center()[1])
-        ordered = sorted(sel, key=key)
+        ordered = sorted(all_sel, key=key)
         first, last = key(ordered[0]), key(ordered[-1])
         step = (last - first) / (len(ordered) - 1)
+        moved: list[int] = []
         for index, it in enumerate(ordered[1:-1], start=1):
+            if self.pose_blocked(it):
+                continue
             cx, cy = it.page_center()
             target = first + step * index
             it.set_page_center(target, cy) if horizontal else it.set_page_center(cx, target)
+            moved.append(it.item_id)
+        if not moved:
+            return
         self.mark_modified()
         self.geometryChanged.emit(None)
-        self.emit_items_changed([it.item_id for it in sel])
+        self.emit_items_changed(moved)
 
     def set_selected_origin(self, x: float, y: float) -> int:
         """把选中图元的旋转支点设到同一个 page 场景点（按住 O + 右键「旋转中心设到此处」）。
@@ -1526,31 +1605,33 @@ class GraphicsScene(QGraphicsScene):
         可视中心不动，只换支点。
         """
         n = 0
+        changed: list[int] = []
         for it in self.selected_items():
-            if it.parentItem() is not None:
+            if it.parentItem() is not None or self.pose_blocked(it):
                 continue
             it.set_page_origin(float(x), float(y))
+            changed.append(it.item_id)
             n += 1
         if n:
             self.mark_modified()
             self.geometryChanged.emit(None)
-            self.emit_items_changed(
-                [it.item_id for it in self.selected_items()])
+            self.emit_items_changed(changed)
         return n
 
     def reset_selected_origin(self) -> int:
         """选中图元的旋转支点回到各自的可视中心。"""
         n = 0
+        changed: list[int] = []
         for it in self.selected_items():
-            if not it.has_custom_origin():
+            if not it.has_custom_origin() or self.pose_blocked(it):
                 continue
             it.reset_page_origin()
+            changed.append(it.item_id)
             n += 1
         if n:
             self.mark_modified()
             self.geometryChanged.emit(None)
-            self.emit_items_changed(
-                [it.item_id for it in self.selected_items()])
+            self.emit_items_changed(changed)
         return n
 
     def select_items(self, items, *, append: bool = False) -> None:

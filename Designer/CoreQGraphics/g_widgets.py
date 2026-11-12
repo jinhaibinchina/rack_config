@@ -2,7 +2,7 @@
 
 对照 ``Designer/Core/elements.py::widget_element``（约 1257-2063 行）：
 旧实现把「变体」做成 ``widgetType`` 一个字符串 → 7 个 Qt 类的一层分发，
-``widgetText`` 再按控件类型重新解释，序列化只有 5 个**顶层**字段：
+本模块追加 ``progressbar`` / ``slider`` 两种变体，仍只写那 5 个**顶层**字段：
 
     widgetType / widgetText / widgetFontSize / widgetColor / widgetBackground
 
@@ -22,22 +22,26 @@
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QLabel, QLineEdit, QPushButton,
-    QSpinBox, QTextEdit, QWidget,
+    QCheckBox, QComboBox, QLabel, QLineEdit, QProgressBar, QPushButton,
+    QSlider, QSpinBox, QTextEdit, QWidget,
 )
 
-# 顺序与旧 Core ``WIDGET_CONTROL_TYPES`` 一致；``textedit`` 是默认 / 兜底项
+# 前 7 项顺序与旧 Core ``WIDGET_CONTROL_TYPES`` 一致；后 2 项是 CoreQGraphics
+# 扩展（旧 Core 读到未知 widgetType 会安全退化成 QTextEdit，不会崩）。
+# ``textedit`` 仍是默认 / 兜底项。
 WIDGET_VARIANTS: tuple[str, ...] = (
     "textedit", "lineedit", "checkbox", "combobox",
-    "pushbutton", "label", "spinbox",
+    "pushbutton", "label", "spinbox", "progressbar", "slider",
 )
 WIDGET_VARIANT_LABELS: dict[str, str] = {
     "textedit": "多行文本", "lineedit": "输入框", "checkbox": "勾选框",
     "combobox": "下拉框", "pushbutton": "按钮", "label": "标签",
-    "spinbox": "数字输入",
+    "spinbox": "数字输入", "progressbar": "进度条", "slider": "滑动条",
 }
 WIDGET_DEFAULTS: dict[str, object] = {
     "widgetType": "textedit",
@@ -51,6 +55,20 @@ DEFAULT_TITLES: dict[str, str] = {
     "checkbox": "选项", "pushbutton": "按钮", "label": "标签",
 }
 WIDGET_FIELD_KEYS = tuple(WIDGET_DEFAULTS)
+
+_VERTICAL_ORIENTATIONS = frozenset(
+    ("vertical", "v", "vert", "竖向", "垂直"))
+_HORIZONTAL_ORIENTATIONS = frozenset(
+    ("horizontal", "h", "horiz", "横向", "水平"))
+
+
+class RangeConfig(NamedTuple):
+    """进度条 / 滑动条共用的 ``widgetText`` 解析结果。"""
+
+    minimum: int
+    maximum: int
+    value: int
+    orientation: str
 
 
 def normalize_variant(key) -> str:
@@ -103,6 +121,47 @@ def widget_spin_config(text: str) -> tuple[int, int, int]:
     return mn, mx, value
 
 
+def widget_range_config(text: str) -> RangeConfig:
+    """progressbar / slider：``widgetText`` 的 ``key=value`` 逐行解析。
+
+    与 spinbox 一样复用已有 ``widgetText``，**不新增第 6 个顶层字段**。
+    缺省 0 / 100 / 中值 / 横向；``min>max`` 交换、value clamp，等宽范围
+    （min == max）也不会除零。方向支持中英文与 ``h`` / ``v`` 简写。
+    """
+    parsed: dict[str, int] = {}
+    orientation = "horizontal"
+    for line in str(text or "").splitlines():
+        if "=" not in line:
+            continue
+        key, raw = line.split("=", 1)
+        key = key.strip().lower()
+        value = raw.strip()
+        if key in ("min", "max", "value"):
+            try:
+                parsed[key] = int(float(value))
+            except (TypeError, ValueError):
+                continue
+        elif key == "orientation":
+            normalized = value.lower()
+            if normalized in _VERTICAL_ORIENTATIONS:
+                orientation = "vertical"
+            elif normalized in _HORIZONTAL_ORIENTATIONS:
+                orientation = "horizontal"
+    mn, mx = parsed.get("min", 0), parsed.get("max", 100)
+    if mn > mx:
+        mn, mx = mx, mn
+    value = parsed.get("value", (mn + mx) // 2)
+    return RangeConfig(mn, mx, max(mn, min(value, mx)), orientation)
+
+
+def widget_range_ratio(cfg: RangeConfig) -> float:
+    """当前值在 [min, max] 中的比例；零宽范围返回 0。"""
+    span = cfg.maximum - cfg.minimum
+    if span <= 0:
+        return 0.0
+    return max(0.0, min(1.0, (cfg.value - cfg.minimum) / span))
+
+
 def widget_display_text(variant: str, text: str) -> str:
     """占位自绘 / 真实控件上要显示的文本（按变体解释 ``widgetText``）。"""
     variant = normalize_variant(variant)
@@ -111,6 +170,11 @@ def widget_display_text(variant: str, text: str) -> str:
         return widget_options(text)[0]
     if variant == "spinbox":
         return str(widget_spin_config(text)[2])
+    if variant in ("progressbar", "slider"):
+        cfg = widget_range_config(text)
+        if variant == "slider":
+            return str(cfg.value)
+        return f"{int(round(widget_range_ratio(cfg) * 100))}%"
     return text or DEFAULT_TITLES.get(variant, "")
 
 
@@ -121,16 +185,43 @@ def _css_color(record: dict, key: str, fallback: str) -> str:
 
 
 def widget_style_sheet(record: dict) -> str:
-    """旧 Core ``_apply_style``：颜色非法回退黑 / 白，字号 pt。"""
+    """旧 Core ``_apply_style``：颜色非法回退黑 / 白，字号 pt。
+
+    两个新增变体沿用同一套颜色；额外补 ``QProgressBar::chunk`` /
+    ``QSlider`` 的 groove + handle，避免主题把填充块 / 滑块画没。
+    """
     try:
         fs = int(float(widget_field(record, "widgetFontSize")))
     except (TypeError, ValueError):
         fs = 12
-    return (
-        f"color: {_css_color(record, 'widgetColor', '#000000')};"
-        f"background-color: {_css_color(record, 'widgetBackground', '#ffffff')};"
+    fg = _css_color(record, "widgetColor", "#000000")
+    bg = _css_color(record, "widgetBackground", "#ffffff")
+    base = (
+        f"color: {fg};"
+        f"background-color: {bg};"
         f"font-size: {max(1, fs)}pt;"
     )
+    variant = widget_variant(record)
+    if variant == "progressbar":
+        return base + (
+            f"QProgressBar {{ border: 1px solid {fg}; border-radius: 2px;"
+            f" background: {bg}; text-align: center; }}"
+            f"QProgressBar::chunk {{ background-color: {fg}; }}"
+        )
+    if variant == "slider":
+        track = QColor(bg).darker(115).name()
+        return base + (
+            "QSlider { background: transparent; }"
+            f"QSlider::groove:horizontal {{ height: 4px; background: {track};"
+            f" border: 1px solid {fg}; }}"
+            f"QSlider::groove:vertical {{ width: 4px; background: {track};"
+            f" border: 1px solid {fg}; }}"
+            f"QSlider::handle:horizontal {{ background: {fg}; width: 12px;"
+            " margin: -6px 0; border-radius: 6px; }"
+            f"QSlider::handle:vertical {{ background: {fg}; height: 12px;"
+            " margin: 0 -6px; border-radius: 6px; }"
+        )
+    return base
 
 
 def create_control(record: dict, host: QWidget | None = None) -> QWidget:
@@ -165,6 +256,24 @@ def create_control(record: dict, host: QWidget | None = None) -> QWidget:
         mn, mx, value = widget_spin_config(text)
         w.setRange(mn, mx)
         w.setValue(value)
+    elif variant == "progressbar":
+        w = QProgressBar(host) if host is not None else QProgressBar()
+        cfg = widget_range_config(text)
+        w.setOrientation(
+            Qt.Vertical if cfg.orientation == "vertical" else Qt.Horizontal)
+        w.setRange(cfg.minimum, cfg.maximum)
+        w.setValue(cfg.value)
+        # 占位自绘会写百分比；真实控件隐藏文字，避免深色填充块压住文字。
+        w.setTextVisible(False)
+    elif variant == "slider":
+        w = QSlider(host) if host is not None else QSlider()
+        cfg = widget_range_config(text)
+        w.setOrientation(
+            Qt.Vertical if cfg.orientation == "vertical" else Qt.Horizontal)
+        w.setRange(cfg.minimum, cfg.maximum)
+        w.setValue(cfg.value)
+        w.setSingleStep(1)
+        w.setPageStep(10)
     else:  # textedit（含未知变体退化）
         w = QTextEdit(host) if host is not None else QTextEdit()
         w.setReadOnly(True)
@@ -274,6 +383,69 @@ def paint_variant(painter: QPainter, r: QRectF, record: dict) -> None:
                                 max(0.0, inner.right() - box.right() - 2 * pad),
                                 inner.height()),
                          Qt.AlignLeft | Qt.AlignVCenter | Qt.TextSingleLine, text)
+    elif variant == "progressbar":
+        # 进度条：底槽 + 已走部分（竖向从下往上）+ 填充区内的百分比文字。
+        cfg = widget_range_config(widget_text(record))
+        ratio = widget_range_ratio(cfg)
+        groove = inner.adjusted(2.0, 2.0, -2.0, -2.0)
+        painter.fillRect(inner, bg)
+        painter.fillRect(groove, QColor(bg).darker(115))
+        painter.drawRect(inner)
+        if groove.width() > 0 and groove.height() > 0:
+            if cfg.orientation == "vertical":
+                fill_h = groove.height() * ratio
+                filled = QRectF(groove.left(), groove.bottom() - fill_h,
+                                groove.width(), fill_h)
+                unfilled = QRectF(groove.left(), groove.top(),
+                                  groove.width(), groove.height() - fill_h)
+            else:
+                fill_w = groove.width() * ratio
+                filled = QRectF(groove.left(), groove.top(),
+                                fill_w, groove.height())
+                unfilled = QRectF(groove.left() + fill_w, groove.top(),
+                                  groove.width() - fill_w, groove.height())
+            if not filled.isEmpty():
+                painter.fillRect(filled, fg)
+            # 同一行文字按填充 / 未填充分段着色，不再被 clip 吃掉半边。
+            for part, ink in ((filled, bg), (unfilled, fg)):
+                if part.isEmpty():
+                    continue
+                painter.save()
+                painter.setClipRect(part)
+                painter.setPen(QPen(ink, max(1.0, pen.widthF())))
+                painter.drawText(inner,
+                                 Qt.AlignCenter | Qt.TextSingleLine, text)
+                painter.restore()
+    elif variant == "slider":
+        # 滑动条：轨道 + 按 value 定位的滑块；竖向同样从下往上。
+        cfg = widget_range_config(widget_text(record))
+        ratio = widget_range_ratio(cfg)
+        painter.fillRect(inner, bg)
+        painter.drawRect(inner)
+        track = QColor(bg).darker(130)
+        if cfg.orientation == "vertical":
+            groove_h = max(4.0, inner.height() - 2 * pad)
+            groove = QRectF(r.center().x() - 2.0, r.center().y() - groove_h / 2,
+                            4.0, groove_h)
+            painter.fillRect(groove, track)
+            handle_h = min(12.0, groove.height() * 0.25)
+            handle_w = min(12.0, inner.width() * 0.5)
+            y = (groove.bottom() - handle_h
+                 - ratio * (groove.height() - handle_h))
+            handle = QRectF(r.center().x() - handle_w / 2, y,
+                            handle_w, handle_h)
+        else:
+            groove_w = max(4.0, inner.width() - 2 * pad)
+            groove = QRectF(r.center().x() - groove_w / 2,
+                            r.center().y() - 2.0, groove_w, 4.0)
+            painter.fillRect(groove, track)
+            handle_w = min(12.0, groove.width() * 0.25)
+            handle_h = min(12.0, inner.height() * 0.5)
+            x = groove.left() + ratio * (groove.width() - handle_w)
+            handle = QRectF(x, r.center().y() - handle_h / 2,
+                            handle_w, handle_h)
+        painter.fillRect(handle, fg)
+        painter.drawRect(handle)
     else:
         # 输入类（textedit / lineedit / combobox / spinbox）共用白底输入区
         painter.fillRect(inner, bg)

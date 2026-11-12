@@ -140,6 +140,12 @@ class DesignerWindow(QMainWindow):
         self._make("ungroup", "解组", "Ctrl+Shift+G")
         self._make("rename", "重命名…", "F2")
         self._make("toggle_visible", "显示 / 隐藏", "Ctrl+H")
+        # 锁定：Ctrl+L / Ctrl+Shift+U 不与既有窗口级快捷键冲突
+        self._make("lock", "锁定所选", "Ctrl+L")
+        self.actions["lock"].setToolTip(
+            "锁定后图元左下角显示同心圆，设计模式不能移动 / 旋转 / 缩放")
+        self._make("unlock", "解锁所选", "Ctrl+Shift+U")
+        self.actions["unlock"].setToolTip("解除位姿锁定，恢复移动 / 旋转 / 缩放")
         self._make("save_template", "将所选图元存为模板…")
         self.actions["save_template"].setToolTip(
             "把选中的单个图元或组保存为可复用模板；布尔结果可直接保存")
@@ -176,7 +182,14 @@ class DesignerWindow(QMainWindow):
         self._make("toggle_ids", "显示中心点标记", "Ctrl+Shift+I", checkable=True)
         self.actions["toggle_ids"].setChecked(True)
         self._make("run_mode", "运行模式预览", "Ctrl+R", checkable=True)
+        self._make("toggle_rulers", "显示坐标刻度", "Ctrl+Shift+L",
+                   checkable=True)
+        self.actions["toggle_rulers"].setChecked(True)
+        self.actions["toggle_rulers"].setToolTip(
+            "画布上边 / 左边显示坐标刻度条；数值是视图坐标，随缩放平移实时更新")
         self._make("about", "关于…")
+        # 标尺只给设计器主窗口打开；GraphicsView 默认关，运行态视图保持关
+        self.view.show_rulers = self.actions["toggle_rulers"].isChecked()
 
     def _build_menus(self) -> None:
         bar = self.menuBar()
@@ -191,7 +204,8 @@ class DesignerWindow(QMainWindow):
             edit.addAction(self.actions[key])
         edit.addSeparator()
         for key in ("duplicate", "copy", "paste", "delete", "select_all",
-                    "group", "ungroup", "rename", "toggle_visible"):
+                    "group", "ungroup", "rename", "toggle_visible",
+                    "lock", "unlock"):
             edit.addAction(self.actions[key])
         edit.addSeparator()
         boolean_menu = edit.addMenu("布尔运算")
@@ -211,7 +225,8 @@ class DesignerWindow(QMainWindow):
 
         view_menu = bar.addMenu("视图")
         for key in ("fit", "fit_saved", "zoom_in", "zoom_out",
-                    "toggle_grid", "toggle_ids", "toggle_ortho", "run_mode"):
+                    "toggle_grid", "toggle_rulers", "toggle_ids",
+                    "toggle_ortho", "run_mode"):
             view_menu.addAction(self.actions[key])
 
         create = bar.addMenu("新建图元")
@@ -229,7 +244,7 @@ class DesignerWindow(QMainWindow):
         self.addToolBar(Qt.TopToolBarArea, bar)
         for key in ("open", "save", "undo", "redo", "duplicate", "delete",
                     "group", "ungroup", "align_left", "align_hcenter",
-                    "z_front", "z_back", "fit"):
+                    "z_front", "z_back", "fit", "lock"):
             bar.addAction(self.actions[key])
         bar.addSeparator()
         bar.addWidget(QLabel("  绘制："))
@@ -369,6 +384,9 @@ class DesignerWindow(QMainWindow):
             # 网格关掉后就不该再吸到「看不见的」格点
             view.snap.grid_enabled = show
             view.viewport().update()
+        elif key == "toggle_rulers":
+            view.show_rulers = self.actions["toggle_rulers"].isChecked()
+            view.viewport().update()
         elif key == "toggle_ids":
             view.show_ids = self.actions["toggle_ids"].isChecked()
             view.viewport().update()
@@ -386,7 +404,7 @@ class DesignerWindow(QMainWindow):
                 self, "关于",
                 "Designer.CoreQGraphics 设计器\n\n"
                 "原生 QGraphicsScene 平行实现；page_*.json 格式与 Core 一致。\n"
-                "widget 图元支持 7 种控件变体（设计态自绘占位、运行预览挂载真实 Qt 控件），\n"
+                "widget 图元支持 9 种控件变体（含进度条 / 滑动条；设计态自绘占位、运行预览挂载真实 Qt 控件），\n"
                 "F8 正交模式：绘制点列图元时锁水平 / 竖直，Shift 临时反转；\n"
                 "直线的宽或高设为 0 即水平 / 竖直线，两者不能同时为 0。\n"
                 "方向键：选中图元后按一下挪一格，按住连续挪；Shift 加速 10 倍，\n"
@@ -395,6 +413,8 @@ class DesignerWindow(QMainWindow):
                 "结果保留多轮廓、孔洞和精确曲线，可继续编辑或再次布尔。\n"
                 "模板：选中单个图元或组后保存进工具箱，点击 / 拖放即可重复实例化，\n"
                 "模板文件与旧设计器共用 toolbox_templates.json。\n"
+                "锁定：Ctrl+L 锁定所选、Ctrl+Shift+U 解锁；锁定图元左下角显示同心圆，\n"
+                "设计模式下不能移动 / 旋转 / 缩放，但可选中、改名、改外观、复制和删除。\n"
                 "不含 PLC / 料仓状态绑定。",
             )
         elif key == "toggle_visible":
@@ -415,6 +435,18 @@ class DesignerWindow(QMainWindow):
                 self.status_bar.showMessage(
                     f"已生成布尔{BOOLEAN_LABELS[operation]}路径；"
                     "可继续编辑，或选择「将所选图元存为模板」", 5000)
+        elif key in ("lock", "unlock"):
+            # payload 来自图层树（可只选中隐藏项）；画布命令用当前选中。
+            targets = payload or [it.item_id for it in sel]
+            n = scene.set_items_locked(targets, key == "lock")
+            if n:
+                self._after_edit()
+                # 属性面板要立刻把 X/Y/W/H/旋转切到只读（或恢复可编辑）
+                self._on_selection_changed()
+            self.status_bar.showMessage(
+                (f"已锁定 {n} 个图元（设计模式不能移动 / 旋转 / 缩放）"
+                 if key == "lock" else f"已解锁 {n} 个图元")
+                if n else "所选图元的锁定状态没有变化", 3000)
         elif key == "save_template":
             self._capture_group_as_template(None)
         self._refresh()
@@ -600,6 +632,9 @@ class DesignerWindow(QMainWindow):
                 tip = f"在画布上点击两下（起点、终点）以创建「{label}」"
             elif type_key == "triangle":
                 tip = f"在画布上点击三下以创建「{label}」"
+            elif type_key == "bezier":
+                tip = (f"在画布上点击四下（起点、控制点 1、控制点 2、终点）"
+                       f"以创建「{label}」")
             else:
                 tip = f"在画布上单击以放置「{label}」"
             if self.view.is_ortho_mode() and type_key in ORTHO_DRAW_TYPES:
@@ -729,7 +764,7 @@ class DesignerWindow(QMainWindow):
         self._update_history_actions()
         has_sel = bool(self.scene.selected_items())
         for key in ("delete", "duplicate", "group", "ungroup", "z_front",
-                    "z_back", "z_raise", "z_lower"):
+                    "z_back", "z_raise", "z_lower", "lock", "unlock"):
             self.actions[key].setEnabled(has_sel)
         can_capture = self._selected_template_item() is not None
         self.actions["save_template"].setEnabled(can_capture)

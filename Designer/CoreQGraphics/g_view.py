@@ -13,8 +13,8 @@ import math
 
 from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
-    QBrush, QColor, QCursor, QFontMetrics, QKeyEvent, QMouseEvent, QPainter,
-    QPainterPath, QPen, QWheelEvent,
+    QBrush, QColor, QCursor, QFont, QFontMetrics, QKeyEvent, QMouseEvent,
+    QPainter, QPainterPath, QPen, QWheelEvent,
 )
 from PySide6.QtWidgets import (
     QApplication, QGraphicsItem, QGraphicsView, QMenu, QRubberBand,
@@ -41,6 +41,50 @@ _ORIGIN_RING_RADIUS = 5.0
 # 背景网格（画在场景坐标里，步长与 SnapSystem.grid_step 共用同一份）
 _GRID_MINOR = QColor(90, 120, 150, 48)
 _GRID_MAJOR = QColor(90, 120, 150, 110)
+
+# 坐标刻度条：画在**视口像素**里（drawForeground 中 resetTransform），
+# 条带位置固定，刻度数值按当前视图变换实时换算。默认关，只有设计器主窗口
+# 打开，运行态预览 / RuntimeView 等一律不画，避免污染对拍与现场画面。
+_RULER_THICKNESS = 22
+_RULER_BG = QColor(248, 249, 251)
+_RULER_CORNER_BG = QColor(234, 238, 244)
+_RULER_BORDER = QColor(196, 200, 208)
+_RULER_TICK = QColor(126, 133, 145)
+_RULER_TEXT = QColor(66, 74, 88)
+_RULER_ZERO = QColor(34, 96, 178)
+_RULER_CURSOR = QColor(214, 51, 46)
+_RULER_TARGET_PX = 88.0        # 主刻度的目标屏幕间距
+_RULER_MINOR = 5               # 每个主刻度细分几格
+
+# 锁定图元左下角的「双同心圆」标记（固定屏幕像素，只在设计态绘制）。
+# 与标尺同理在 drawForeground 里切回视口像素坐标，缩放时不会变形；外圈 +
+# 内圈 + 中心点三层，浅色底圆保证压在网格 / 图元填充上仍看得清。
+_LOCK_BADGE_OUTER = 6.0
+_LOCK_BADGE_INNER = 3.0
+_LOCK_BADGE_DOT = 1.1
+_LOCK_BADGE_OFFSET = QPointF(7.0, -7.0)   # 相对 AABB 左下角，往右上让一点
+_LOCK_BADGE_COLOR = QColor(36, 46, 60)
+_LOCK_BADGE_BG = QColor(255, 255, 255, 235)
+
+
+def nice_ruler_step(scene_per_px: float) -> float:
+    """挑 1/2/5×10^n 的场景步长，让主刻度屏幕间距接近目标像素。
+
+    纯函数，便于回归直接测；缩放变化时步长跳档但不会密到数字互相压住。
+    """
+    raw = max(float(scene_per_px), 1e-9) * _RULER_TARGET_PX
+    base = 10.0 ** math.floor(math.log10(raw))
+    for m in (1.0, 2.0, 5.0, 10.0):
+        if m * base >= raw - 1e-12:
+            return m * base
+    return 10.0 * base
+
+
+def ruler_label(value: float, step: float) -> str:
+    if step >= 1.0:
+        return str(int(round(value)))
+    text = f"{value:.3f}".rstrip("0").rstrip(".")
+    return text or "0"
 
 # 鼠标附近吸附标记：小于这个屏幕像素的偏移不吸附，避免抖动
 _SNAP_MIN_PX = 2.0
@@ -98,6 +142,9 @@ class GraphicsView(QGraphicsView):
         self._pan_enabled = True
         self._zoom_enabled = True
         self.show_grid = True
+        # 坐标刻度条：默认关，由 DesignerWindow 显式打开；运行态 / 其它视图
+        # 一律保持关闭，标尺不进 scene 渲染、不影响几何对拍与页面数据。
+        self.show_rulers = False
         # O 键作为「设置旋转中心」的修饰键：按住 O 时右键把选中图元的旋转中心
         # 钉到点击处（见 mousePressEvent），取代原右键菜单项。
         self._origin_key_held = False
@@ -356,6 +403,22 @@ class GraphicsView(QGraphicsView):
         if self._snap_full_dirty:
             self.refresh_snap_points()
 
+    def _ensure_snap_table(self) -> None:
+        """取点前保证点表新鲜；绘制态再把临时图元的自身点撤掉。
+
+        绘制图元由 ``create_item(commit=False)`` 建立，几何随预览逐帧变化且
+        不广播编辑信号；若把它留在点表里，鼠标一动就留下上一帧的「幽灵
+        端点」，下一帧可能吸到自己身上。按 owner 撤登记有引用计数兜底，
+        同一坐标上别的图元的点不会被误删。
+        """
+        self.sync_snap_points()
+        if not self._draw_type:
+            return
+        scene = self.scene()
+        item = getattr(scene, "_draw_item", None) if scene is not None else None
+        if item is not None:
+            self.snap.remove_owners([item.item_id])
+
     def _emit_changes(self, ids=None, *, structural: bool = False) -> None:
         """交互收尾统一广播（兼容只有老 ``contentChanged`` 的自定义场景）。"""
         scene = self.scene()
@@ -393,6 +456,14 @@ class GraphicsView(QGraphicsView):
         self.end_follow()            # 换到绘制工具：先把跟手的图元落定
         self.setDragMode(QGraphicsView.NoDrag)
         self.setCursor(Qt.CrossCursor)
+        # 工具按钮在 Dock 里，点完按钮焦点留在工具箱：不把焦点收回画布，
+        # T / Esc / Shift 这些绘制期按键根本送不到 keyPressEvent，按 T 会
+        # 像没反应一样（回归里直接把事件发给 view 恰好绕过了这一点）。
+        self.setFocus()
+        # 进绘制模式就补一份新鲜点表：结构变化（刚画完 / 刚放下图元）只置脏，
+        # 等到按 T 才重建的话，那些图元的端点 / 中点还不在表里，十字只能落在
+        # 格点上，看起来就是「识别不了已存在图元的特征点」。
+        self.refresh_snap_points()
         self.viewport().update()
 
     # ------------------------------------------------------------------
@@ -412,9 +483,25 @@ class GraphicsView(QGraphicsView):
         return self._ortho_mode
 
     def _draw_page_point(self, event) -> QPointF:
-        """绘制模式下把鼠标位置换算成 page 点，必要时施加正交约束。"""
+        """绘制取点的唯一入口：光标 → 吸附 → page → 正交约束。
+
+        第一点与后续点都走这里，``mousePressEvent``（落点）与
+        ``mouseMoveEvent``（预览）也共用，所以「十字在哪、预览在哪、点下去
+        在哪」必然一致。
+
+        旧版只有按 T 时把 ``aim`` 的结果喂给系统光标（``QCursor.setPos``）
+        和预览，落点却仍用未吸附的原始坐标；离屏 / 部分平台 setPos 不会
+        同步派发 mouseMove，于是「按 T 看着吸过去了、点下去却没吸」。
+        现在落点直接吃与红十字同一份 ``aim`` 结果，不再依赖光标 warp。
+        """
         scene = self.scene()
         pos_scene = self.mapToScene(event.position().toPoint())
+        if self.snap.enabled:
+            self._ensure_snap_table()
+            target, _kind = self.snap.aim(
+                pos_scene, exclude=self._snap_scan_exclude(), always=True)
+            if target is not None:
+                pos_scene = QPointF(target)
         cx, cy = scene.projection.inverse_point(pos_scene.x(), pos_scene.y())
         return self._ortho_page_point(QPointF(cx, cy), event.modifiers())
 
@@ -678,6 +765,15 @@ class GraphicsView(QGraphicsView):
     # ------------------------------------------------------------------
     # 双击跟手：抓住图元 → 图元随光标走 → 单击 / Esc 落定
     # ------------------------------------------------------------------
+    def _pose_blocked(self, item) -> bool:
+        """设计模式下该图元的位姿是否被锁定（含「子树里有锁定成员」的组）。"""
+        scene = self.scene()
+        if scene is None or getattr(scene, "is_run_mode", False):
+            return False
+        if hasattr(scene, "pose_blocked"):
+            return bool(scene.pose_blocked(item))
+        return bool(getattr(item, "is_locked", lambda: False)())
+
     def _follow_target_at(self, viewport_pos: QPoint):
         """光标下可作为跟手目标的顶层图元（子图元返回根父对象）。"""
         scene = self.scene()
@@ -708,6 +804,7 @@ class GraphicsView(QGraphicsView):
             it for it in scene.selected_items()
             if not getattr(it, "parent_id", 0)
             and (it.flags() & QGraphicsItem.ItemIsSelectable)
+            and not self._pose_blocked(it)   # 锁定项不进跟手集合
         ]
         if not sel:
             return False
@@ -802,7 +899,8 @@ class GraphicsView(QGraphicsView):
         sel = scene.selected_items()
         if len(sel) != 1 or not sel[0].isVisible():
             return None
-        return sel[0]
+        # 锁定的图元不显示角手柄，也不能拖角改尺寸
+        return None if self._pose_blocked(sel[0]) else sel[0]
 
     def _handle_points(self, item) -> dict[str, QPointF]:
         """四个角在视口里的位置（用**包围盒**四角，自动跟随旋转）。
@@ -1061,6 +1159,8 @@ class GraphicsView(QGraphicsView):
                     it = root
             if getattr(it, "item_id", None) is None or it.item_id in seen:
                 continue
+            if self._pose_blocked(it):
+                continue
             seen.add(it.item_id)
             out.append(it)
         return out
@@ -1231,17 +1331,19 @@ class GraphicsView(QGraphicsView):
         # 再单独变换一次子图元就是双重变换。
         batch = (scene.top_level_items(sel)
                  if hasattr(scene, "top_level_items") else sel)
+        # 锁定项（以及含锁定成员的组）不参与快捷键缩放 / 旋转
+        pose_batch = [it for it in batch if not self._pose_blocked(it)]
         if key in (Qt.Key_Plus, Qt.Key_Equal):
-            for it in batch:
+            for it in pose_batch:
                 it.resize_by(1.1)
         elif key == Qt.Key_Minus:
-            for it in batch:
+            for it in pose_batch:
                 it.resize_by(1.0 / 1.1)
         elif key == Qt.Key_BracketLeft:
-            for it in batch:
+            for it in pose_batch:
                 it.rotate_by(-5.0)
         elif key == Qt.Key_BracketRight:
-            for it in batch:
+            for it in pose_batch:
                 it.rotate_by(5.0)
         elif key == Qt.Key_G:
             self.end_follow()          # 跟手中成组：先落定再成组
@@ -1373,16 +1475,21 @@ class GraphicsView(QGraphicsView):
                 if set(self.snap.owners_at(QPointF(c[0], c[1]))) <= {iid}}
 
     def _snap_scan_exclude(self) -> set:
-        """本次捕捉点扫描要排除的坐标：选中项自身 + 绘制中临时图元自身。
+        """本次捕捉点扫描要排除的坐标。
 
-        绘制阶段的「自身」有两层：既有选中图元，以及正在画的那个临时图元。
-        显示（``_hover_marker``）、吸附（``_snap_action``）都走这一份，口径
-        才不会分叉。
+        **绘制态只排除正在画的临时图元自身点**：绘制时没有任何图元跟着
+        光标动，已选中图元的特征点恰恰是最常用的起画 / 对齐目标（刚画完
+        的图元默认就是选中态）。旧口径把选中项自身点一并排掉，结果是想
+        从已有矩形的角上起画一条线，十字却只能落到旁边的格点上 —— 表现
+        正是「识别不了已存在图元的特征点」。
+
+        非绘制态仍按旧口径排除选中项自身点（移动 / 抓手时不吸自己）。
+        显示（``_hover_marker``）、吸附（``_snap_action``）、落点
+        （``_draw_page_point``）都走这一份，口径不会分叉。
         """
-        own = self._selection_own_points()
         if self._draw_type:
-            own = own | self._draw_own_points()
-        return own
+            return self._draw_own_points()
+        return self._selection_own_points()
 
     def _invalidate_own_points(self, *_args) -> None:
         self._own_cache = None
@@ -1539,7 +1646,11 @@ class GraphicsView(QGraphicsView):
             # 已选中图元（或其父）的特征点已被排除，不该再被抓起
             if item.item_id in selected or item.parent_id in selected:
                 continue
-            return item.root_parent() if item.parent_id else item
+            target = item.root_parent() if item.parent_id else item
+            # 锁定的图元不能被 T 抓起（抓起后会跟着光标走）
+            if self._pose_blocked(target):
+                continue
+            return target
         return None
 
     def _begin_snap_grab(self, item, point: QPointF) -> None:
@@ -1573,7 +1684,8 @@ class GraphicsView(QGraphicsView):
         """
         scene = self.scene()
         item = self._grabbed_item()
-        if scene is None or item is None or self._snap_grab_point is None:
+        if (scene is None or item is None or self._snap_grab_point is None
+                or self._pose_blocked(item)):
             self._clear_snap_grab()
             return
         delta = target - self._snap_grab_point
@@ -1584,7 +1696,8 @@ class GraphicsView(QGraphicsView):
         if not any(it is item for it in movers):
             movers.append(item)
         for it in movers:
-            it.moveBy(delta.x(), delta.y())
+            if not self._pose_blocked(it):
+                it.moveBy(delta.x(), delta.y())
         if hasattr(scene, "mark_modified"):
             scene.mark_modified()
         if hasattr(scene, "geometryChanged"):
@@ -1618,25 +1731,34 @@ class GraphicsView(QGraphicsView):
         吸附、也不画十字。
         """
         scene = self.scene()
+        if scene is None:
+            return
+        # 一次性动作键：吸附系统恒开（十字常亮为可吸状态），不再按 T 关闭；
+        # 外部仍可直接设 snap.enabled=False 关掉门控（回归 / 运行态各管各的）。
+        # 先打开门控再判 hover：从工具箱切进绘制、鼠标还没进过画布时按 T，
+        # 也应当让随后的第一点按同一份 aim 结果吸附。
+        self.snap.enabled = True
+        # 第一点之前 / 之后统一走这一条：结构变化只置脏才全量重建，绘制
+        # 临时图元的自身点由 remove_owners 撤掉，不再分叉成两条路径。
+        self._ensure_snap_table()
         # 记录「鼠标此刻是否还在画布上」：leaveEvent 会清 hover，那时只把图元
         # 吸过去，不去劫持别的窗口里的鼠标。
         cursor_on_canvas = self.snap.hover is not None
         hover = (self.snap.hover if cursor_on_canvas else self._last_hover)
-        if scene is None or hover is None:
+        if hover is None:
+            # 刚点完工具箱按钮、还没在画布上移动过鼠标时 hover 是 None。
+            # 用全局光标补一个，让「按 T 立刻吸到最近的红十字」仍然成立。
+            vp = self.viewport().mapFromGlobal(QCursor.pos())
+            if self.viewport().rect().contains(vp):
+                hover = self.mapToScene(vp)
+                cursor_on_canvas = True
+        if hover is None:
+            # 光标确实不在画布上：只把吸附打开、点表备好，等下一次落点。
+            self.viewport().update()
             return
-        # 一次性动作键：吸附系统恒开（十字常亮为可吸状态），不再按 T 关闭；
-        # 外部仍可直接设 snap.enabled=False 关掉门控（回归 / 运行态各管各的）。
-        self.snap.enabled = True
-        if not cursor_on_canvas:
-            self.snap.hover = QPointF(hover)
-        # 点表由 itemChanged / structureChanged 持续维护；只有标脏（换页 /
-        # 增删图元）时才需要在这里全量重建，平时按 T 是零成本。绘制中的临时
-        # 图元不进编辑广播，仍按老口径每次全量收点，避免自我牵引。
-        if getattr(scene, "_draw_item", None) is not None:
-            self.refresh_snap_points()
-        else:
-            self.sync_snap_points()
         hover = QPointF(hover)
+        if self.snap.hover is None:
+            self.snap.hover = QPointF(hover)
         target, kind = self.snap.aim(
             hover, exclude=self._snap_scan_exclude(), always=True)
         if target is None:
@@ -1745,6 +1867,151 @@ class GraphicsView(QGraphicsView):
         # 光标处的那一个捕捉点：始终跟随鼠标显示（门控只决定是否真的吸过去）
         if self.snap.show_markers and not getattr(scene, "is_run_mode", False):
             self._draw_hover_snap_points(painter)
+        # 坐标刻度条画在最上层（设计态才有，运行预览不显示）
+        if self.show_rulers and scene is not None and not getattr(scene, "is_run_mode", False):
+            self._draw_rulers(painter)
+        # 锁定图元的同心圆标记：常显，不依赖选中；运行态一律不画
+        if scene is not None and not getattr(scene, "is_run_mode", False):
+            self._draw_lock_badges(painter)
+
+    def _draw_lock_badges(self, painter: QPainter) -> None:
+        """锁定图元左下角的两个同心圆（固定屏幕像素）。
+
+        位置取 ``sceneBoundingRect()`` 的左下角：它是视口里稳定的 AABB，
+        旋转图元也不会把标记甩到奇怪的方向。刻意不用 ``viewportMargins``，
+        标记只是叠在最上层的装饰，命中测试 / fit / resize 口径零改动。
+        """
+        scene = self.scene()
+        if scene is None or getattr(scene, "is_run_mode", False):
+            return
+        vp = self.viewport()
+        w, h = vp.width(), vp.height()
+        edge = _LOCK_BADGE_OUTER + 2.0
+        painter.save()
+        painter.resetTransform()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        pen = QPen(_LOCK_BADGE_COLOR, 1.2)
+        for it in scene.all_items():
+            if not it.isVisible() or not getattr(it, "is_locked", lambda: False)():
+                continue
+            r = it.sceneBoundingRect()
+            p = QPointF(self.mapFromScene(QPointF(r.left(), r.bottom())))
+            p += _LOCK_BADGE_OFFSET
+            if (p.x() < -edge or p.y() < -edge
+                    or p.x() > w + edge or p.y() > h + edge):
+                continue
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(_LOCK_BADGE_BG))
+            painter.drawEllipse(p, edge, edge)
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(pen)
+            painter.drawEllipse(p, _LOCK_BADGE_OUTER, _LOCK_BADGE_OUTER)
+            painter.drawEllipse(p, _LOCK_BADGE_INNER, _LOCK_BADGE_INNER)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(_LOCK_BADGE_COLOR))
+            painter.drawEllipse(p, _LOCK_BADGE_DOT, _LOCK_BADGE_DOT)
+        painter.restore()
+
+    def _draw_rulers(self, painter: QPainter) -> None:
+        """顶部 / 左侧坐标刻度条，画在**视口像素**里。
+
+        ``drawForeground`` 的 painter 带着「场景→视口」变换，先
+        ``resetTransform()`` 切回视口像素，条带就钉在画布上边 / 左边，平移
+        缩放都不漂移；刻度数值由 ``mapToScene`` 反算，跟着实时变。刻意不设
+        ``viewportMargins``：所有命中测试、fit、resize 钉角仍用原来的视口
+        口径，零改动。
+        """
+        vp = self.viewport()
+        w, h = vp.width(), vp.height()
+        t = _RULER_THICKNESS
+        if w <= t * 2 or h <= t * 2:
+            return
+        p0 = self.mapToScene(QPoint(0, 0))
+        pr = self.mapToScene(QPoint(w, 0))
+        pb = self.mapToScene(QPoint(0, h))
+        dx = (pr.x() - p0.x()) / w
+        dy = (pb.y() - p0.y()) / h
+        if abs(dx) < 1e-9 or abs(dy) < 1e-9:
+            return
+        step_x = nice_ruler_step(abs(dx))
+        step_y = nice_ruler_step(abs(dy))
+
+        painter.save()
+        painter.resetTransform()
+        painter.setClipping(False)
+        painter.setRenderHint(QPainter.Antialiasing, False)
+        painter.setFont(QFont("Arial", 8))
+        painter.fillRect(QRect(0, 0, w, t), _RULER_BG)
+        painter.fillRect(QRect(0, 0, t, h), _RULER_BG)
+        painter.setPen(QPen(_RULER_BORDER, 1.0))
+        painter.drawLine(QPoint(0, t), QPoint(w, t))
+        painter.drawLine(QPoint(t, 0), QPoint(t, h))
+
+        # 水平标尺：场景 x，主刻度带数字、其间均分短刻度
+        lo, hi = sorted((p0.x(), pr.x()))
+        value = math.floor(lo / step_x) * step_x
+        guard = 0
+        while value <= hi + 1e-9 and guard < 400:
+            x = int(round((value - p0.x()) / dx))
+            if x >= t:
+                painter.setPen(QPen(_RULER_TICK, 1.0))
+                for k in range(1, _RULER_MINOR):
+                    xx = int(round(
+                        (value + step_x * k / _RULER_MINOR - p0.x()) / dx))
+                    if xx >= t:
+                        painter.drawLine(QPoint(xx, t - 4), QPoint(xx, t - 1))
+                zero = abs(value) < step_x * 1e-6
+                painter.setPen(QPen(_RULER_ZERO if zero else _RULER_TICK, 1.0))
+                painter.drawLine(QPoint(x, t - 9), QPoint(x, t - 1))
+                painter.setPen(_RULER_TEXT)
+                painter.drawText(QPoint(x + 2, t - 10),
+                                 ruler_label(value, step_x))
+            value += step_x
+            guard += 1
+
+        # 垂直标尺：场景 y，数字旋转 -90° 沿条带向上读
+        lo, hi = sorted((p0.y(), pb.y()))
+        value = math.floor(lo / step_y) * step_y
+        guard = 0
+        while value <= hi + 1e-9 and guard < 400:
+            y = int(round((value - p0.y()) / dy))
+            if y >= t:
+                painter.setPen(QPen(_RULER_TICK, 1.0))
+                for k in range(1, _RULER_MINOR):
+                    yy = int(round(
+                        (value + step_y * k / _RULER_MINOR - p0.y()) / dy))
+                    if yy >= t:
+                        painter.drawLine(QPoint(t - 4, yy), QPoint(t - 1, yy))
+                zero = abs(value) < step_y * 1e-6
+                painter.setPen(QPen(_RULER_ZERO if zero else _RULER_TICK, 1.0))
+                painter.drawLine(QPoint(t - 9, y), QPoint(t - 1, y))
+                painter.save()
+                painter.translate(t - 11, y - 2)
+                painter.rotate(-90)
+                painter.setPen(_RULER_TEXT)
+                painter.drawText(QPoint(0, 0), ruler_label(value, step_y))
+                painter.restore()
+            value += step_y
+            guard += 1
+
+        # 左上角交叉块：盖住两条带的交叠，画个小十字
+        painter.fillRect(QRect(0, 0, t, t), _RULER_CORNER_BG)
+        painter.setPen(QPen(_RULER_BORDER, 1.0))
+        painter.drawRect(QRect(0, 0, t, t))
+        painter.setPen(QPen(_RULER_TICK, 1.0))
+        painter.drawLine(QPoint(6, t // 2), QPoint(t - 6, t // 2))
+        painter.drawLine(QPoint(t // 2, 6), QPoint(t // 2, t - 6))
+
+        # 当前光标位置的红色短线（截图里那条红色指示）
+        if vp.underMouse():
+            cur = vp.mapFromGlobal(QCursor.pos())
+            if 0 <= cur.x() <= w and 0 <= cur.y() <= h:
+                painter.setPen(QPen(_RULER_CURSOR, 1.0))
+                if cur.x() >= t:
+                    painter.drawLine(QPoint(cur.x(), t - 11), QPoint(cur.x(), t))
+                if cur.y() >= t:
+                    painter.drawLine(QPoint(t - 11, cur.y()), QPoint(t, cur.y()))
+        painter.restore()
 
     def _hover_marker(self) -> tuple[QPointF | None, bool]:
         """光标处该显示的那**一个**捕捉点，以及它此刻是否真的会吸附。
@@ -1758,7 +2025,11 @@ class GraphicsView(QGraphicsView):
         的特判，结果是十字画在自己身上、``_warp_cursor_to_snap`` 也把光标
         挪过去，而 ``_apply_snap_follow`` 吸到的却是别处的点 —— 按 T 后
         光标与图元错位。现在显示、吸附、warp 三者共用同一份 ``aim`` 结果。
+
+        取点表在这里兜底同步：增删图元只置脏，若等到按 T 才重建，绘制
+        过程中十字会一直停在格点上，看不到刚放下的图元端点 / 中点。
         """
+        self._ensure_snap_table()
         hover = self.snap.hover
         if hover is None:
             return None, False
@@ -1919,7 +2190,15 @@ class GraphicsView(QGraphicsView):
                 path.lineTo(prev_view)
             painter.drawPath(path)
         elif prev_view is not None:
-            painter.drawLine(pts_view[0], prev_view)
+            if type_key == "bezier":
+                # 四击定曲线：已落点依次是 P0/C1/C2，光标补齐 P3。
+                # 曲线本体由图元自己实时画，这里只补两条手柄线，避免重影。
+                ctrl = list(pts_view[:4]) + [prev_view] * max(
+                    0, 4 - len(pts_view[:4]))
+                painter.drawLine(ctrl[0], ctrl[1])
+                painter.drawLine(ctrl[3], ctrl[2])
+            else:
+                painter.drawLine(pts_view[0], prev_view)
             if type_key == "rect":
                 r = QRectF(pts_view[0], prev_view).normalized()
                 painter.drawRect(r)
@@ -1994,6 +2273,8 @@ class GraphicsView(QGraphicsView):
     # ------------------------------------------------------------------
     _CONTEXT_ENTRIES = (
         ("属性…", "property"),
+        (None, None),
+        ("锁定所选", "lock"), ("解锁所选", "unlock"),
         (None, None),
         ("移到最前", "z_front"), ("上移一层", "z_raise"),
         ("下移一层", "z_lower"), ("移到最后", "z_back"),

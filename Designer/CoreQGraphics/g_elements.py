@@ -1,4 +1,4 @@
-"""12 类图元：对应 ``Designer/Core/elements.py`` 的 paint 配方。
+"""13 类图元：对应 ``Designer/Core/elements.py`` 的 paint 配方。
 
 坐标系已经在 ``BaseItem`` 里投影到视图坐标，因此这里不再做
 ``sceneToView`` / ``painter.translate`` / ``painter.rotate(-angle)``：
@@ -18,7 +18,7 @@ import math
 import os
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QPainter, QPainterPath, QPixmap
+from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPixmap
 
 from .g_element import BaseItem, _page_xy, norm_deg, rotate_xy
 from .g_path import (
@@ -1277,10 +1277,115 @@ class PathItem(_PointBasedItem):
         self._replace_points(vertices, center=center, pivot=pivot)
 
 
+class BezierItem(PathItem):
+    """三次贝塞尔曲线：P0 / C1 / C2 / P3 四个控制点定一段 ``cubicTo``。
+
+    几何、序列化、平移/旋转/缩放/复制/模板/撤销全部复用 ``PathItem`` 的
+    精确段（``path_segments`` 里只有 ``move + curve``），控制点 c1/c2 会跟着
+    一起变换，不会退化成折线；``vertices`` 仍是旧 Core 能读的折线兜底。
+    与布尔结果路径的区别：**开放、不填充**，选中时画控制点和手柄线。
+    """
+
+    TYPE = "bezier"
+
+    def __init__(self, record, projection) -> None:
+        # 手工写的 JSON 可能只给 4 个 vertices：先补出精确段再交给 PathItem。
+        if not record.get(PATH_SEGMENTS_KEY):
+            verts = list(record.get("vertices") or [])[:4]
+            if len(verts) == 4:
+                try:
+                    pts = [QPointF(float(v["x"]), float(v["y"])) for v in verts]
+                except (KeyError, TypeError, ValueError):
+                    pts = []
+                if len(pts) == 4:
+                    record = dict(record)
+                    path = QPainterPath(pts[0])
+                    path.cubicTo(pts[1], pts[2], pts[3])
+                    record[PATH_SEGMENTS_KEY] = path_to_segments(path)
+        super().__init__(record, projection)
+
+    def draw_step(self, points: list[QPointF], preview: QPointF | None) -> bool:
+        """四击定曲线；点不足时把光标当终点补齐，每帧都有连续预览。
+
+        第 1 击只有起点（曲线退化成一个点），第 2 击 C1=C2=P1 是直线，
+        第 3 击补上 C2，第 4 击落定。``_DRAW_CLICKS`` 里本类型是 4。
+        """
+        pts = [QPointF(p) for p in points]
+        if preview is not None and len(pts) < 4:
+            pts.append(QPointF(preview))
+        if len(pts) < 2:
+            return False
+        c1 = pts[1]
+        c2 = pts[2] if len(pts) > 2 else c1
+        p3 = pts[3] if len(pts) > 3 else c2
+        path = QPainterPath(pts[0])
+        path.cubicTo(c1, c2, p3)
+        self._replace_path(path)
+        return len(points) >= 4
+
+    def _bezier_points_local(self) -> list[QPointF]:
+        """局部（视图）坐标下的 P0 / C1 / C2 / P3，来自实时路径。"""
+        path = self._path_local
+        if path is None or path.elementCount() < 4:
+            return []
+        return [QPointF(path.elementAt(i).x, path.elementAt(i).y)
+                for i in range(4)]
+
+    def _local_points(self) -> list[QPointF]:
+        # 吸附点取 4 个控制点（父类在精确段模式下只给曲线端点）。
+        return self._bezier_points_local()
+
+    def snap_closed(self) -> bool:
+        return False
+
+    def set_page_vertices(self, vertices: list[QPointF], center=None,
+                          pivot=None) -> None:
+        """顶点编辑仍保持曲线：4 个点重新定一段 cubicTo，不折线化。"""
+        pts = [QPointF(p) for p in list(vertices or [])[:4]]
+        if len(pts) < 4:
+            return
+        path = QPainterPath(pts[0])
+        path.cubicTo(pts[1], pts[2], pts[3])
+        self._replace_path(path, center=center, pivot=pivot)
+
+    def paint(self, painter: QPainter, option, widget=None) -> None:
+        path = self._path_local
+        if path is None:
+            return
+        s = self._style
+        painter.save()
+        painter.setPen(s.pen(self.stroke_color()))
+        painter.setBrush(Qt.NoBrush)   # 开放曲线不填充
+        painter.drawPath(path)
+        painter.restore()
+        scene = self.scene()
+        if ((scene is None or not getattr(scene, "is_run_mode", False))
+                and (self.isSelected() or self._drawing)):
+            self._draw_bezier_handles(painter)
+        _selection_overlay(painter, self)
+
+    def _draw_bezier_handles(self, painter: QPainter) -> None:
+        pts = self._bezier_points_local()
+        if len(pts) < 4:
+            return
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(QPen(QColor(22, 119, 255, 170), 1.0, Qt.DashLine))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawLine(pts[0], pts[1])
+        painter.drawLine(pts[3], pts[2])
+        painter.setPen(QPen(QColor(22, 119, 255), 1.4))
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        for point in pts:
+            painter.drawEllipse(point, 3.0, 3.0)
+        painter.restore()
+
+
 ITEM_TYPES: dict[str, type[BaseItem]] = {
     cls.TYPE: cls
     for cls in (
         LineItem, RectItem, CheckboxItem, WidgetItem, GroupItem,
         CircleItem, TextItem, ImageItem, TriangleItem, PolygonItem, PathItem,
+        BezierItem,
     )
 }

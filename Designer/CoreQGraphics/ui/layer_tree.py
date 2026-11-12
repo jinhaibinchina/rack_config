@@ -246,6 +246,7 @@ class LayerTreeDock(QDockWidget):
         menu = QMenu(self)
         entries = (
             ("显示 / 隐藏", "toggle_visible"),
+            ("锁定所选", "lock"), ("解锁所选", "unlock"),
             ("移到最前", "z_front"), ("上移一层", "z_raise"),
             ("下移一层", "z_lower"), ("移到最后", "z_back"),
             (None, None),

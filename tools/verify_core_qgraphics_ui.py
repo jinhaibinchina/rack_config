@@ -2,7 +2,7 @@
 
     .venv/Scripts/python.exe tools/verify_core_qgraphics_ui.py
 
-覆盖：主窗口装配 / 12 类属性页分派 / 属性编辑精确回写 / 创建与删除 /
+覆盖：主窗口装配 / 全类型属性页分派 / 属性编辑精确回写 / 创建与删除 /
 图层树双模式与过滤 / 命令分发 / 撤销重做 / 保存 round-trip / 渲染稳定 /
 关窗不重写页面文件。
 
@@ -158,12 +158,17 @@ def main() -> int:
     check("初始图元数 >= 11", len(scene.all_items()) >= 11,
           f"n={len(scene.all_items())}")
     check("菜单齐备", window.menuBar().actions().__len__() >= 5)
-    check("工具箱 11 类 + 7 种 widget 变体按钮",
-          len(window.toolbox.buttons) == 18,
+    check("工具箱 12 类 + 9 种 widget 变体按钮",
+          len(window.toolbox.buttons) == 21,
           f"buttons={len(window.toolbox.buttons)}")
+    check("基本图元组新增「贝塞尔曲线」按钮",
+          "bezier" in [b.key for b in window.toolbox.buttons],
+          str([b.key for b in window.toolbox.buttons][:8]))
     variant_buttons = [b.key for b in window.toolbox.buttons
                        if b.key.startswith("widget:")]
-    check("工具箱含 7 种 widget 变体", len(variant_buttons) == 7,
+    check("工具箱含 9 种 widget 变体（含进度条 / 滑动条）",
+          len(variant_buttons) == 9
+          and {"widget:progressbar", "widget:slider"} <= set(variant_buttons),
           str(variant_buttons))
     check("撤销栈初始不可撤销", not window.history.can_undo())
     check("图层树初始已填充", window.layers.tree.topLevelItemCount() ==
@@ -263,7 +268,7 @@ def main() -> int:
     for key in TYPE_LABELS:
         item = scene.create_item(key, center=(1000.0, 1000.0))
         made[key] = item
-    check("11 类全部可创建", all(v is not None for v in made.values()),
+    check("12 类全部可创建", all(v is not None for v in made.values()),
           str({k: (v.TYPE if v else None) for k, v in made.items()}))
     check("创建后索引与数量同步",
           len(scene.all_items()) == base_count + len(TYPE_LABELS)
@@ -1715,7 +1720,10 @@ def main() -> int:
     app.processEvents()
 
     print("\n=== 8.22 widget 控件变体：属性面板 / 工具箱 / 运行预览 ===")
-    from PySide6.QtWidgets import QLabel as _QLabel, QSpinBox as _QSpinBox  # noqa: E402
+    from PySide6.QtWidgets import (  # noqa: E402
+        QLabel as _QLabel, QProgressBar as _QProgressBar,
+        QSlider as _QSlider, QSpinBox as _QSpinBox,
+    )
 
     wg = scene.create_item("widget:combobox", center=(11200.0, 8600.0))
     scene.clearSelection()
@@ -1726,8 +1734,8 @@ def main() -> int:
     variants = wpage.findChildren(QComboBox) if wpage else []
     check("控件页提供变体下拉", len(variants) == 1, str(len(variants)))
     if variants:
-        check("变体下拉含 7 项且当前为 combobox",
-              variants[0].count() == 7
+        check("变体下拉含 9 项且当前为 combobox",
+              variants[0].count() == 9
               and str(variants[0].currentData()) == "combobox",
               f"n={variants[0].count()} cur={variants[0].currentData()}")
         variants[0].setCurrentIndex(variants[0].findData("spinbox"))
@@ -1790,8 +1798,66 @@ def main() -> int:
           and dropped.page_record()["widgetType"] == "lineedit",
           str(dropped.page_record().get("widgetType")))
 
+    # 新增变体：工具箱按钮 → 点击绘制模式 → 拖放落点 → 属性提示 →
+    # 真实 Qt 控件（含方向 / 数值范围）。只写现有 5 个顶层字段。
+    extras = []
+    widget_keys = {"widgetType", "widgetText", "widgetFontSize",
+                   "widgetColor", "widgetBackground"}
+    for idx, (key, cfg) in enumerate((
+        ("progressbar", "min=0\nmax=200\nvalue=75"),
+        ("slider", "min=-10\nmax=10\nvalue=3\norientation=vertical"),
+    )):
+        new_btn = next((b for b in window.toolbox.buttons
+                        if b.key == f"widget:{key}"), None)
+        check(f"工具箱有 {key} 变体按钮", new_btn is not None)
+        if new_btn is not None:
+            new_btn.click()
+            check(f"点击 {key} 变体按钮进入绘制模式",
+                  window.view._draw_type == f"widget:{key}",
+                  str(window.view._draw_type))
+            window.view.set_draw_tool(None)
+        before = len(scene.all_items())
+        window._spawn(f"widget:{key}", (11500.0 + idx * 260.0, 8600.0))
+        spawned = scene.all_items()[-1]
+        spawned.set_page_field("widgetText", cfg)
+        extras.append(spawned)
+        rec = spawned.page_record()
+        check(f"拖放 {key} 只写 widgetType / widgetText 顶层字段",
+              len(scene.all_items()) == before + 1
+              and spawned.TYPE == "widget"
+              and rec["widgetType"] == key
+              and rec["widgetText"] == cfg
+              and widget_keys <= set(rec),
+              str(rec.get("widgetType")))
+
     scene.clearSelection()
-    scene.delete_items([wg, dropped])
+    extras[0].setSelected(True)
+    app.processEvents()
+    new_page = _page_by_key("widget")
+    check("进度条属性页提示 orientation= 配置",
+          new_page is not None
+          and any("orientation=" in lab.text()
+                  for lab in new_page.findChildren(_QLabel)),
+          "hint")
+
+    scene.set_scene_mode(True)
+    p_proxy = scene.widget_proxies.get(extras[0].item_id)
+    s_proxy = scene.widget_proxies.get(extras[1].item_id)
+    p_widget = p_proxy.widget() if p_proxy else None
+    s_widget = s_proxy.widget() if s_proxy else None
+    check("新变体运行预览挂 QProgressBar / QSlider 并灌入范围 / 方向",
+          isinstance(p_widget, _QProgressBar)
+          and isinstance(s_widget, _QSlider)
+          and (p_widget.minimum(), p_widget.maximum(), p_widget.value(),
+               p_widget.orientation()) == (0, 200, 75, Qt.Horizontal)
+          and (s_widget.minimum(), s_widget.maximum(), s_widget.value(),
+               s_widget.orientation()) == (-10, 10, 3, Qt.Vertical),
+          f"{type(p_widget).__name__} / {type(s_widget).__name__}")
+    scene.set_scene_mode(False)
+    check("退出运行预览销毁新变体 proxy", len(scene.widget_proxies) == 0)
+
+    scene.clearSelection()
+    scene.delete_items([wg, dropped, *extras])
     app.processEvents()
 
     print("\n=== 8.23 运行预览真实控件与图元矩形逐点对齐 ===")
@@ -2618,6 +2684,294 @@ def main() -> int:
     app.processEvents()
     sview.close()
     sview.deleteLater()
+    app.processEvents()
+
+    print("\n=== 8.31 坐标刻度条（视口固定 / 数值随变换） ===")
+    from Designer.CoreQGraphics.g_view import (  # noqa: E402
+        _RULER_BG, _RULER_CORNER_BG, _RULER_THICKNESS,
+        nice_ruler_step, ruler_label,
+    )
+    from PySide6.QtGui import QTransform  # noqa: E402
+
+    T = _RULER_THICKNESS
+    check("刻度步长按缩放挑 1/2/5 档",
+          nice_ruler_step(4.0) == 500.0
+          and nice_ruler_step(0.25) == 50.0
+          and nice_ruler_step(1.0) == 100.0)
+    check("刻度标签整数 / 小数格式",
+          ruler_label(-500, 500) == "-500"
+          and ruler_label(0.5, 0.5) == "0.5")
+    window.show()
+    app.processEvents()
+    check("设计器默认打开刻度条",
+          window.view.show_rulers
+          and window.actions["toggle_rulers"].isChecked())
+
+    on_img = window.view.viewport().grab().toImage()
+    corner = on_img.pixelColor(5, 5).getRgb()[:3]
+    hbar = on_img.pixelColor(T + 40, 5).getRgb()[:3]
+    vbar = on_img.pixelColor(5, T + 40).getRgb()[:3]
+    check("水平 / 垂直 / 交叉块都画出来",
+          corner == _RULER_CORNER_BG.getRgb()[:3]
+          and hbar == _RULER_BG.getRgb()[:3]
+          and vbar == _RULER_BG.getRgb()[:3],
+          f"{corner} / {hbar} / {vbar}")
+    xmax = min(on_img.width(), 300)
+    ticks = sum(
+        on_img.pixelColor(x, y).getRgb()[:3] != _RULER_BG.getRgb()[:3]
+        for y in range(0, T, 2) for x in range(T, xmax, 2))
+    check("水平标尺上有刻度线 / 数字", ticks > 0, str(ticks))
+
+    window.actions["toggle_rulers"].setChecked(False)
+    window._do("toggle_rulers")
+    app.processEvents()
+    off_img = window.view.viewport().grab().toImage()
+    check("菜单关掉后不再画刻度条",
+          off_img.pixelColor(T + 40, 5) != on_img.pixelColor(T + 40, 5))
+    window.actions["toggle_rulers"].setChecked(True)
+    window._do("toggle_rulers")
+    app.processEvents()
+
+    def _ruler_span():
+        p0 = window.view.mapToScene(QPoint(0, 0))
+        p1 = window.view.mapToScene(QPoint(1, 0))
+        return abs(p1.x() - p0.x())
+
+    # 离屏 grab 在门禁后半段可能返回缓存帧，这里直接验证刻度换算的输入：
+    # 视图变换一变，每像素场景跨度与主刻度步长就必须跟着跳档。
+    old_tf = QTransform(window.view.transform())
+    step_before = nice_ruler_step(_ruler_span())
+    window.view.scale(2.0, 2.0)
+    app.processEvents()
+    step_after = nice_ruler_step(_ruler_span())
+    check("缩放后刻度步长随视图变换跳档",
+          step_before != step_after,
+          f"{step_before} -> {step_after}")
+    window.view.setTransform(old_tf)
+    window.view.viewport().update()
+    app.processEvents()
+
+    # 只切标志，不真的挂 / 销毁运行态 proxy，避免影响后续断言
+    old_run = scene.is_run_mode
+    scene.is_run_mode = True
+    app.processEvents()
+    run_img = window.view.viewport().grab().toImage()
+    check("运行态不显示刻度条",
+          run_img.pixelColor(T + 40, 5) != on_img.pixelColor(T + 40, 5))
+    scene.is_run_mode = old_run
+    app.processEvents()
+
+    print("\n=== 8.32 图元锁定：同心圆标记 / 设计模式位姿只读 ===")
+    from Designer.CoreQGraphics.g_view import _LOCK_BADGE_OFFSET  # noqa: E402
+    from PySide6.QtGui import QKeySequence  # noqa: E402
+
+    vp_c = window.view.mapToScene(window.view.viewport().rect().center())
+    cx, cy = scene.projection.inverse_point(vp_c.x(), vp_c.y())
+    li = scene.create_item("rect", center=(cx, cy), size=(600.0, 400.0))
+    li_id = li.item_id
+    scene.clearSelection()
+    app.processEvents()
+    lr = li.sceneBoundingRect()
+    bp = (QPointF(window.view.mapFromScene(QPointF(lr.left(), lr.bottom())))
+          + _LOCK_BADGE_OFFSET)
+    bx, by = int(bp.x()), int(bp.y())
+
+    def _badge_frame():
+        # 离屏 grab 会拿到缓存帧，显式 update + 两轮事件循环才可靠
+        window.view.viewport().update()
+        app.processEvents()
+        app.processEvents()
+        return window.view.viewport().grab().toImage()
+
+    def _badge_region(img):
+        return [img.pixelColor(bx + dx, by + dy).getRgb()[:3]
+                for dy in range(-8, 9, 2) for dx in range(-8, 9, 2)]
+
+    off_img = _badge_frame()
+    check("存量图元缺省未锁定（记录里没有 locked 键）",
+          not li.is_locked() and "locked" not in li.to_page_record())
+    li.set_locked(True)
+    on_img = _badge_frame()
+    changed = sum(u != v for u, v in
+                  zip(_badge_region(off_img), _badge_region(on_img)))
+    check("锁定后左下角画出同心圆标记", changed > 0, f"changed_px={changed}")
+    li.set_locked(False)
+    check("解锁后标记消失、画面逐像素还原",
+          _badge_region(_badge_frame()) == _badge_region(off_img))
+    li.set_locked(True)
+    run_flag = scene.is_run_mode
+    scene.is_run_mode = True
+    check("运行态不显示锁定标记",
+          _badge_region(_badge_frame()) == _badge_region(off_img))
+    scene.is_run_mode = run_flag
+    li.set_locked(False)
+    app.processEvents()
+
+    check("锁定 / 解锁动作与快捷键就位",
+          window.actions["lock"].shortcut() == QKeySequence("Ctrl+L")
+          and window.actions["unlock"].shortcut() == QKeySequence("Ctrl+Shift+U"))
+    scene.clearSelection()
+    li.setSelected(True)
+    app.processEvents()
+    window.history.commit()          # 基线：含这个图元、未锁定
+    check("未锁定时双击抓得起图元",
+          window.view.begin_follow(li, QPointF(vp_c)))
+    window.view.end_follow(restore=True)
+    window._do("lock")
+    app.processEvents()
+    li = scene.find_item(li_id)
+    check("命令上锁写入 locked 并标脏",
+          li.is_locked() and scene.is_modified())
+    check("锁定后双击跟手被拒绝",
+          not window.view.begin_follow(li, QPointF(vp_c))
+          and not window.view.is_following())
+    check("方向键微调目标不含锁定项",
+          li_id not in [it.item_id for it in window.view._nudge_targets()])
+    check("锁定后不再显示拖角手柄", window.view._resize_item() is None)
+    angle0 = li.rotation()
+    QTest.keyClick(window.view.viewport(), Qt.Key_BracketRight)
+    app.processEvents()
+    check("] 旋转对锁定图元无效", abs(li.rotation() - angle0) < 1e-9)
+    pose_boxes = [box for box, _enabled in window.property_panel._pose_widgets]
+    check("属性面板 X/Y/W/H/旋转全部置灰",
+          len(pose_boxes) == 5 and all(not box.isEnabled() for box in pose_boxes))
+
+    window._do("undo")
+    app.processEvents()
+    li = scene.find_item(li_id)
+    check("撤销恢复为未锁定", li is not None and not li.is_locked())
+    window._do("redo")
+    app.processEvents()
+    li = scene.find_item(li_id)
+    check("重做恢复为锁定", li is not None and li.is_locked())
+    scene.clearSelection()
+    li.setSelected(True)
+    app.processEvents()
+    window._do("unlock")
+    app.processEvents()
+    li = scene.find_item(li_id)
+    check("解锁后跟手恢复", window.view.begin_follow(li, QPointF(vp_c)))
+    window.view.end_follow(restore=True)
+    angle0 = li.rotation()
+    QTest.keyClick(window.view.viewport(), Qt.Key_BracketRight)
+    app.processEvents()
+    check("解锁后 ] 旋转恢复生效（快捷键本身有效）",
+          abs(li.rotation() - angle0) > 1e-9)
+
+    # 「常规」页复选框是用户最常用的入口，单独验证（不在 toggled 里重建面板）
+    from PySide6.QtWidgets import QCheckBox  # noqa: E402
+    scene.clearSelection()
+    li.setSelected(True)
+    app.processEvents()
+    cb = [b for b in window.property_panel.findChildren(QCheckBox)
+          if b.text() == "锁定"]
+    check("常规页有锁定复选框且当前未勾选",
+          len(cb) == 1 and not cb[0].isChecked())
+    cb[0].setChecked(True)
+    app.processEvents()
+    cb_boxes = [box for box, _enabled in window.property_panel._pose_widgets]
+    check("勾选复选框即上锁并同步置灰位姿输入框",
+          li.is_locked() and len(cb_boxes) == 5
+          and all(not box.isEnabled() for box in cb_boxes))
+    cb[0].setChecked(False)
+    app.processEvents()
+    cb_boxes = [box for box, _enabled in window.property_panel._pose_widgets]
+    check("取消勾选即解锁并恢复输入框",
+          not li.is_locked() and len(cb_boxes) == 5
+          and all(box.isEnabled() for box in cb_boxes))
+    scene.delete_items([li])
+    app.processEvents()
+
+    print("\n=== 8.33 贝塞尔曲线图元：工具箱 / 四击落子 / 控制点手柄 ===")
+    from Designer.CoreQGraphics.g_path import PATH_SEGMENTS_KEY  # noqa: E402
+
+    bz_button = next(b for b in window.toolbox.buttons if b.key == "bezier")
+    bz_icon = bz_button.icon().pixmap(28, 28).toImage()
+    bz_icon_px = sum(1 for y in range(28) for x in range(28)
+                     if bz_icon.pixelColor(x, y).alpha() > 0)
+    check("工具箱贝塞尔按钮有中文名与非空线稿图标",
+          "贝塞尔" in bz_button.text() and not bz_icon.isNull()
+          and bz_icon_px > 20, f"icon_px={bz_icon_px}")
+    check("「新建图元」菜单自动收录贝塞尔曲线",
+          any("贝塞尔" in a.text()
+              for m in window.menuBar().actions()
+              if m.text().replace("&", "") == "新建图元"
+              for a in m.menu().actions()))
+    window._activate_draw_tool("bezier")
+    app.processEvents()
+    check("工具箱点击后进入四点绘制模式",
+          window.view._draw_type == "bezier"
+          and "四下" in window.status_bar.currentMessage())
+
+    # 真实鼠标四击：起点 / C1 / C2 / 终点
+    vp = window.view.viewport()
+    for pt in ((240, 300), (300, 220), (380, 300), (450, 220)):
+        QTest.mouseClick(vp, Qt.LeftButton, Qt.NoModifier, QPoint(*pt))
+        app.processEvents()
+    drawn = [it for it in scene.all_items() if it.TYPE == "bezier"]
+    check("画布四击生成贝塞尔图元并自动选中",
+          len(drawn) == 1 and drawn[0].isSelected()
+          and not scene.drawing_active())
+    window._activate_draw_tool("")
+    app.processEvents()
+    drawn_rec = drawn[0].to_page_record()
+    bz_segs = drawn_rec.get(PATH_SEGMENTS_KEY) or []
+    check("手绘结果仍是 move + curve 精确曲线",
+          [d["kind"] for d in bz_segs] == ["move", "curve"]
+          and all(k in bz_segs[1] for k in
+                  ("c1x", "c1y", "c2x", "c2y", "x", "y")))
+    check("手绘结束写入撤销栈", window.history.can_undo())
+    nav_titles = [window.property_panel.nav.topLevelItem(i).text(0)
+                  for i in range(window.property_panel.nav.topLevelItemCount())]
+    check("属性面板新增「顶点」页（4 控制点说明）", "顶点" in nav_titles,
+          str(nav_titles))
+
+    # 拖放创建 + 控制点手柄渲染（scene.render 不含 view 的标尺 / 锁定标记）
+    before_drop = set(i.item_id for i in scene.all_items())
+    window._spawn("bezier", (2400.0, 2400.0))
+    app.processEvents()
+    dropped = [i for i in scene.all_items() if i.item_id not in before_drop]
+    check("工具箱拖放也能放置贝塞尔曲线",
+          len(dropped) == 1 and dropped[0].TYPE == "bezier")
+    bz_item = dropped[0]
+    rect_for_bool = scene.create_item("rect", center=(2600.0, 2400.0),
+                                      size=(200.0, 120.0))
+    scene.clearSelection()
+    bz_item.setSelected(True)
+    rect_for_bool.setSelected(True)
+    app.processEvents()
+    check("贝塞尔是开放曲线，不参与布尔面域运算",
+          all(it.TYPE != "bezier" for it in scene.boolean_items()))
+
+    def _render_bz():
+        img = QImage(320, 260, QImage.Format_ARGB32_Premultiplied)
+        img.fill(Qt.white)
+        pt = QPainter(img)
+        src = QRectF(bz_item.sceneBoundingRect()).adjusted(-25, -25, 25, 25)
+        scene.render(pt, QRectF(0, 0, 320, 260), src, Qt.KeepAspectRatio)
+        pt.end()
+        return img
+
+    def _handle_px(img):
+        return sum(1 for y in range(img.height()) for x in range(img.width())
+                   if img.pixelColor(x, y).getRgb()[:3] == (22, 119, 255))
+
+    scene.clearSelection()
+    app.processEvents()
+    px_off = _handle_px(_render_bz())
+    bz_item.setSelected(True)
+    app.processEvents()
+    px_on = _handle_px(_render_bz())
+    check("选中后画出蓝色控制点与手柄线", px_on > px_off and px_on > 0,
+          f"off={px_off} on={px_on}")
+    run_bz = scene.is_run_mode
+    scene.is_run_mode = True
+    px_run = _handle_px(_render_bz())
+    check("运行态不画控制点手柄", px_run == px_off,
+          f"off={px_off} run={px_run}")
+    scene.is_run_mode = run_bz
+    scene.clearSelection()
+    scene.delete_items([bz_item, rect_for_bool] + drawn)
     app.processEvents()
 
     print("\n=== 9. 关窗不重写页面文件 ===")

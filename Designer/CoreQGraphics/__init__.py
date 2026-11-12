@@ -155,17 +155,23 @@ UI 外壳在子包 ``Designer.CoreQGraphics.ui``：属性面板 / 工具箱 / �
 widget 控件变体（对照 ``Core/elements.py:widget_element``）：
 * 旧实现把变体做成 ``widgetType`` 一个字符串 → 7 个 Qt 类的一层分发：
   ``textedit`` / ``lineedit`` / ``checkbox`` / ``combobox`` / ``pushbutton`` /
-  ``label`` / ``spinbox``，未知值退化 ``textedit``。序列化只有 5 个**顶层**
-  字段（不在 ``style``、不复用 ``context``）：
+  ``label`` / ``spinbox``，未知值退化 ``textedit``。CoreQGraphics 在原 7 项后
+  追加 ``progressbar`` / ``slider``，工具箱与属性面板由同一张标签表派生；
+  旧 Core 读到这两个未知值仍安全退化成 ``QTextEdit``。序列化仍只有 5 个
+  **顶层**字段（不在 ``style``、不复用 ``context``）：
   ``widgetType`` / ``widgetText`` / ``widgetFontSize`` / ``widgetColor`` /
   ``widgetBackground``，默认值 ``textedit`` / ``""`` / ``12`` / ``#000000`` /
   ``#ffffff``。``width`` / ``height`` / ``rotate`` / ``style`` / ``zValue``
   与矩形图元完全同构。
 * ``widgetText`` 按变体解释：combobox 每行一个选项（空 → ``["选项 1"]``）；
   spinbox 每行 ``min=`` / ``max=`` / ``value=``（缺省 Qt 0 / 99、value 取 min，
-  ``min>max`` 交换、value clamp）；checkbox / pushbutton / label 空文本显示
+  ``min>max`` 交换、value clamp）；progressbar / slider 复用同一个
+  ``key=value`` 口径，支持 ``min=`` / ``max=`` / ``value=`` /
+  ``orientation=horizontal|vertical``（缺省 0 / 100 / 中值 / 横向，也接受
+  ``h`` / ``v`` 与中英文方向名）。checkbox / pushbutton / label 空文本显示
   「选项 / 按钮 / 标签」；lineedit 直接 ``setText``；textedit 只读多行。
-  样式统一 ``color / background-color / font-size: Npt``，颜色非法回退黑 / 白。
+  样式统一 ``color / background-color / font-size: Npt``，颜色非法回退黑 / 白；
+  新增变体额外补 ``QProgressBar::chunk`` 与 ``QSlider`` groove/handle QSS。
 * 旧 Core 的 ``paint`` 完全不区分变体（矩形 + "Widget" 字样），不同外观来自
   ``EmbeddedWidgetLayer`` 挂载的真实 QWidget。重写版是平铺 QGraphicsItem，
   所以 ``g_widgets.paint_variant`` 在设计态按变体自绘可辨识占位（下拉三角、
@@ -182,7 +188,7 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
   设计态完全不创建，退出运行预览即销毁；字段变了按签名重建控件，
   图元位姿变了由 ``geometryChanged`` / ``on_item_moved`` 调用
   ``align_widget_proxies()`` 只重排、不重建。
-* 工具箱用 ``widget:<key>`` 伪类型（7 个变体按钮 + 1 个通用），``create_item``
+* 工具箱用 ``widget:<key>`` 伪类型（9 个变体按钮 + 1 个通用），``create_item``
   在入口解析别名：真正的 ``type`` 仍写 ``widget``，变体只落 ``widgetType``。
   属性面板「控件」页可切变体、编辑文本 / 字号 / 文字色 / 背景色；注意 widget
   的字号是顶层 ``widgetFontSize``，不是 ``style.font_size``。
@@ -208,9 +214,11 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
 * 光标附近最近的那**一个**点画成**红色十字**（旧 Core 同款纯红，带一圈深色
   描边保证压在黑色描边上也看得见），门控打开时加粗 + 套圆环；阈值按屏幕像素
   （``pixel_threshold = 12px``）换算成场景单位，缩放后手感一致。
-  **已选中图元的特征点彻底不纳入捕捉点扫描**（``exclude=_selection_own_points()``）：
-  既不吸附、也不画十字、光标也不会 warp 过去。显示 / 吸附 / warp 共用同一份
-  ``aim()`` 结果，不会出现「十字在自己身上、图元却吸到别处」的错位。
+  **非绘制态下，已选中图元的特征点彻底不纳入捕捉点扫描**
+  （``exclude=_selection_own_points()``）：既不吸附、也不画十字、光标也不会
+  warp 过去。显示 / 吸附 / warp 共用同一份 ``aim()`` 结果，不会出现「十字在
+  自己身上、图元却吸到别处」的错位。绘制态例外：已选中图元是最常用的起画 /
+  对齐目标，不能排除；只剔除正在画的临时图元自身点。
 * ``T`` 是**一次性动作键**（不再是开关门控），见 ``_snap_action()``：
   1. 光标吸附到最近的捕捉点；若该点来自图元（``SnapSystem.owners_at`` 查归属，
      来自 ``GraphicsScene.snap_points_with_owners``），就选中该图元、进入
@@ -229,14 +237,17 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
       图元上（多选整体平移），已按需求移除；该方法仅作历史兼容保留，设计器
       自身无调用点。图元因吸附而移动**只允许发生在第 2 条的抓手对齐分支**。
   4. **绘制工具激活时**（``_draw_type`` 非空）按 T 只做 CAD 式「取点吸附」：
-     光标与绘制预览吸到捕捉点（``_sync_draw_preview_to_snap``，预览 / 落点
-     共用 ``_ortho_page_point``），**不选中已有图元、不抓手、不跟手、不平移
-     任何图元**——跟手会抢走 ``mouseMoveEvent`` 的绘制预览分支，逐点落子就
-     断了；``_begin_snap_grab`` 里也留了一道同样的门。
-     扫描统一走 ``_snap_scan_exclude()``：除选中项自身点外，还要剔除
-     **正在绘制的临时图元自身**的端点 / 中点（``_draw_own_points``）。它虽是
-     ``commit=False`` 建的，仍进 ``index.by_id`` 且可见，不排除就会吸到自己
-     刚落的点；与别的图元共享的坐标按 owner 保留，仍是合法捕捉目标。
+     光标、绘制预览与真正落点吸到同一个捕捉点（``_draw_page_point`` 与
+     ``_sync_draw_preview_to_snap`` 共用 ``_ortho_page_point``），**不选中已有
+     图元、不抓手、不跟手、不平移任何图元**——跟手会抢走 ``mouseMoveEvent``
+     的绘制预览分支，逐点落子就断了；``_begin_snap_grab`` 里也留了一道同样的门。
+     激活绘制工具即 ``setFocus()`` + 刷新点表：否则焦点留在工具箱按钮上，T
+     送不到画布；刚创建的图元只把点表置脏，等到按 T 才重建时第一点只能退到
+     格点。``_ensure_snap_table()`` 在十字 / 按 T / 落点前同步脏表，并按 owner
+     撤掉 ``commit=False`` 临时图元的登记，避免预览逐帧变化留下幽灵端点。
+     扫描统一走 ``_snap_scan_exclude()``：绘制态只排除**正在绘制的临时图元自身**的
+     端点 / 中点（``_draw_own_points``），已选中图元仍可作为起画 / 对齐目标；
+     与别的图元共享的坐标按 owner 保留，仍是合法捕捉目标。
 
 正交模式（CAD 的 F8）：
 * ``GraphicsView.set_ortho_mode(True)`` 打开后，绘制 ``line`` / ``triangle`` /

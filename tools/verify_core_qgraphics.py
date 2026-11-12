@@ -836,21 +836,25 @@ def main() -> int:
                if fs_saved[k] != fs_load.get(k)][:3]))
 
     print("\n=== 6.9 widget 控件变体（对照旧 Core widget_element） ===")
+    from Designer.Core.elements import widget_element  # noqa: E402
     from Designer.CoreQGraphics.g_elements import WidgetItem  # noqa: E402
     from Designer.CoreQGraphics.g_widgets import (  # noqa: E402
         WIDGET_DEFAULTS, WIDGET_VARIANTS, _widget_font, create_control,
         normalize_variant, widget_display_text, widget_options,
-        widget_spin_config,
+        widget_range_config, widget_spin_config,
     )
+    from Designer.CoreQGraphics.runtime.stage import _default_apply  # noqa: E402
     from PySide6.QtWidgets import (  # noqa: E402
-        QCheckBox, QComboBox, QLabel, QLineEdit, QPushButton, QSpinBox,
-        QTextEdit,
+        QCheckBox, QComboBox, QLabel, QLineEdit, QProgressBar, QPushButton,
+        QSlider, QSpinBox, QTextEdit,
     )
 
-    check("7 种变体与旧 Core WIDGET_CONTROL_TYPES 一致",
-          WIDGET_VARIANTS == ("textedit", "lineedit", "checkbox", "combobox",
-                              "pushbutton", "label", "spinbox"),
-          str(WIDGET_VARIANTS))
+    check("前 7 种变体与旧 Core WIDGET_CONTROL_TYPES 一致",
+          WIDGET_VARIANTS[:7] == tuple(widget_element.WIDGET_CONTROL_TYPES),
+          str(WIDGET_VARIANTS[:7]))
+    check("追加进度条 / 滑动条两种变体",
+          WIDGET_VARIANTS[7:] == ("progressbar", "slider")
+          and len(WIDGET_VARIANTS) == 9, str(WIDGET_VARIANTS))
     check("5 个顶层字段默认值与旧 Core 一致",
           WIDGET_DEFAULTS == {
               "widgetType": "textedit", "widgetText": "",
@@ -863,9 +867,9 @@ def main() -> int:
     wscene = GraphicsScene()
     made = [wscene.create_item(f"widget:{k}", center=(float(i) * 500.0, 0.0))
             for i, k in enumerate(WIDGET_VARIANTS)]
-    check("工具箱别名创建的 7 个图元 type 仍是 widget",
+    check("工具箱别名创建的 9 个图元 type 仍是 widget",
           all(it.TYPE == "widget" for it in made))
-    check("7 个别名各自写入顶层 widgetType",
+    check("9 个别名各自写入顶层 widgetType",
           [it.page_record()["widgetType"] for it in made] == list(WIDGET_VARIANTS))
     plain = wscene.create_item("widget", center=(0.0, 900.0))
     check("通用 widget 默认 textedit / 空文本（对齐旧 Core）",
@@ -907,26 +911,36 @@ def main() -> int:
           widget_spin_config("min=5\nmax=3\nvalue=99") == (3, 5, 5)
           and widget_spin_config("") == (0, 99, 0)
           and widget_spin_config("min=10") == (10, 99, 10))
+    check("progressbar / slider 复用 widgetText 解析范围与方向",
+          widget_range_config("") == (0, 100, 50, "horizontal")
+          and widget_range_config("min=8\nmax=2\nvalue=99\norientation=v")
+          == (2, 8, 8, "vertical")
+          and widget_range_config("min=7\nmax=7\norientation=横向")
+          == (7, 7, 7, "horizontal"))
     check("空文本默认标题按变体区分",
           [widget_display_text(k, "") for k in WIDGET_VARIANTS]
-          == ["", "", "选项", "选项 1", "按钮", "标签", "0"])
+          == ["", "", "选项", "选项 1", "按钮", "标签", "0", "50%", "50"])
 
     classes = {
         "textedit": QTextEdit, "lineedit": QLineEdit, "checkbox": QCheckBox,
         "combobox": QComboBox, "pushbutton": QPushButton, "label": QLabel,
-        "spinbox": QSpinBox,
+        "spinbox": QSpinBox, "progressbar": QProgressBar, "slider": QSlider,
     }
     controls = {}
     for key in WIDGET_VARIANTS:
         rec = {
             "widgetType": key,
-            "widgetText": {"combobox": "A\nB", "spinbox":
-                           "min=5\nmax=20\nvalue=7"}.get(key, "hello"),
+            "widgetText": {
+                "combobox": "A\nB",
+                "spinbox": "min=5\nmax=20\nvalue=7",
+                "progressbar": "min=10\nmax=30\nvalue=20",
+                "slider": "min=-5\nmax=5\nvalue=0\norientation=vertical",
+            }.get(key, "hello"),
             "widgetFontSize": 16, "widgetColor": "#123456",
             "widgetBackground": "#aaffff",
         }
         controls[key] = create_control(rec)
-    check("7 个变体映射到对应 Qt 控件类",
+    check("9 个变体映射到对应 Qt 控件类",
           all(isinstance(controls[k], cls) for k, cls in classes.items()),
           str({k: type(v).__name__ for k, v in controls.items()}))
     check("combobox 灌入多行选项", [controls["combobox"].itemText(i)
@@ -935,11 +949,28 @@ def main() -> int:
     check("spinbox 灌入 range / value",
           (controls["spinbox"].minimum(), controls["spinbox"].maximum(),
            controls["spinbox"].value()) == (5, 20, 7))
+    check("进度条 / 滑动条灌入 range / value / orientation",
+          (controls["progressbar"].minimum(),
+           controls["progressbar"].maximum(),
+           controls["progressbar"].value(),
+           controls["progressbar"].orientation()) == (10, 30, 20, Qt.Horizontal)
+          and (controls["slider"].minimum(), controls["slider"].maximum(),
+               controls["slider"].value(), controls["slider"].orientation())
+          == (-5, 5, 0, Qt.Vertical))
+    check("运行态标签 setValue 能推进度条 / 滑动条",
+          (_default_apply(controls["progressbar"], "27") is None
+           and _default_apply(controls["slider"], "-4") is None
+           and controls["progressbar"].value() == 27
+           and controls["slider"].value() == -4))
     check("样式表沿用 widgetFontSize / 文字色 / 背景色",
           "font-size: 16pt" in controls["lineedit"].styleSheet()
           and "#123456" in controls["lineedit"].styleSheet()
           and "#aaffff" in controls["lineedit"].styleSheet(),
           controls["lineedit"].styleSheet())
+    check("新增变体 QSS 显式画 chunk / groove / handle",
+          "QProgressBar::chunk" in controls["progressbar"].styleSheet()
+          and "QSlider::groove:horizontal" in controls["slider"].styleSheet()
+          and "QSlider::handle:vertical" in controls["slider"].styleSheet())
 
     # 变体化自绘：每种独立场景渲染，像素签名互不相同，且几何完全不变
     def _variant_shot(variant, text):
@@ -964,12 +995,17 @@ def main() -> int:
         return QRectF(it.page_bounding_rect()), sig, dark
 
     shots = {
-        k: _variant_shot(k, {"combobox": "选项甲\n选项乙",
-                             "spinbox": "min=1\nmax=9\nvalue=4"}.get(k, "示例文本"))
+        k: _variant_shot(k, {
+            "combobox": "选项甲\n选项乙",
+            "spinbox": "min=1\nmax=9\nvalue=4",
+            "progressbar": "min=0\nmax=100\nvalue=65",
+            "slider": "min=0\nmax=100\nvalue=35",
+        }.get(k, "示例文本"))
         for k in WIDGET_VARIANTS
     }
     sigs = [v[1] for v in shots.values()]
-    check("7 种占位外观渲染互不相同", len(set(sigs)) == 7, str(sigs))
+    check("9 种占位外观渲染互不相同",
+          len(set(sigs)) == len(WIDGET_VARIANTS), str(sigs))
     check("每种占位都有可见像素", all(v[2] > 20 for v in shots.values()),
           str({k: v[2] for k, v in shots.items()}))
     boxes = [v[0] for v in shots.values()]
@@ -997,18 +1033,32 @@ def main() -> int:
     check("设计模式不创建真实控件", len(wscene.widget_proxies) == 0)
     wscene.set_scene_mode(True)
     proxies = wscene.widget_proxies
-    check("运行预览为 7 个别名 + 1 个通用 widget 挂真实控件",
-          len(proxies) == 8, str(len(proxies)))
-    check("proxy 控件类覆盖全部 7 种变体",
+    check("运行预览为 9 个别名 + 1 个通用 widget 挂真实控件",
+          len(proxies) == 10, str(len(proxies)))
+    check("proxy 控件类覆盖全部 9 种变体",
           set(type(p.widget()).__name__ for p in proxies.values())
           == {"QTextEdit", "QLineEdit", "QCheckBox", "QComboBox",
-              "QPushButton", "QLabel", "QSpinBox"},
+              "QPushButton", "QLabel", "QSpinBox", "QProgressBar",
+              "QSlider"},
           str(sorted(set(type(p.widget()).__name__ for p in proxies.values()))))
     check("proxy 不进索引 / 不进 page JSON",
           len(wscene.all_items()) == n_before
           and len(wscene.page_data()["items"]) == n_before)
     wscene.set_scene_mode(False)
     check("退出运行预览销毁全部 proxy", len(wscene.widget_proxies) == 0)
+
+    # 新增变体也走同一份 5 顶层字段：JSON 往返后记录逐字不变。
+    rt = GraphicsScene()
+    rt.create_item("widget:progressbar", center=(0.0, 0.0),
+                   widgetText="min=0\nmax=200\nvalue=75")
+    rt.create_item("widget:slider", center=(500.0, 0.0),
+                   widgetText="min=-10\nmax=10\nvalue=3\norientation=vertical")
+    rt_data = rt.page_data()
+    rt2 = GraphicsScene()
+    rt2.load_data(json.loads(json.dumps(rt_data, ensure_ascii=False)))
+    check("进度条 / 滑动条 page JSON 往返零改动",
+          rt2.page_data() == rt_data,
+          str([r.get("widgetType") for r in rt_data["items"]]))
 
     print("\n=== 6.10 删组递归删成员（对照旧 Core base_element.Delete） ===")
     dl = GraphicsScene()
@@ -1238,10 +1288,237 @@ def main() -> int:
         check("父被 Qt 拖动 %s 后再旋转：子父系位姿零漂移" % (amt,),
               dev < 1e-3, f"max_dev={dev:.6f}")
 
+    print("\n=== 6.13 图元锁定：可选字段 / 位姿 API 过滤（独立小场景） ===")
+    from Designer.CoreQGraphics.g_scene import GraphicsScene
+    from PySide6.QtWidgets import QGraphicsItem  # noqa: E402
+
+    lk = GraphicsScene()
+    la = lk.create_item("rect", center=(1000.0, 1000.0), size=(400.0, 200.0))
+    lb = lk.create_item("rect", center=(1400.0, 1000.0), size=(400.0, 200.0))
+    lc = lk.create_item("rect", center=(1800.0, 1000.0), size=(400.0, 200.0))
+    ld = lk.create_item("rect", center=(2600.0, 1000.0), size=(400.0, 200.0))
+    ids = [la.item_id, lb.item_id, lc.item_id, ld.item_id]
+    check("存量记录没有 locked 键、缺省全部未锁定",
+          all("locked" not in r for r in lk.page_data()["items"])
+          and not any(lk.find_item(i).is_locked() for i in ids))
+    box0 = la.sceneBoundingRect()
+    n_lock = lk.set_items_locked([ids[0]], True)
+    check("批量上锁只改一个并写进 page 记录",
+          n_lock == 1 and la.is_locked()
+          and la.to_page_record().get("locked") is True
+          and not lb.is_locked())
+    check("上锁不改几何（包围盒逐项相等）",
+          close_rect(box0, la.sceneBoundingRect()))
+    check("pose_blocked / editable_pose 口径",
+          lk.pose_blocked(la) and not lk.pose_blocked(lb)
+          and [i.item_id for i in lk.editable_pose([la, lb])] == [ids[1]])
+
+    lk.clearSelection()
+    for it in (la, lb, lc, ld):
+        it.setSelected(True)
+    p0, b0 = la.page_center(), lb.page_center()
+    lk.align_selected("left")
+    check("左对齐跳过锁定项、其它图元照常移动",
+          la.page_center() == p0 and lb.page_center() != b0)
+    check("拖角缩放拒绝锁定项、接受未锁定项",
+          not lk.resize_item_about(la, (0.0, 0.0), 1.2, 1.2)
+          and lk.resize_item_about(lb, (0.0, 0.0), 1.2, 1.2))
+    lk.clearSelection()
+    la.setSelected(True)
+    check("旋转支点设置跳过锁定项",
+          lk.set_selected_origin(1234.0, 567.0) == 0)
+    lb.setSelected(True)
+    check("旋转支点设置对未锁定项仍生效",
+          lk.set_selected_origin(1234.0, 567.0) == 1)
+    check("旋转支点复位也跳过锁定项",
+          lk.reset_selected_origin() == 1)
+    la.setSelected(False)
+    lb.setSelected(False)
+
+    # distribute：4 个图元里锁中间那个，只应移动另一个中间项
+    for it, cx in zip((la, lb, lc, ld), (1000.0, 1400.0, 1800.0, 2600.0)):
+        it.set_page_center(cx, 1000.0)
+    lk.set_items_locked([ids[0]], False)
+    lk.set_items_locked([ids[1]], True)
+    lk.clearSelection()
+    for it in (la, lb, lc, ld):
+        it.setSelected(True)
+    lc0 = lc.page_center()[0]
+    lk.distribute_selected(True)
+    check("水平等距跳过锁定中间项、未锁定中间项照常移动",
+          abs(lb.page_center()[0] - 1400.0) < 1e-6
+          and abs(lc.page_center()[0] - lc0) > 1e-6)
+
+    # 组：成员锁定后整组位姿受保护（防「拖父组把锁定的成员带走」）
+    grp = lk.create_item("group", center=(3000.0, 1000.0), size=(400.0, 300.0))
+    kid = lk.create_item("rect", center=(3000.0, 1000.0), size=(100.0, 60.0))
+    kid.set_page_parent(grp.item_id)
+    grp.set_page_field("children_ids", [kid.item_id])
+    lk.index.rebuild_links()
+    kid.set_locked(True)
+    check("组内成员锁定 -> 整组位姿受保护",
+          lk.pose_blocked(grp) and lk.editable_pose([grp]) == [])
+    lk.set_movable_gate(True)
+    check("锁定项拿不到 ItemIsMovable，未锁定项仍能拿到",
+          not (lb.flags() & QGraphicsItem.ItemIsMovable)
+          and not (grp.flags() & QGraphicsItem.ItemIsMovable)
+          and bool(la.flags() & QGraphicsItem.ItemIsMovable))
+    lk.set_movable_gate(False)
+
+    # 落盘 / 重载：locked 是可选顶层字段，旧页缺省为零改动
+    os.makedirs("tools/_out", exist_ok=True)
+    tmp_lock = "tools/_out/lock_roundtrip.json"
+    lk.save_page(tmp_lock)
+    with open(tmp_lock, encoding="utf-8") as fp:
+        disk = json.load(fp)
+    written = {r["id"] for r in disk["items"] if r.get("locked")}
+    check("落盘只给锁定的图元写 locked", written == {ids[1], kid.item_id},
+          str(sorted(written)))
+    rl = GraphicsScene()
+    rl.load_data(disk)
+    check("重载后锁定状态保持、未锁定项仍缺省",
+          rl.find_item(ids[1]).is_locked()
+          and rl.find_item(kid.item_id).is_locked()
+          and not rl.find_item(ids[0]).is_locked())
+    rl.set_items_locked([i for i in rl.index.order], False)
+    check("解锁后 locked 键彻底消失（回到存量记录原貌）",
+          all("locked" not in r for r in rl.page_data()["items"]))
+    try:
+        os.remove(tmp_lock)
+    except OSError:
+        pass
+
+    print("\n=== 6.14 贝塞尔曲线图元：精确曲线 / 四点落子 / 变换（独立小场景） ===")
+    from Designer.CoreQGraphics.g_scene import GraphicsScene  # noqa: E402
+    from Designer.CoreQGraphics.g_elements import BezierItem  # noqa: E402
+    from Designer.CoreQGraphics.g_path import PATH_SEGMENTS_KEY  # noqa: E402
+    from Designer.CoreQGraphics.g_boolean import supports_boolean  # noqa: E402
+
+    def _segments(rec):
+        return rec.get(PATH_SEGMENTS_KEY) or []
+
+    def _curve(rec):
+        return next((d for d in _segments(rec) if d["kind"] == "curve"), {})
+
+    bz = GraphicsScene()
+    b1 = bz.create_item("bezier", center=(1000.0, 1000.0))
+    rec0 = b1.page_record()
+    check("bezier 已注册，默认记录是 move + curve",
+          isinstance(b1, BezierItem)
+          and [d["kind"] for d in _segments(rec0)] == ["move", "curve"])
+    c0 = _curve(b1.to_page_record())
+    check("c1/c2 与端点都进 path_segments、vertices 折线兜底在",
+          all(k in c0 for k in ("c1x", "c1y", "c2x", "c2y", "x", "y"))
+          and len(rec0.get("vertices") or []) >= 2
+          and rec0["style"]["fill"] is False)
+    check("开放曲线：不填充、不参与布尔、4 个控制点进吸附表",
+          not b1.snap_closed() and not supports_boolean(b1)
+          and len(b1.snap_points()[0]) == 4
+          and len(b1._bezier_points_local()) == 4)
+
+    c1_before = (c0["c1x"], c0["c1y"])
+    b1.rotate_by(15.0)
+    rec_rot = b1.to_page_record()
+    cr = _curve(rec_rot)
+    check("旋转后仍是精确曲线且 c1/c2 同步刚体变换",
+          [d["kind"] for d in _segments(rec_rot)] == ["move", "curve"]
+          and (abs(cr["c1x"] - c1_before[0])
+               + abs(cr["c1y"] - c1_before[1])) > 1.0)
+    w0, h0 = b1.page_size()
+    b1.set_page_size(w0 * 1.5, h0 * 1.2)
+    rec_sc = b1.to_page_record()
+    check("改宽高仍是精确曲线且 c1/c2 同步缩放",
+          [d["kind"] for d in _segments(rec_sc)] == ["move", "curve"]
+          and abs(_curve(rec_sc)["c1x"] - cr["c1x"]) > 1.0)
+    before_move = _curve(b1.to_page_record())
+    b1.moveBy(20.0, 30.0)
+    after_move = _curve(b1.to_page_record())
+    check("moveBy 平移后 c1/c2 同步平移",
+          abs(after_move["c1x"] - before_move["c1x"]) > 1e-6
+          or abs(after_move["c1y"] - before_move["c1y"]) > 1e-6)
+
+    # CAD 四点落子：起点 / 控制点 1 / 控制点 2 / 终点
+    bz2 = GraphicsScene()
+    draft = bz2.begin_draw_tool("bezier")
+    check("绘制工具按 4 击落子、绘制期图元可见",
+          bz2._draw_clicks("bezier") == 4 and draft is not None
+          and draft.isVisible() and not bz2.drawing_polygon())
+    four = [(1000.0, 1200.0), (1100.0, 800.0),
+            (1300.0, 1200.0), (1400.0, 800.0)]
+    for x, y in four[:3]:
+        bz2.draw_add_point(QPointF(x, y))
+        bz2.draw_preview(QPointF(x + 50.0, y + 50.0))
+    check("前三击仍在绘制、曲线实时生成",
+          bz2.drawing_active() and draft._segment_mode
+          and draft._path_local is not None)
+    bz2.draw_add_point(QPointF(*four[3]))
+    check("第四击自动落定、不留临时图元",
+          not bz2.drawing_active() and len(bz2.all_items()) == 1
+          and not bz2.all_items()[0]._drawing)
+    done = bz2.all_items()[0].to_page_record()
+    seg = _segments(done)
+    cv = _curve(done)
+    check("落点顺序精确等于 P0 / C1 / C2 / P3",
+          len(seg) == 2 and seg[0]["kind"] == "move"
+          and (seg[0]["x"], seg[0]["y"]) == four[0]
+          and (cv["c1x"], cv["c1y"]) == four[1]
+          and (cv["c2x"], cv["c2y"]) == four[2]
+          and (cv["x"], cv["y"]) == four[3],
+          f"{seg}")
+
+    # 手工 JSON 只有 4 个 vertices 时自动补出精确曲线
+    raw = {
+        "id": 1, "name": "raw_bezier", "type": "bezier",
+        "parent_id": 0, "children_ids": [], "group_id": 0,
+        "center_pos": {"x": 1000.0, "y": 1000.0},
+        "origin_pos": {"x": 1000.0, "y": 1000.0},
+        "width": 400.0, "height": 200.0, "rotate": 0.0, "zValue": 1.0,
+        "style": {"stroke": "#000000", "strokeWidth": 2, "fill": False},
+        "vertices": [{"x": x, "y": y} for x, y in four],
+    }
+    bz3 = GraphicsScene()
+    bz3.load_data({"backgroundColor": "#ffffff", "items": [raw]})
+    manual = bz3.all_items()[0]
+    check("只有 vertices 的手工 JSON 自动补出精确曲线",
+          len(bz3.all_items()) == 1 and manual._segment_mode
+          and [d["kind"] for d in _segments(manual.to_page_record())]
+          == ["move", "curve"])
+
+    # 剪贴板 / 模板走 _shift_record：精确段 c1/c2 与折线兜底都要一起平移
+    hand = bz2.all_items()[0]
+    bz2.clearSelection()
+    hand.setSelected(True)
+    bz2.copy_selected()
+    copies = bz2.paste_clipboard((50.0, 60.0))
+    copy_rec = copies[0].to_page_record()
+    orig_cv = _curve(hand.to_page_record())
+    copy_cv = _curve(copy_rec)
+    check("复制 / 粘贴同步平移 c1/c2（shift_segments 口径）",
+          [d["kind"] for d in _segments(copy_rec)] == ["move", "curve"]
+          and (abs(copy_cv["c1x"] - orig_cv["c1x"])
+               + abs(copy_cv["c1y"] - orig_cv["c1y"])) > 1e-6)
+
+    os.makedirs("tools/_out", exist_ok=True)
+    tmp_bz = "tools/_out/bezier_roundtrip.json"
+    bz2.save_page(tmp_bz)
+    with open(tmp_bz, encoding="utf-8") as fp:
+        first_text = fp.read()
+    bz4 = GraphicsScene()
+    bz4.load_data(json.loads(first_text))
+    bz4.save_page(tmp_bz)
+    with open(tmp_bz, encoding="utf-8") as fp:
+        second_text = fp.read()
+    check("贝塞尔页 save → load → save 字节一致",
+          first_text == second_text)
+    try:
+        os.remove(tmp_bz)
+    except OSError:
+        pass
+
     print("\n=== 7. 性能对照请用独立基准 ===")
     print("  第 4~6 节已修改过场景状态，此处帧耗时不可比，故不采样。")
     print("  .venv/Scripts/python.exe tools/bench_qgraphics_scene.py --phase ab")
-    print("  完整功能实现的 12 类 paint 仍在 Python；要兑现上一轮 -54%~-66%")
+    print("  完整功能实现的 13 类 paint 仍在 Python；要兑现上一轮 -54%~-66%")
     print("  需把 paint 换成 Qt 内置 item 或 C++ 实现（路线 C3 / Stage 2 P3）。")
 
     print(f"\n失败 {len(FAILURES)} 项" + (": " + ", ".join(FAILURES) if FAILURES else ""))
