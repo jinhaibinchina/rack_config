@@ -63,7 +63,7 @@ from Designer.CoreQGraphics.runtime import RuntimeStage
 from . import fixture_config as cfg
 from .datasource import DataSource
 from .servo_panel import ServoAxisPanel, make_panel_provider
-
+from .flip_number import   FlipNumberProvider
 
 # ---------------------------------------------------------------- 小工具
 def _as_bool(value: Any) -> bool:
@@ -227,7 +227,7 @@ class FixtureRuntime(QObject):
     def __init__(self, page_path: str | Path | None = None,
                  source: DataSource | None = None,
                  parent: QObject | None = None,
-                 *, panel_provider=None) -> None:
+                 *, panel_provider=None, flip_provider=None) -> None:
         super().__init__(parent)
         self.page_path = Path(page_path or cfg.PAGE_PATH)
         self.stage = RuntimeStage(
@@ -239,13 +239,25 @@ class FixtureRuntime(QObject):
         )
         # set_mapping 用图元名登记，registry 此刻还是空的；load() 里
         # widgets.rebuild() 会按名字命中工厂，reload 也仍然有效。
+        #
+        # 翻页计数**不走** controlCreated：FlipNumberProvider 本身就是稳定的
+        # 门面——set_value 转发到 display，换页重建时 create() 用 _latest
+        # 补灌，控件 destroyed 时自动清 display。而 controlCreated 的第二个
+        # 参数是造出来的 QWidget（这里是 FlipNumberDisplay），**不是**
+        # provider；拿 isinstance(widget, FlipNumberProvider) 判断恒为假，
+        # 会让引用永远停在 None（见 tools/verify_test_fixture.py 第 11 组）。
+        flip_provider = flip_provider or FlipNumberProvider(digits=5)
         self.stage.set_mapping(
-            {cfg.WIDGET["monitor"]: panel_provider or make_panel_provider()})
+            {cfg.WIDGET["monitor"]: panel_provider or make_panel_provider(),
+             cfg.WIDGET["flip_total_count"]: flip_provider})
+
         self.visuals = CleanVisuals(self.stage)
         self.geometry: FixtureGeometry | None = None
         self._source: DataSource | None = None
         self._spins: dict[str, QSpinBox] = {}
         self._panel: ServoAxisPanel | None = None
+        self._flip_panel: FlipNumberProvider | None = flip_provider
+
         self._panel_iid = -1
         self._last_lamps: dict[str, bool] = {}
         self._values: dict[str, Any] = {}
@@ -253,6 +265,7 @@ class FixtureRuntime(QObject):
         self.stage.controlCreated.connect(self._on_control_created)
         self.stage.widgets.controlDestroyed.connect(
             self._on_control_destroyed)
+
         self.stage.elementClicked.connect(
             lambda e: self._log(f"点击图元：{e.get_name()}", "info"))
         if source is not None:
@@ -267,6 +280,10 @@ class FixtureRuntime(QObject):
         self.geometry = FixtureGeometry.derive(self.stage)
         self._install_controls()
         self._check_text_bindings()
+        # load() 之前外部可能已经 push 过值：补灌一次，避免首屏停在 0。
+        tag = cfg.TAG["total_count"]
+        if tag in self._values and self._flip_panel is not None:
+            self._flip_panel.set_value(self._values[tag], animate=False)
         self.stage.fit()
         return count
 
@@ -348,6 +365,12 @@ class FixtureRuntime(QObject):
         self._apply_texts(values)
         if self._panel is not None:
             self._panel.set_values(values)
+     
+        # 只在本次推送确实带了总计数时才翻页。以前写成
+        # values.get(tag, 0)，任何别的点位推一次值都会把翻牌清成 0。
+        tag = cfg.TAG["total_count"]
+        if tag in values and self._flip_panel is not None:
+            self._flip_panel.set_value(values[tag])
 
     def _apply_lamps(self, values: dict) -> None:
         for short, el_key in self.LAMPS:
@@ -409,11 +432,16 @@ class FixtureRuntime(QObject):
                 continue
             value = values[tag]
             try:
-                text = (f"{float(value):.{digits}f}" if digits
-                        else str(_as_int(value, 0)))
+                if short=="manual_mode":
+                    text = "手动模式" if _as_bool(value) else '自动模式'
+                else:
+                    text = (f"{float(value):.{digits}f}" if digits
+                            else str(_as_int(value, 0)))
             except (TypeError, ValueError):
                 text = str(value)
             self.visuals.paint_text(element, text)
+
+    
 
     def _value_of(self, short: str) -> Any:
         tag = cfg.TAG.get(short)
@@ -466,12 +494,16 @@ class FixtureRuntime(QObject):
                 f"[{time.strftime('%H:%M:%S')}] {text}", level)
         self.message.emit(text, level)
 
+
     # -- 生命周期 -------------------------------------------------------
     def report(self) -> str:
         g = self.geometry
         geo = (f"y∈[{g.y_at_pos:.1f}, {g.y_at_neg:.1f}]" if g else "未推导")
+        flip = self._flip_panel
         return (f"FixtureRuntime({self.stage.report()}, "
                 f"spins={len(self._spins)}, panel={self._panel is not None}, "
+                f"flip={'on' if flip and flip.display else 'off'}"
+                f"(value={getattr(flip, '_latest', '-')}), "
                 f"geo={geo}, "
                 f"source={type(self._source).__name__ if self._source else 'none'})")
 
@@ -482,4 +514,5 @@ class FixtureRuntime(QObject):
             if link is not None:
                 link.close()
         self._panel = None
+        self._flip_panel = None
         self.stage.release()

@@ -66,6 +66,12 @@
   `WidgetHost.reset()` 必须在 `scene.load_page()` 之前；proxy 独立顶层 + `resize` +
   `setTransformOriginPoint(w/2,h/2)` + `pos=mapToScene(0,0)-半尺寸` + `z+0.5`；
   回收 `setWidget(None)`→hide→setParent(None)→deleteLater。
+- **运行态 widget 尺寸口径**：`QSizePolicy.Fixed` 的控件（`setFixedSize`）会把
+  `WidgetHost.align()` 的 `proxy.resize(图元宽高)` 顶回去 → 左上角对齐、右下内缩；
+  改 sizePolicy 无效（proxy 缓存旧 geometry）。必须在 provider `create()` 里读
+  `element.item().boundingRect()` 反推控件尺寸并 `setFixedSize(图元框取整)`，
+  别改框架。参考 `FlipNumberDisplay.fit_to_size()`；门禁 `verify_test_fixture.py`
+  第 12 组遍历全部 widget 对拍 ≤1px。
 - 旧 API 门面：`stage.scene_manager`（rack 口径）/ `stage.pages_manager`（PopPick 只 widget 卡片）。
   **未覆盖**：位图快照缓存、PageDeck 动画精确标脏、snap7 客户端、活跃页订阅、safety 双形态载荷信号代理
   （`set_motion_cache`/`set_exact_repaint` 是明示 no-op 钩子）。

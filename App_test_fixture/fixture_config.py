@@ -37,8 +37,8 @@ TAG = {
     "pos_pos": "axis.pos_pos",
     "home_count": "axis.home_count",
     "home_count_now": "axis.home_count_now",
-    "total_count": "axis.total_count"
-
+    "total_count": "axis.total_count",
+    "manual_mode": "axis.manual_mode"
 }
 
 # ---------------------------------------------------------------- 图元名
@@ -53,6 +53,7 @@ EL = {
     # element_of() 按 name 查，写错会静默返回 None，界面就一直停在 ### 。
     "home_count_now": "home_count_now",     # id 123，context="###"
     "total_count": "total_count",           # id 124，context="#####"
+    "manual_mode": "text_手动模式",                 # checkbox，切换手动/自动
 }
 
 
@@ -64,6 +65,7 @@ EL = {
 TEXT_BINDINGS = (
     ("home_count_now", "home_count_now", 0),
     ("total_count", "total_count", 0),
+    ("manual_mode", "manual_mode", 0)
 )
 
 
@@ -76,6 +78,9 @@ WIDGET = {
     "neg_pos": "negitive_pos",             # spinbox：负向终点（注意 JSON 里拼写）
     "pos_pos": "positive_pos",             # spinbox：正向终点
     "home_count": "home_count",            # spinbox：回零次数
+
+    "flip_total_count":"计数控件"
+
 }
 
 # spinbox 的 widgetText 为空 → 核心默认 range 很窄，这里统一放大
@@ -287,21 +292,20 @@ def _build_register_map() -> dict[str, dict]:
     st, ma = axis_status_key, axis_manual_key
     m: dict[str, dict] = {}
 
-    # 40001 伺服状态字：11 个 BOOL 压在一个字里，bit0..bit10
     for byte, (_, field, _) in enumerate(AXIS_STATUS_FIELDS):
         m[st(field)] = _reg(byte/2+ 112, "byte", byte= byte % 2, note="伺服状态字 40101")
     # 40002 工装光电字：bit0 负极限 / bit1 原点 / bit2 正极限
 
-    m[TAG["neg_limit"]] = _reg(3+ 112, "byte", byte=0, note="工装光电字 40101")
-    m[TAG["home"]]      = _reg(3+ 112, "byte", byte=1, note="工装光电字 40101")
-    m[TAG["pos_limit"]] = _reg(4+ 112, "byte", byte=0, note="工装光电字 40101")
+    m[TAG["neg_limit"]] = _reg(3+ 112, "byte", byte=0, note="工装光电字 40115.0")
+    m[TAG["home"]]      = _reg(3+ 112, "byte", byte=1, note="工装光电字 40115.8")
+    m[TAG["pos_limit"]] = _reg(4+ 112, "byte", byte=0, note="工装光电字 40116.0")
    
 
     # 40003~40032 只读数值（float32 占 2 字）
     m[st("fPositionNow")] = _reg(100, "double64", note="滑块与面板位置同源")
     m[TAG["position"]] = _reg(100, "double64", note="滑块与面板位置同源")
     m[st("fVelocityNow")] = _reg(104, "double64")
-    m[st("iState")] = _reg(108, "double64")
+    m[st("iState")] = _reg(108, "int16")
     m[st("sDriverErrorID")] = _reg(110, "uint16")
 
     # 两个新增 text 图元的数据源（见 TEXT_BINDINGS）：
@@ -310,7 +314,7 @@ def _build_register_map() -> dict[str, dict]:
     # 高字在前，用 MODBUS_REGISTER_OVERRIDES 给这个点位单独设 word_order="big"。
     m[TAG["home_count_now"]] = _reg(201, "int16", note="回零计数")
     m[TAG["total_count"]]    = _reg(202, "uint32", note="总计数")
-
+    m[TAG["manual_mode"]]    = _reg(200,"byte",byte=0,note="手动模式")
 
    
     for offset, short in ((1120, "reduction"), (1108, "speed"),

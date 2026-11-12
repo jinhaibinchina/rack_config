@@ -273,8 +273,60 @@ class StatusLamp(QWidget):
         painter.end()
 
 
+class _ValueLabel(QLabel):
+    """右对齐数值标签：宽度不够时自动缩字号，**绝不从左侧裁字**。
+
+    QLabel 右对齐且分配宽度小于文字宽度时，Qt 直接把超出的左半截裁掉，
+    既没有省略号也不缩小字号。现场出现过 ``1174.74 mm/s`` 被显示成
+    ``174.74 mm/s``（首位 1 被削成一条竖线），``100.00`` 被显示成 ``1.00``。
+    这里在文本变化 / 尺寸变化时按 QFontMetrics 找到能放下全文的最大字号，
+    下限 ``min_px``；字号可升可降，宽度恢复后会自动回到基础字号。
+
+    只改字号、不动 minimumWidth，因此不会顶住 ``proxy.resize`` 把面板
+    压到图元尺寸的硬约束。
+    """
+
+    def __init__(self, px: int, *, min_px: int = 7,
+                 parent: QWidget | None = None) -> None:
+        super().__init__("--", parent)
+        self._base_px = max(int(px), min_px)
+        self._min_px = min_px
+        self._applied_px = self._base_px
+
+    def setText(self, text: str) -> None:  # noqa: N802 - Qt 命名
+        super().setText(text)
+        self._fit()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt 命名
+        super().resizeEvent(event)
+        self._fit()
+
+    def _fit(self) -> None:
+        text = self.text()
+        if not text:
+            return
+        avail = max(1, self.width() - 2)     # 2px 余量，抵消 QSS 字体差异
+        base = self.font()
+        target = self._min_px
+        for px in range(self._base_px, self._min_px - 1, -1):
+            probe = QFont(base)
+            probe.setPixelSize(px)
+            if QFontMetrics(probe).horizontalAdvance(text) <= avail:
+                target = px
+                break
+        if target != self._applied_px:
+            fitted = QFont(base)
+            fitted.setPixelSize(target)
+            self.setFont(fitted)
+            self._applied_px = target
+
+
 class ValueCell(QWidget):
-    """一行「名称 : 值」，无数据显示 ``--``。"""
+    """一行「名称 : 值」，无数据显示 ``--``。
+
+    名称按 ``sizeHint`` 拿刚好的宽度，数值拿剩余空间（不再五五开），
+    再由 :class:`_ValueLabel` 兜底保证任何宽度下都完整显示。
+    """
 
     def __init__(self, label: str, unit: str = "", *, font_px: int = 11,
                  parent: QWidget | None = None) -> None:
@@ -288,12 +340,14 @@ class ValueCell(QWidget):
         self._name = QLabel(label)
         self._name.setObjectName("servoMuted")
         self._name.setMinimumWidth(0)
+        self._name.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         _font(self._name, font_px)
-        layout.addWidget(self._name, 1)
-        self._value = QLabel("--")
+        layout.addWidget(self._name, 0)
+        self._value = _ValueLabel(font_px)
         self._value.setObjectName("servoValue")
         self._value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._value.setMinimumWidth(24)
+        self._value.setMinimumWidth(26)
+        self._value.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         _font(self._value, font_px, mono=True)
         layout.addWidget(self._value, 1)
         self.setToolTip(label)
@@ -442,10 +496,11 @@ class WriteRow(QWidget):
         name.setMinimumWidth(0)
         _font(name, font_px)
         top.addWidget(name, 0)
-        self._current = QLabel("--")
+        self._current = _ValueLabel(font_px)
         self._current.setObjectName("servoValue")
         self._current.setMinimumWidth(52)
         self._current.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._current.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         _font(self._current, font_px, mono=True)
         top.addWidget(self._current, 1)
         outer.addLayout(top)
@@ -469,6 +524,7 @@ class WriteRow(QWidget):
         text = _format(value, self.unit)
         if self._current.text() != text:
             self._current.setText(text)
+        self._current.setToolTip(text)
 
     def current_text(self) -> str:
         return self._current.text()

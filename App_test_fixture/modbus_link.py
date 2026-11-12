@@ -172,13 +172,13 @@ def decode(spec: dict, words: list[int] | tuple[int, ...]) -> Any:
         return bool(w[0] & _byte_bit(spec))
     
     if kind == "uint16":
-        return w[0] * scale
+        return w[0] 
     if kind == "int16":
-        return struct.unpack(">h", struct.pack(">H", w[0]))[0] * scale
+        return struct.unpack(">h", struct.pack(">H", w[0]))[0] 
 
     if kind == "uint32":
         a, b = _ordered_words(w[:2], spec)
-        return ((a << 16) | b) * scale
+        return ((a << 16) | b) 
     
     if kind == "float32":
         a, b = _ordered_words(w[:2], spec)
@@ -210,13 +210,13 @@ def encode(spec: dict, value: Any) -> list[int]:
         return [_byte_bit(spec) if _truthy(value) else 0]
     
     if kind in ("int16", "uint16"):
-        n = int(round(float(value) / scale))
+        n = int(round(float(value)))
         n = (max(-32768, min(32767, n)) if kind == "int16"
              else max(0, min(65535, n)))
         return [n & 0xFFFF]
 
     if kind in ("int32", "uint32"):
-        n = int(round(float(value) / scale))
+        n = int(round(float(value) ))
         n = (max(-2147483648, min(2147483647, n)) if kind == "int32"
              else max(0, min(4294967295, n)))
         words = [(n >> 16) & 0xFFFF, n & 0xFFFF]

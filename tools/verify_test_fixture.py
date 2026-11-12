@@ -5,8 +5,8 @@
 
 红线
 ====
-1. **装载**：图元数按磁盘 JSON 动态取 / 6 widget 图元 / 6 个真实控件
-   （5 QSpinBox + 1 伺服轴面板）；新增 text 图元不会让门禁变红。
+1. **装载**：图元数、widget 图元数、控件数都按磁盘 JSON 动态取；
+   现场增删图元不会让门禁变红。
 2. **取景**：``sceneRect=0`` 时框架回退到内容包围盒，20 个图元全部落在可视区
    （回归 RuntimeView.fit_scene 的二次投影修复）。
 3. **运行态零污染**：装载、光电变色、滑块连续 20 次位移、控件回填之后
@@ -20,6 +20,11 @@
    ``DataSource.write``，危险命令走页面内确认条；换页重建后面板仍可用且不污染设计数据。
 7. **text 图元绑定**：``TEXT_BINDINGS`` 的图元名必须能在 JSON 查到；点位值能刷进
    文字，Modbus 寄存器 → 数据源 → 总线的端到端链路通，且刷新文本零污染。
+8. **翻页计数控件**：``_flip_panel`` 必须是 provider 门面（不是 controlCreated
+   载荷里的 QWidget）；推值能刷到显示、推别的点位不清零、reload 后自动补灌。
+9. **运行态/设计态包围盒对拍**：每个 widget 图元的 proxy 与占位框四边差
+   ≤1px；固定尺寸（``QSizePolicy.Fixed``）控件必须按图元框反推卡片尺寸，
+   否则 ``proxy.resize`` 被拒、右下角会往里缩一圈。
 
 离屏运行，不写任何页面文件。
 """
@@ -40,6 +45,9 @@ from PySide6.QtWidgets import QApplication, QSpinBox  # noqa: E402
 from App_test_fixture import fixture_config as cfg  # noqa: E402
 from App_test_fixture.servo_panel import (  # noqa: E402
     MomentaryButton, ServoAxisPanel,
+)
+from App_test_fixture.flip_number import (  # noqa: E402
+    FlipNumberDisplay, FlipNumberProvider,
 )
 from App_test_fixture.datasource import (  # noqa: E402
     DemoDataSource, ModbusDataSource, NullDataSource, make_source,
@@ -111,8 +119,14 @@ def main() -> int:
     # 现场会往 JSON 里加 text 图元，别把数量写死（之前写 20，加到 22 就变红）。
     expected = len(disk_json()["items"])
     check(f"载入 {expected} 个图元", n == expected, f"n={n}")
-    check("6 个 widget 图元", len(rt.stage.registry.widgets()) == 6)
-    check("6 个真实控件", len(rt.stage.controls()) == 6,
+    # 现场会往 JSON 里加 widget 图元（如「控件_125」），数量别写死。
+    widget_expected = sum(1 for i in disk_json()["items"]
+                          if i.get("type") == "widget")
+    check(f"{widget_expected} 个 widget 图元",
+          len(rt.stage.registry.widgets()) == widget_expected,
+          f"widgets={len(rt.stage.registry.widgets())}")
+    check(f"{widget_expected} 个真实控件",
+          len(rt.stage.controls()) == widget_expected,
           f"controls={len(rt.stage.controls())}")
     check("5 个 QSpinBox", len(rt._spins) == 5,
           f"spins={sorted(rt._spins)}")
@@ -493,7 +507,9 @@ def main() -> int:
     rt.load()
     check("reload 后门面仍可用（按 id 现查）",
           not old_element.is_detached() and old_element.item() is not None)
-    check("reload 后控件数量不变", len(rt.stage.controls()) == 6)
+    check("reload 后控件数量不变",
+          len(rt.stage.controls()) == sum(1 for i in disk_json()["items"]
+                                         if i.get("type") == "widget"))
     clean(rt, "reload 后零污染")
     check("report 含关键状态",
           "spins=5" in rt.report() and "panel=True" in rt.report())
@@ -637,6 +653,89 @@ def main() -> int:
           cfg.TAG["total_count"] in frames[0])
     demo.stop()
     rt2.release()
+
+    print("\n=== 11. 翻页计数控件挂进运行态 ===")
+    # 回归根因：controlCreated 的第二个参数是「造出来的 QWidget」
+    # (FlipNumberDisplay)，不是工厂 (FlipNumberProvider)。旧代码在回调里
+    # 写 isinstance(widget, FlipNumberProvider)，判断恒假 → _flip_panel 永远
+    # 是 None，推值链路整条失效，而控件其实早就挂在场景里了。
+    rt3 = FixtureRuntime(page_path=PAGE, source=NullDataSource())
+    created: list[tuple] = []
+    rt3.stage.controlCreated.connect(
+        lambda iid, w: created.append((int(iid), type(w).__name__)))
+    rt3.load()
+    flip = rt3._flip_panel
+    check("_flip_panel 不是 None 且是 provider",
+          isinstance(flip, FlipNumberProvider), f"{type(flip).__name__}")
+    check("计数控件确实造出 FlipNumberDisplay",
+          isinstance(flip.display, FlipNumberDisplay) and
+          any(name == "FlipNumberDisplay" for _, name in created),
+          f"created={created}")
+    check("controlCreated 不发 provider（根因钉死）",
+          all(name != "FlipNumberProvider" for _, name in created))
+
+    tag_total = cfg.TAG["total_count"]
+    rt3.push(tag_total, 12345)
+    check("总计数点位推值 → 翻牌显示同步",
+          flip.display.value() == 12345, f"value={flip.display.value()}")
+    rt3.push(cfg.TAG["position"], 55.0)
+    check("推别的点位不会把翻牌清成 0",
+          flip.display.value() == 12345, f"value={flip.display.value()}")
+    check("report 带 flip 状态", "flip=on" in rt3.report(), rt3.report())
+    clean(rt3, "翻页联动零污染")
+
+    old_display = flip.display
+    rt3.load()                          # 换页重建控件
+    check("reload 后 display 换成新实例且值由 provider 补灌",
+          flip.display is not None and flip.display is not old_display and
+          flip.display.value() == 12345,
+          f"value={flip.display.value() if flip.display else None}")
+    clean(rt3, "reload 后翻页零污染")
+    rt3.release()
+    check("release 后引用清空", rt3._flip_panel is None)
+
+    print("\n=== 12. widget 图元：运行态 vs 设计态包围盒 ===")
+    # 回归根因：QSizePolicy.Fixed 的控件把 proxy.resize(图元宽高) 顶回去，
+    # 左上角仍对齐、右下角却缩一圈（129 计数控件 350.12x111.89 → 336x92）。
+    # 固定尺寸控件必须按图元框反推自身尺寸，不能让 proxy 迁就 sizeHint。
+    rt4 = FixtureRuntime(page_path=PAGE, source=NullDataSource())
+    rt4.load()
+    worst, bad = 0.0, []
+    for el in rt4.stage.registry.widgets():
+        it, proxy = el.item(), rt4.stage.widgets.proxy_of(el.item_id)
+        if it is None or proxy is None:
+            bad.append(f"{el.get_name()}: 缺 item/proxy")
+            continue
+        a, b = it.sceneBoundingRect(), proxy.sceneBoundingRect()
+        delta = (b.x() - a.x(), b.y() - a.y(),
+                 b.width() - a.width(), b.height() - a.height())
+        worst = max(worst, *(abs(v) for v in delta))
+        if max(abs(v) for v in delta) > 1.0:
+            bad.append(f"{el.get_name()}: {tuple(round(v, 1) for v in delta)}")
+    check(f"全部 widget 图元 proxy 与设计态框一致（{len(rt4.stage.registry.widgets())} 个）",
+          not bad, f"worst={worst:.2f}px, bad={bad}")
+
+    flip_el = next(e for e in rt4.stage.registry.widgets()
+                   if e.get_name() == cfg.WIDGET["flip_total_count"])
+    fw, fh = (flip_el.item().boundingRect().width(),
+              flip_el.item().boundingRect().height())
+    flip_widget = rt4.stage.widget(cfg.WIDGET["flip_total_count"])
+    check("翻牌控件尺寸 = 图元框（整数取整）",
+          flip_widget.size().toTuple() == (round(fw), round(fh)),
+          f"widget={flip_widget.size().toTuple()} frame=({fw:.2f},{fh:.2f})")
+    cards = flip_widget.digits()
+    check("卡片高度铺满框高",
+          all(d.height() == round(fh) for d in cards),
+          str([d.height() for d in cards]))
+    cards_w = sum(d.width() for d in cards) + (len(cards) - 1) * flip_widget._gap
+    check("卡片总宽铺满框宽（留白 < 位数）",
+          0 <= round(fw) - cards_w < len(cards),
+          f"cards={cards_w} frame={round(fw)} gap={flip_widget._gap}")
+    rt4.push(cfg.TAG["total_count"], 8888)
+    check("自适应后推值链路仍通", flip_widget.value() == 8888,
+          f"value={flip_widget.value()}")
+    clean(rt4, "widget 对拍零污染")
+    rt4.release()
 
     print(f"\n失败 {len(FAILURES)} 项" +
           (": " + ", ".join(FAILURES) if FAILURES else ""))
