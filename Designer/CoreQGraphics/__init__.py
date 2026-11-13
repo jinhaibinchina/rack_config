@@ -36,16 +36,20 @@ UI 外壳在子包 ``Designer.CoreQGraphics.ui``：属性面板 / 工具箱 / �
 * 不含 PLC / 料仓状态绑定与运行态站点说明页。
 
 父对象与旋转支点（口径与 Designer.Core 逐项对齐）：
-* 有父对象（``parent_id``）的图元**不能自行平移、但可以自行旋转**：父对象平移 /
-  旋转时，后代图元的中心、支点、角度一起走同一个刚体变换（顶点类图元把旋转
-  烘焙进 ``vertices``）；子图元自己拖不动——拖它会转成拖根父对象，而
+* 有父对象（``parent_id``）的图元在**设计态不能自行平移、但可以自行旋转**；
+  **运行态允许自行平移**（HMI 动画 / 业务脚本调 ``set_page_center`` /
+  ``RuntimeElement.setPos`` 在父图元内部偏移子控件）。父对象平移 / 旋转时，
+  后代图元的中心、支点、角度始终走同一个刚体变换（顶点类图元把旋转烘焙进
+  ``vertices``）；设计态子图元自己拖不动——拖它会转成拖根父对象，而
   ``set_page_angle`` / ``rotate_by`` / 面板「旋转」仍然生效（绕自己的支点转，
-  后代跟着转，父对象与兄弟不动）。
+  后代跟着转，父对象与兄弟不动）。运行态子图元自身平移不带动父对象，之后
+  父对象运动仍会带着它走。
 * **坐标系**：设了父对象后，对外读数与写入口径都是**父坐标系**——原点是父图元
   的可视中心、朝向是父图元的绝对角度。``page_local_center()`` /
   ``page_local_angle()`` / ``page_local_origin()`` 取值，父对象怎么动这组数都不
   变；``set_page_local_angle`` / ``set_page_local_origin`` 按父系写入。属性面板
-  的「布局」页因此显示 ``（父坐标系）``，中心 X/Y 只读（不能自行平移）。
+  的「布局」页因此显示 ``（父坐标系）``，中心 X/Y 只读（设计态不能自行平移；
+  运行态由业务代码放行）。
   存储与 page JSON 仍是场景绝对坐标（``page_center`` / ``page_angle``），以便
   存量页面零改动、与旧引擎逐项对拍；两套口径靠 ``local_to_world`` /
   ``world_to_local`` 互换。
@@ -98,6 +102,14 @@ UI 外壳在子包 ``Designer.CoreQGraphics.ui``：属性面板 / 工具箱 / �
   这里刻意修掉旧 Core 三处历史缺陷：非组顶层不再丢弃用户自定义名、连续粘贴
   不再产生 ``原名_2_2_2``（剪贴板始终是原始快照）、默认命名包含 ``path``
   分支。
+* **名字唯一**：改名只走 ``BaseItem.set_name`` → ``GraphicsScene.rename_item``，
+  由 ``rename_problem()`` 判定（空名 / 与别的图元撞名——去空白后全等、区分
+  大小写）；被拒时**一个字段都不写**、不产生撤销点，属性面板把输入框回滚到
+  真名并用气泡提示，F2 / 右键重命名弹 ``QMessageBox`` 后留在对话框里让人改。
+  组的改名校验在写之前做完：重名时组名与成员前缀**都不动**，不留「组叫 A、
+  成员还挂着 B_ 前缀」的半成品。存量 page 若是历史重名数据，加载**不**报错、
+  也**不**自动改名（只有显式改名才校验），保证 1618 图元对拍与 round-trip
+  零改动。
 * **拖角手柄**：旧 Core 其实**没有**这个交互（改尺寸只有属性面板 →
   ``change_size``），这里按 ``change_size`` 的锚点 / 递归语义新做。设计模式下
   单选图元在四角画蓝色小方块（``GraphicsView._draw_resize_handles``），按下
@@ -109,6 +121,15 @@ UI 外壳在子包 ``Designer.CoreQGraphics.ui``：属性面板 / 工具箱 / �
   场景级 ``_resizing_group`` 挡住 ``apply_scale_about`` 回到
   ``GroupItem.set_page_size`` 时的二次委托。四角屏幕跨度小于 28px 时不画也不
   命中，避免小图元的手柄挤在中心抢走选中按下；运行模式不显示。
+
+框选（橡皮筋）性能：Qt 的 ``RubberBandDrag`` 把 band 画在视口画布上，每移动
+一格都会重画整个视口，所以每帧成本就是「一帧全画」。两条与它无关的额外开销
+已经削掉：选中变化只走 ``_refresh_selection_dirty()`` 用 ``updateScene()``
+标脏「标记区域」，不再整屏 ``update()``；框选中（``is_band_selecting()``）
+主窗口只记 ``_selection_pending``，松手由 ``selectionSettled`` 一次性重建属性
+面板 / 同步图层树。另把 ``TextItem.paint`` 里「先 boundingRect 再 drawText」
+的双次排版改成一次 ``drawText(..., Qt.TextDontClip)``（逐像素一致）。page_1
+实测整屏框选 193 → 99 ms、中等区域 63 → 20 ms。
 
 删除语义（对照 ``Core/element.py:base_element.Delete``）：
 * 删除组（或任何拥有成员的图元）时**递归删除全部后代**，嵌套组逐层展开。
@@ -124,14 +145,28 @@ UI 外壳在子包 ``Designer.CoreQGraphics.ui``：属性面板 / 工具箱 / �
   真值。新场景反过来：``style.font_size`` 由属性面板直接给定（「文本内容」
   页的「字体大小」与「外观」页的「字号」两处同步），边框 / 背景只是文字的
   容器，随文字重新计算。
-* ``g_style.text_metrics(text, font_size)`` 用与 ``TextItem.paint`` 同一份
-  ``font_for("Arial", size, True)`` 的 ``QFontMetricsF`` 量出视图像素尺寸；
-  多行按 ``lineSpacing*(n-1) + height`` 累加（直接 ``height*n`` 会少算
+* ``g_style.text_metrics(text, font_size, font_family)`` 用与
+  ``TextItem.paint`` 同一份 ``font_for(font_family, size, True)`` 的
+  ``QFontMetricsF`` 量出视图像素尺寸；多行按
+  ``lineSpacing*(n-1) + height`` 累加（直接 ``height*n`` 会少算
   leading 把字裁掉）。量完外扩 ``TEXT_PAD_X/Y``，再用
   ``SceneProjection.inverse_size`` 反算 page 宽高——AGV 投影交换了轴，
   **view 宽对应 page 的 height、view 高对应 page 的 width**。
-* 触发点只有两个显式编辑：``style.font_size`` 真变了（``_sync_field`` 比较
-  新旧值，改颜色 / 线宽不会撑大边框）或 ``context`` 变了；
+* 字体族存 ``style.font_family``（属性面板「文本内容」页与「外观」页各有一个
+  「字体」下拉，跨页同步）。**缺字段时取 ``Arial``**——旧 Core 的
+  ``text_element`` 恒用 Arial，所以存量 page 不用补键就有相同观感，JSON
+  round-trip 与 1618 图元逐像素对拍都不受影响；只有用户真的换了字体才写键。
+  字体名同样在 ``QFont`` 缓存键里，不会互相串。
+* 字体下拉的候选族来自 ``g_style.available_font_families()``，会**剔除 GDI
+  位图字体**（``Terminal`` / ``Fixedsys`` / ``System`` / ``Modern`` /
+  ``Roman`` / ``Script`` / ``Small Fonts`` / ``Courier`` / ``MS Serif`` /
+  ``MS Sans Serif``）：DirectWrite 没有它们的字体文件，给它们设
+  ``Qt.FontRole`` 预览会刷 ``CreateFontFaceFromHDC() failed`` 告警，而且位图
+  字体不支持缩放。存量 page 若真存了这类族名，仍会插到下拉最前保持所见即真值，
+  只是不给预览字体。判定用 ``QFontDatabase.isSmoothlyScalable``（整表带缓存）。
+* 触发点只有三个显式编辑：``style.font_size`` / ``style.font_family`` 真变了
+  （``_sync_field`` 比较新旧值，改颜色 / 线宽不会撑大边框）或 ``context``
+  变了；
   ``BaseItem._on_text_changed`` 是空 hook，``TextItem`` 覆写后调
   ``set_page_size``，中心与支点都不动。**加载 / 撤销重建绝不重算**，否则
   page_1 的 1618 图元对拍和 JSON round-trip 零改动会立刻失效。
@@ -151,17 +186,19 @@ UI 外壳在子包 ``Designer.CoreQGraphics.ui``：属性面板 / 工具箱 / �
 * 属性面板 ``refresh_geometry`` 会把反算后的字号回显到「文本内容」/「外观」
   两处输入；布局页对文本图元给出对应 hint。旧 Core 的「宽度→字号→派生高度」
   口径没有照搬，两处设计器互相打开时字号仍不完全等价。
-
 widget 控件变体（对照 ``Core/elements.py:widget_element``）：
 * 旧实现把变体做成 ``widgetType`` 一个字符串 → 7 个 Qt 类的一层分发：
   ``textedit`` / ``lineedit`` / ``checkbox`` / ``combobox`` / ``pushbutton`` /
   ``label`` / ``spinbox``，未知值退化 ``textedit``。CoreQGraphics 在原 7 项后
   追加 ``progressbar`` / ``slider``，工具箱与属性面板由同一张标签表派生；
-  旧 Core 读到这两个未知值仍安全退化成 ``QTextEdit``。序列化仍只有 5 个
+  旧 Core 读到这两个未知值仍安全退化成 ``QTextEdit``。序列化是 6 个
   **顶层**字段（不在 ``style``、不复用 ``context``）：
-  ``widgetType`` / ``widgetText`` / ``widgetFontSize`` / ``widgetColor`` /
-  ``widgetBackground``，默认值 ``textedit`` / ``""`` / ``12`` / ``#000000`` /
-  ``#ffffff``。``width`` / ``height`` / ``rotate`` / ``style`` / ``zValue``
+  ``widgetType`` / ``widgetText`` / ``widgetFontSize`` / ``widgetFontFamily`` /
+  ``widgetColor`` / ``widgetBackground``，默认值 ``textedit`` / ``""`` / ``12`` /
+  ``""`` / ``#000000`` / ``#ffffff``。**前 5 个与旧 Core 逐字一致**；
+  ``widgetFontFamily`` 是本场景扩展的**可选键**，空串表示「跟随应用默认字体」
+  （即旧行为），旧 Core 的 ``from_dict`` 只读已知键会忽略它，不会加载失败。
+  ``width`` / ``height`` / ``rotate`` / ``style`` / ``zValue``
   与矩形图元完全同构。
 * ``widgetText`` 按变体解释：combobox 每行一个选项（空 → ``["选项 1"]``）；
   spinbox 每行 ``min=`` / ``max=`` / ``value=``（缺省 Qt 0 / 99、value 取 min，
@@ -170,7 +207,8 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
   ``orientation=horizontal|vertical``（缺省 0 / 100 / 中值 / 横向，也接受
   ``h`` / ``v`` 与中英文方向名）。checkbox / pushbutton / label 空文本显示
   「选项 / 按钮 / 标签」；lineedit 直接 ``setText``；textedit 只读多行。
-  样式统一 ``color / background-color / font-size: Npt``，颜色非法回退黑 / 白；
+  样式统一 ``color / background-color / font-size: Npt``（``widgetFontFamily``
+  非空时再补 ``font-family: "族名"``），颜色非法回退黑 / 白；
   新增变体额外补 ``QProgressBar::chunk`` 与 ``QSlider`` groove/handle QSS。
 * 旧 Core 的 ``paint`` 完全不区分变体（矩形 + "Widget" 字样），不同外观来自
   ``EmbeddedWidgetLayer`` 挂载的真实 QWidget。重写版是平铺 QGraphicsItem，
@@ -190,9 +228,10 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
   ``align_widget_proxies()`` 只重排、不重建。
 * 工具箱用 ``widget:<key>`` 伪类型（9 个变体按钮 + 1 个通用），``create_item``
   在入口解析别名：真正的 ``type`` 仍写 ``widget``，变体只落 ``widgetType``。
-  属性面板「控件」页可切变体、编辑文本 / 字号 / 文字色 / 背景色；注意 widget
-  的字号是顶层 ``widgetFontSize``，不是 ``style.font_size``。
-  缺 5 字段的老页面只在读取侧按默认值兜底，**绝不回写**。
+  属性面板「控件」页可切变体、编辑文本 / 字体 / 字号 / 文字色 / 背景色；
+  注意 widget 的字号与字体族是顶层 ``widgetFontSize`` / ``widgetFontFamily``，
+  不是 ``style.font_size`` / ``style.font_family``。
+  缺 widget 字段的老页面只在读取侧按默认值兜底，**绝不回写**。
 
 背景网格与鼠标吸附（对照 ``Core/myGraphicsScene.draw_grid`` 与
 ``Core/mySnapSystem``）：
@@ -287,7 +326,7 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
 * 平移走与双击跟手同一条 ``moveBy`` 增量链路：``itemChange`` →
   ``on_item_moved`` 负责标脏、支点随行、后代刚体随动。目标先过
   ``top_level_items`` 去掉「父子同时选中」，再把仍带父对象的项上溯到根
-  （子图元被 ``translate_locked`` 禁止自行平移），因此画布选中的组整体移动、
+  （子图元在设计态被 ``translate_locked`` 禁止自行平移），因此画布选中的组整体移动、
   图层树单选某个成员时也是整组移动。
 * 连续移动期间**不**重建吸附点（page_1 约 1.4 万点，每帧重建会掉帧），
   ``_finish_nudge()`` 在最后一个键松开 / ``focusOutEvent`` 时统一刷新吸附点、
@@ -325,7 +364,7 @@ widget 控件变体（对照 ``Core/elements.py:widget_element``）：
 
 双击跟手（双击图元 → 图元钉在光标上；鼠标移动图元的唯一入口）：
 * ``GraphicsView.mouseDoubleClickEvent`` 命中可选图元即进入 ``_follow_items``
-  状态；命中子图元时抓的是它的**根父对象**（与「有父对象不能自行平移」一致）。
+  状态；命中子图元时抓的是它的**根父对象**（与「设计态有父对象不能自行平移」一致）。
   运行态、绘制工具激活、平移中都不启用。
 * 位移按**光标增量**施加（``_update_follow``），不是「绝对定位到光标」：这样
   按 T 吸出来的偏移不会被下一帧抹掉。``_warp_cursor_to_snap`` 把系统光标挪到

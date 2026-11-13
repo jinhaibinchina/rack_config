@@ -161,6 +161,7 @@ class GraphicsScene(QGraphicsScene):
     geometryChanged = Signal(object)
     drawFinished = Signal(object)        # 一次手动绘制完成，携带新图元
     drawCancelled = Signal()             # 取消进行中的绘制
+    sceneModeChanged = Signal(bool)      #true--run mode
 
     def __init__(self, projection: SceneProjection | None = None, parent=None) -> None:
         super().__init__(parent)
@@ -604,6 +605,9 @@ class GraphicsScene(QGraphicsScene):
 
     def set_scene_mode(self, run: bool) -> None:
         self.is_run_mode = bool(run)
+        # 必须是自己的信号：``sceneRectChanged`` 是 Qt 内置信号、载荷是
+        # QRectF，拿 bool 去 emit 会直接抛 TypeError（且把 sceneRect 语义搞乱）。
+        self.sceneModeChanged.emit(self.is_run_mode)
         self._widget_layer_on = bool(run)
         self.clearSelection()
         for it in self.all_items():
@@ -807,8 +811,10 @@ class GraphicsScene(QGraphicsScene):
             record["checked"] = False
             record["toggleEnabled"] = True
         elif type_key == "widget":
-            # 5 个顶层字段与默认值逐字对齐旧 Core widget_element.to_dict，
-            # 老页面缺字段时也只在读取侧兜底、绝不回写。
+            # 顶层字段与默认值逐字对齐旧 Core widget_element.to_dict（其中
+            # widgetFontFamily 是新场景扩展的可选键，空串 = 跟随应用默认字体，
+            # 旧 Core 读到不认识会忽略），老页面缺字段时也只在读取侧兜底、
+            # 绝不回写。
             record.update(dict(WIDGET_DEFAULTS))
             if variant:
                 record["widgetType"] = variant
@@ -1064,6 +1070,59 @@ class GraphicsScene(QGraphicsScene):
     def names_in_use(self) -> set[str]:
         return {it.get_name() for it in self.all_items()}
 
+    def name_conflict(self, name: str, exclude_id: int = 0):
+        """名字被谁占了：返回占用者，没有冲突返回 ``None``。
+
+        ``exclude_id`` 传自己的 id（改名时不能和自己比）。名字按**去空白后的
+        全等**比较（``Terminal `` 与 ``Terminal`` 视为同名），区分大小写——
+        与旧 Core 一致，也是图层树 / ``find_item_by_name`` 的查找口径。
+        """
+        target = str(name or "").strip()
+        if not target:
+            return None
+        for it in self.all_items():
+            if exclude_id and it.item_id == int(exclude_id):
+                continue
+            if str(it.get_name() or "").strip() == target:
+                return it
+        return None
+
+    def rename_problem(self, name: str, exclude_id: int = 0) -> str:
+        """改名会被拒的原因；空串表示可以改。
+
+        名字是**整页唯一**的：图层树、``find_item_by_name``、运行态按名字绑定
+        都靠它，重名会让这些地方指到错误的图元，所以设计器一律拒绝重名。文案
+        只在这里拼，属性面板与 F2 / 右键重命名共用同一句话。
+        """
+        target = str(name or "").strip()
+        if not target:
+            return "名称不能为空"
+        owner = self.name_conflict(target, exclude_id)
+        if owner is not None:
+            return (f"已存在同名图元「{target}」（ID {owner.item_id}），"
+                    "名称不能重复")
+        return ""
+
+    def rename_item(self, item, name: str) -> tuple[bool, str]:
+        """改名（组会连同成员的名字前缀一起换），失败返回 ``(False, 原因)``。
+
+        拒绝时**一个字段都不写**：调用方（属性面板 / 重命名对话框）据此回滚
+        输入框并提示，也不该产生撤销快照。
+        """
+        if item is None:
+            return False, "图元不存在"
+        problem = self.rename_problem(name, item.item_id)
+        if problem:
+            return False, problem
+        target = str(name or "").strip()
+        if target == str(item.get_name() or "").strip():
+            return True, ""
+        if item.TYPE == "group":
+            self.rename_group(item, target)
+        else:
+            item.set_page_field("name", target)
+        return True, ""
+
     def default_name(self, type_key: str, iid: int, used: set[str]) -> str:
         """``类型_序号`` 命名（旧 Core createItem / next_default_name 口径）。"""
         return self._free_from(
@@ -1095,12 +1154,20 @@ class GraphicsScene(QGraphicsScene):
                 it.set_page_field(
                     "name", self.default_name(it.TYPE, it.item_id, used))
 
-    def rename_group(self, group, new_name: str) -> None:
-        """改组名并把成员前缀一起换掉（旧 Core ``group_element.set_name``）。"""
+    def rename_group(self, group, new_name: str) -> bool:
+        """改组名并把成员前缀一起换掉（旧 Core ``group_element.set_name``）。
+
+        重名 / 空名直接返回 ``False`` 且**不改任何名字**：组名与成员前缀要么
+        一起换、要么都不动，否则会出现「组叫 A、成员还挂着 B_ 前缀」的半成品。
+        正常链路先经 :meth:`rename_problem` 判过，这里再兜一次底（该方法也是
+        公开 API，别的地方可能直接调）。
+        """
         old = str(group.get_name() or "")
         new = str(new_name or "").strip()
         if not new or new == old:
-            return
+            return False
+        if self.name_conflict(new, group.item_id) is not None:
+            return False
         used = self.names_in_use()
         used.discard(old)
         used.add(new)
@@ -1109,6 +1176,7 @@ class GraphicsScene(QGraphicsScene):
             self.replace_name_prefix(
                 [it.item_id for it in self.index.descendants(group.item_id)],
                 f"{old}_", f"{new}_", used)
+        return True
 
     # ------------------------------------------------------------------
     # 组尺寸：递归改变组内成员（对照旧 Core rect_element.change_size）

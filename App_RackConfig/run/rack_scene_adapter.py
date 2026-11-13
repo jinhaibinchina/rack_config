@@ -485,8 +485,9 @@ class RackSceneView(GraphicsView):
       比控件小 2px，缩放到不了旧版那个值；
     * 手算 ``scale()`` 而不是 ``fitInView`` —— 后者内部取整，同一面板会比旧版
       小半个百分点；
-    * 设计网格必须显式关（``drawBackground`` 只看 ``show_grid`` /
-      ``snap.grid_enabled``，不看 ``is_run_mode``）。
+    * 设计网格显式关（``drawBackground`` 已经不看运行态就跑，``is_run_mode``
+      与 ``show_grid`` / ``snap.grid_enabled`` 任一个拦住即可；这里仍然显式关，
+      是因为取景 / 截图回归不依赖场景模式是否被置上）。
     """
 
     double_clicked_without_group = Signal()

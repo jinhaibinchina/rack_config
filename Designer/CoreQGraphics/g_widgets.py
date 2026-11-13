@@ -2,9 +2,16 @@
 
 对照 ``Designer/Core/elements.py::widget_element``（约 1257-2063 行）：
 旧实现把「变体」做成 ``widgetType`` 一个字符串 → 7 个 Qt 类的一层分发，
-本模块追加 ``progressbar`` / ``slider`` 两种变体，仍只写那 5 个**顶层**字段：
+本模块追加 ``progressbar`` / ``slider`` 两种变体，顶层字段是这 6 个：
 
-    widgetType / widgetText / widgetFontSize / widgetColor / widgetBackground
+    widgetType / widgetText / widgetFontSize / widgetFontFamily /
+    widgetColor / widgetBackground
+
+``widgetFontFamily`` 是本次新增的**可选**字段（缺省空串 = 跟随应用默认字体）：
+旧 Core 的 ``to_dict`` / ``from_dict`` 只认自己那 5 个键，多出来的键它读时忽略、
+保存时才可能丢掉，因此老设计器打开新页面不会报错；缺字段的老页面也绝不补写，
+保证 JSON round-trip 零改动。字体族没有别的字段能承载（``widgetText`` 是内容 /
+选项 / 数值范围，combobox 还按行拆选项），所以只能加一个顶层键。
 
 旧 Core 的 ``paint`` 完全不区分变体（只画矩形 + "Widget"），不同外观来自
 ``EmbeddedWidgetLayer`` 挂载的真实 QWidget。重写版是平铺 QGraphicsItem，
@@ -47,6 +54,8 @@ WIDGET_DEFAULTS: dict[str, object] = {
     "widgetType": "textedit",
     "widgetText": "",
     "widgetFontSize": 12,
+    # 空串 = 跟随应用默认字体（旧 Core 与本模块原有行为），存量页面不用补键
+    "widgetFontFamily": "",
     "widgetColor": "#000000",
     "widgetBackground": "#ffffff",
 }
@@ -88,6 +97,23 @@ def widget_variant(record: dict) -> str:
 
 def widget_text(record: dict) -> str:
     return str(widget_field(record, "widgetText") or "")
+
+
+def widget_font_family(record: dict) -> str:
+    """控件字体族；空串表示「跟随应用默认字体」，调用方不要替换成具体字体。"""
+    return str(widget_field(record, "widgetFontFamily") or "").strip()
+
+
+def _css_font_family(record: dict) -> str:
+    """把字体族拼成 ``font-family: "xxx";``；空串时不输出这一项。
+
+    字体名里带引号或分号的极端情况按 CSS 转义，避免把整段样式表打断。
+    """
+    family = widget_font_family(record)
+    if not family:
+        return ""
+    safe = family.replace("\\", "\\\\").replace('"', '\\"')
+    return f'font-family: "{safe}";'
 
 
 def widget_options(text: str) -> list[str]:
@@ -200,6 +226,7 @@ def widget_style_sheet(record: dict) -> str:
         f"color: {fg};"
         f"background-color: {bg};"
         f"font-size: {max(1, fs)}pt;"
+        f"{_css_font_family(record)}"
     )
     variant = widget_variant(record)
     if variant == "progressbar":
@@ -299,12 +326,17 @@ def _widget_font(record: dict) -> QFont:
     42%，两态会差近一倍（实测 12pt 被压到 6.2pt），用户就会看到
     「运行态字体被放大」。字太大属于图元尺寸与字号不匹配，应由用户在
     属性面板调小字号 / 加大控件，设计态如实预览（超框和真实控件一样裁切）。
+
+    字体族同理：``widgetFontFamily`` 为空时用应用默认字体（与运行态真实控件
+    继承到的一致），非空时与 ``widget_style_sheet`` 的 ``font-family`` 同族，
+    保证设计态占位文字和运行态控件「同族同字号」。
     """
     try:
         fs = float(widget_field(record, "widgetFontSize"))
     except (TypeError, ValueError):
         fs = 12.0
-    font = QFont()          # 应用默认字体，与运行态真实控件继承的字体同族
+    family = widget_font_family(record)
+    font = QFont(family) if family else QFont()   # 空 = 应用默认字体
     font.setPointSizeF(max(4.0, fs))
     return font
 
@@ -324,7 +356,7 @@ def paint_variant(painter: QPainter, r: QRectF, record: dict) -> None:
     """在 ``_local_rect``（view 坐标、中心在原点）里画变体化占位外观。
 
     只画不改几何，``boundingRect`` / ``page_bounding_rect`` 完全不变，因此对拍
-    与 JSON round-trip 不受影响。颜色、字号取自 5 个顶层字段。
+    与 JSON round-trip 不受影响。颜色 / 字号 / 字体族取自 6 个顶层字段。
     """
     if r.width() < 8.0 or r.height() < 8.0:
         return

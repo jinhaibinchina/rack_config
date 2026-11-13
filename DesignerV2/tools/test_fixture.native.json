@@ -1,0 +1,923 @@
+{
+    "sceneRect": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 0.0,
+        "height": 0.0
+    },
+    "backgroundColor": "#ffd9e9f6",
+    "items": [
+        {
+            "id": 4,
+            "name": "工装_矩形_4",
+            "type": "rect",
+            "parent_id": 122,
+            "children_ids": [],
+            "group_id": 122,
+            "center_pos": {
+                "x": -2211.808,
+                "y": -4110.578
+            },
+            "origin_pos": {
+                "x": -2211.808,
+                "y": -4110.578
+            },
+            "width": 821.5999559070792,
+            "height": 14.870966248130856,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 1.0
+        },
+        {
+            "id": 92,
+            "name": "滑块_group_96_多边形_92",
+            "type": "polygon",
+            "parent_id": 109,
+            "children_ids": [],
+            "group_id": 109,
+            "center_pos": {
+                "x": -2338.725,
+                "y": -4116.7505
+            },
+            "origin_pos": {
+                "x": -2338.725,
+                "y": -4116.7505
+            },
+            "width": 88.42699999999968,
+            "height": 11.144499999999425,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#aaaaff",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 87.0,
+            "vertices": [
+                {
+                    "x": -2382.915,
+                    "y": -4121.962
+                },
+                {
+                    "x": -2346.722,
+                    "y": -4111.53675
+                },
+                {
+                    "x": -2294.51225,
+                    "y": -4111.17625
+                },
+                {
+                    "x": -2332.10475,
+                    "y": -4122.32075
+                },
+                {
+                    "x": -2382.93925,
+                    "y": -4122.02475
+                }
+            ]
+        },
+        {
+            "id": 94,
+            "name": "滑块_group_96_矩形_94",
+            "type": "rect",
+            "parent_id": 109,
+            "children_ids": [],
+            "group_id": 109,
+            "center_pos": {
+                "x": -2320.53025,
+                "y": -4105.765
+            },
+            "origin_pos": {
+                "x": -2320.53025,
+                "y": -4105.765
+            },
+            "width": 52.43696384908213,
+            "height": 11.120411121620934,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#aaaaff",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 88.0
+        },
+        {
+            "id": 95,
+            "name": "滑块_group_96_多边形_95",
+            "type": "polygon",
+            "parent_id": 109,
+            "children_ids": [],
+            "group_id": 109,
+            "center_pos": {
+                "x": -2364.89675,
+                "y": -4111.11475
+            },
+            "origin_pos": {
+                "x": -2364.89675,
+                "y": -4111.11475
+            },
+            "width": 35.89825000000019,
+            "height": 21.74725000000035,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 89.0,
+            "vertices": [
+                {
+                    "x": -2370.085,
+                    "y": -4105.53925
+                },
+                {
+                    "x": -2346.9465,
+                    "y": -4100.23975
+                },
+                {
+                    "x": -2346.9465,
+                    "y": -4111.58475
+                },
+                {
+                    "x": -2382.84475,
+                    "y": -4121.987
+                },
+                {
+                    "x": -2382.84475,
+                    "y": -4117.38975
+                },
+                {
+                    "x": -2371.77025,
+                    "y": -4117.31375
+                },
+                {
+                    "x": -2368.07975,
+                    "y": -4115.85775
+                },
+                {
+                    "x": -2366.15575,
+                    "y": -4113.6375
+                },
+                {
+                    "x": -2366.01225,
+                    "y": -4110.65
+                },
+                {
+                    "x": -2366.746,
+                    "y": -4108.12175
+                },
+                {
+                    "x": -2368.37575,
+                    "y": -4106.359
+                },
+                {
+                    "x": -2369.552,
+                    "y": -4105.4395
+                }
+            ]
+        },
+        {
+            "id": 98,
+            "name": "电机监控窗口",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2391.42375,
+                "y": -4332.5995
+            },
+            "origin_pos": {
+                "x": -2391.42375,
+                "y": -4332.5995
+            },
+            "width": 468.20249626601907,
+            "height": 345.2820768923432,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 91.0,
+            "widgetType": "textedit",
+            "widgetText": "",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 101,
+            "name": "reduction",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1953.9395,
+                "y": -4455.9635
+            },
+            "origin_pos": {
+                "x": -1953.9395,
+                "y": -4455.9635
+            },
+            "width": 109.50714919573609,
+            "height": 28.41250426490933,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 93.0,
+            "widgetType": "spinbox",
+            "widgetText": "",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 102,
+            "name": "speed",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1953.6435,
+                "y": -4423.1795
+            },
+            "origin_pos": {
+                "x": -1953.6435,
+                "y": -4423.1795
+            },
+            "width": 110.0991647352635,
+            "height": 27.966358938922895,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 94.0,
+            "widgetType": "spinbox",
+            "widgetText": "",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 103,
+            "name": "negitive_pos",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1953.9395,
+                "y": -4390.69175
+            },
+            "origin_pos": {
+                "x": -1953.9395,
+                "y": -4390.69175
+            },
+            "width": 109.50714919573605,
+            "height": 26.928448073407708,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 95.0,
+            "widgetType": "spinbox",
+            "widgetText": "",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 104,
+            "name": "positive_pos",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1953.6435,
+                "y": -4357.02
+            },
+            "origin_pos": {
+                "x": -1953.6435,
+                "y": -4357.02
+            },
+            "width": 110.09916473526343,
+            "height": 28.258599366004095,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 96.0,
+            "widgetType": "spinbox",
+            "widgetText": "",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 105,
+            "name": "home_count",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1953.0805,
+                "y": -4324.08975
+            },
+            "origin_pos": {
+                "x": -1953.0805,
+                "y": -4324.08975
+            },
+            "width": 111.34162055196063,
+            "height": 25.703552202386323,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 97.0,
+            "widgetType": "spinbox",
+            "widgetText": "",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 107,
+            "name": "每转位移量",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2084.35675,
+                "y": -4456.4465
+            },
+            "origin_pos": {
+                "x": -2084.35675,
+                "y": -4456.4465
+            },
+            "width": 137.54551690015973,
+            "height": 24.39376288694713,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 252,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 98.0,
+            "context": "电机每转位移量mm",
+            "visible": true
+        },
+        {
+            "id": 109,
+            "name": "滑块",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                94,
+                95,
+                92
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2338.6255,
+                "y": -4111.26275
+            },
+            "origin_pos": {
+                "x": -2338.6255,
+                "y": -4111.26275
+            },
+            "width": 88.62758936219598,
+            "height": 22.115905126397593,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 90.0
+        },
+        {
+            "id": 112,
+            "name": "文本_112",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2098.65825,
+                "y": -4423.72525
+            },
+            "origin_pos": {
+                "x": -2098.65825,
+                "y": -4423.72525
+            },
+            "width": 102.921875,
+            "height": 22.515625,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 99.0,
+            "context": "电机转速mm/s"
+        },
+        {
+            "id": 115,
+            "name": "文本_115",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2101.70675,
+                "y": -4391.42025
+            },
+            "origin_pos": {
+                "x": -2107.8005,
+                "y": -4391.42025
+            },
+            "width": 82.25,
+            "height": 22.515625,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 100.0,
+            "context": "负向终点："
+        },
+        {
+            "id": 116,
+            "name": "文本_116",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2102.2135,
+                "y": -4356.8555
+            },
+            "origin_pos": {
+                "x": -2113.18225,
+                "y": -4360.51175
+            },
+            "width": 69.0,
+            "height": 22.515625,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 101.0,
+            "context": "正向终点"
+        },
+        {
+            "id": 117,
+            "name": "文本_117",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2091.201,
+                "y": -4323.50225
+            },
+            "origin_pos": {
+                "x": -2091.201,
+                "y": -4323.50225
+            },
+            "width": 108.75,
+            "height": 22.515625,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 102.0,
+            "context": "回来多少次回零"
+        },
+        {
+            "id": 118,
+            "name": "工装_负极限光电",
+            "type": "rect",
+            "parent_id": 122,
+            "children_ids": [],
+            "group_id": 122,
+            "center_pos": {
+                "x": -2612.777,
+                "y": -4080.89
+            },
+            "origin_pos": {
+                "x": -2612.777,
+                "y": -4080.89
+            },
+            "width": 21.7750836286318,
+            "height": 21.503881369057027,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": true,
+                "fill_color": "#00aa00",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 103.0
+        },
+        {
+            "id": 119,
+            "name": "工装_原点光电",
+            "type": "rect",
+            "parent_id": 122,
+            "children_ids": [],
+            "group_id": 122,
+            "center_pos": {
+                "x": -2478.533,
+                "y": -4083.1915
+            },
+            "origin_pos": {
+                "x": -2478.533,
+                "y": -4083.1915
+            },
+            "width": 21.7750836286318,
+            "height": 21.503881369057027,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": true,
+                "fill_color": "#00aa00",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 104.0
+        },
+        {
+            "id": 120,
+            "name": "工装_正极限光电",
+            "type": "rect",
+            "parent_id": 122,
+            "children_ids": [],
+            "group_id": 122,
+            "center_pos": {
+                "x": -1812.03025,
+                "y": -4082.94625
+            },
+            "origin_pos": {
+                "x": -1812.03025,
+                "y": -4082.94625
+            },
+            "width": 21.7750836286318,
+            "height": 21.503881369057027,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": true,
+                "fill_color": "#00aa00",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 105.0
+        },
+        {
+            "id": 122,
+            "name": "工装",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                120,
+                118,
+                119,
+                4
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2212.336,
+                "y": -4094.0755
+            },
+            "origin_pos": {
+                "x": -2212.336,
+                "y": -4094.0755
+            },
+            "width": 822.6562451606734,
+            "height": 47.875492707544716,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 106.0
+        },
+        {
+            "id": 123,
+            "name": "home_count_now",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1871.0895,
+                "y": -4323.84225
+            },
+            "origin_pos": {
+                "x": -1860.0255,
+                "y": -4319.25625
+            },
+            "width": 37.65625,
+            "height": 22.515625,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 107.0,
+            "context": "###"
+        },
+        {
+            "id": 124,
+            "name": "total_count",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1928.6785,
+                "y": -4099.014
+            },
+            "origin_pos": {
+                "x": -1935.349,
+                "y": -4086.2645
+            },
+            "width": 296.3322621204079,
+            "height": 115.34516463418096,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 1,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 55.5,
+                "font_size": 72
+            },
+            "zValue": 108.0,
+            "context": "#####",
+            "visible": false
+        },
+        {
+            "id": 125,
+            "name": "控件_125",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2212.236,
+                "y": -4553.8065
+            },
+            "origin_pos": {
+                "x": -2212.236,
+                "y": -4553.8065
+            },
+            "width": 829.1594602894144,
+            "height": 64.48745360422444,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 109.0,
+            "widgetType": "label",
+            "widgetText": "工作测试上位机",
+            "widgetFontSize": 33,
+            "widgetColor": "#aa557f",
+            "widgetBackground": "#aaffff"
+        },
+        {
+            "id": 126,
+            "name": "矩形_126",
+            "type": "rect",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1971.60725,
+                "y": -4392.73325
+            },
+            "origin_pos": {
+                "x": -1971.60725,
+                "y": -4392.73325
+            },
+            "width": 347.90150770314193,
+            "height": 222.52823398246792,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 0.0
+        },
+        {
+            "id": 127,
+            "name": "矩形_127",
+            "type": "rect",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2222.58525,
+                "y": -4332.27425
+            },
+            "origin_pos": {
+                "x": -2220.72925,
+                "y": -4332.27425
+            },
+            "width": 901.825356406627,
+            "height": 608.5937988020178,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 50.0,
+                "font_size": 10
+            },
+            "zValue": -1.0
+        },
+        {
+            "id": 128,
+            "name": "text_手动模式",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1867.12525,
+                "y": -4554.469
+            },
+            "origin_pos": {
+                "x": -1867.12525,
+                "y": -4554.469
+            },
+            "width": 109.40625,
+            "height": 39.265625,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": true,
+                "fill_color": "#aaaaff",
+                "opacity": 255,
+                "cornerRadius": 8.5,
+                "font_size": 21
+            },
+            "zValue": 110.0,
+            "context": "手/自动"
+        },
+        {
+            "id": 129,
+            "name": "计数控件",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -1973.26675,
+                "y": -4217.18275
+            },
+            "origin_pos": {
+                "x": -1973.26675,
+                "y": -4217.18275
+            },
+            "width": 350.12393914943993,
+            "height": 111.8869884166871,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 111.0,
+            "widgetType": "textedit",
+            "widgetText": "",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        }
+    ]
+}

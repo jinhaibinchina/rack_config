@@ -79,8 +79,9 @@ class _ReadOnlyView(GraphicsView):
         # 旧 QuadTreeScene 是自绘 widget，没有这层边框；留着它取景就永远差
         # 一两个百分点（370×878 的可用区变成 368×876）。
         self.setFrameShape(QFrame.NoFrame)
-        # 运行态不画设计网格 / 捕捉标记：GridView.drawBackground 只看这两个
-        # 开关（不看 is_run_mode），不关掉面板背后会是一片网格。
+        # 运行态不画设计网格 / 捕捉标记：``drawBackground`` 里 ``is_run_mode``
+        # 已经拦住网格，这里再把两个开关关掉——不依赖场景模式有没有被置上，
+        # 面板背后绝不会漏出一片网格。
         self.show_grid = False
         self.snap.grid_enabled = False
         self.snap.show_markers = False

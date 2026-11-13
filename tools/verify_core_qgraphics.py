@@ -587,6 +587,56 @@ def main() -> int:
                                 gg2.find_item(iid).page_bounding_rect(), 1e-2)]
     check("组拖角后保存 / 重载逐图元包围盒一致", not drift2, str(drift2[:4]))
 
+    print("\n=== 6.6b 名称唯一性：改名重复 / 空名一律拒绝 ===")
+    un = GraphicsScene()
+    na = un.create_item("rect", center=(100.0, 100.0))
+    nb = un.create_item("rect", center=(200.0, 200.0))
+    na.set_name("唯一甲")
+    nb.set_name("唯一乙")
+    un.mark_saved()
+    before_rec = nb.to_page_record()
+    check("重名改名被拒绝（返回 False）", nb.set_name("唯一甲") is False)
+    check("被拒后名字与 page 记录一字不动",
+          nb.get_name() == "唯一乙" and nb.to_page_record() == before_rec)
+    check("被拒的改名不标脏", not un.is_modified())
+    owner = un.name_conflict("唯一甲")
+    check("name_conflict 指到占用者",
+          owner is not None and owner.item_id == na.item_id)
+    check("同名不算冲突（exclude_id 传自己）",
+          un.name_conflict("唯一甲", na.item_id) is None)
+    check("前后空白不算另一个名字",
+          nb.set_name("  唯一甲  ") is False and nb.get_name() == "唯一乙")
+    check("空名被拒绝", nb.set_name("   ") is False and nb.get_name() == "唯一乙")
+    ok, reason = un.rename_item(nb, "唯一甲")
+    check("rename_item 给出可直接提示的原因",
+          not ok and "已存在同名图元" in reason, reason)
+    ok, reason = un.rename_item(nb, "唯一乙B")
+    check("换成不冲突的名字可以改", ok and nb.get_name() == "唯一乙B", reason)
+    check("改名后旧名字空出来、新名字归自己",
+          un.name_conflict("唯一乙") is None and un.name_conflict("唯一乙B") is nb)
+
+    # 组改名：重名时组名与成员前缀**都不动**，不留半成品
+    gr = GraphicsScene()
+    gm1 = gr.create_item("rect", center=(10.0, 10.0))
+    gm2 = gr.create_item("rect", center=(20.0, 20.0))
+    gr.clearSelection()
+    gm1.setSelected(True)
+    gm2.setSelected(True)
+    g1 = gr.group_selected()
+    gname = g1.get_name()
+    taker = gr.create_item("group", center=(400.0, 400.0))
+    taker.set_name("占用名")
+    mem_before = (gm1.get_name(), gm2.get_name())
+    check("组改重名被拒绝", g1.set_name("占用名") is False)
+    check("被拒后组名与成员前缀都不动",
+          g1.get_name() == gname and (gm1.get_name(), gm2.get_name()) == mem_before,
+          f"{g1.get_name()} / {gm1.get_name()} / {gm2.get_name()}")
+    suffix = mem_before[0][len(gname) + 1:]
+    check("组换成不冲突的名字仍然联动成员前缀",
+          g1.set_name("新组名2") is True
+          and gm1.get_name() == f"新组名2_{suffix}",
+          f"{g1.get_name()} / {gm1.get_name()}")
+
     print("\n=== 6.7 文本图元：字号 / 文字驱动边框背景（独立小场景） ===")
     from Designer.CoreQGraphics.g_elements import TextItem  # noqa: E402
     from Designer.CoreQGraphics.g_style import (  # noqa: E402
@@ -855,10 +905,11 @@ def main() -> int:
     check("追加进度条 / 滑动条两种变体",
           WIDGET_VARIANTS[7:] == ("progressbar", "slider")
           and len(WIDGET_VARIANTS) == 9, str(WIDGET_VARIANTS))
-    check("5 个顶层字段默认值与旧 Core 一致",
+    check("6 个顶层字段默认值与旧 Core 一致（含字体族扩展）",
           WIDGET_DEFAULTS == {
               "widgetType": "textedit", "widgetText": "",
-              "widgetFontSize": 12, "widgetColor": "#000000",
+              "widgetFontSize": 12, "widgetFontFamily": "",
+              "widgetColor": "#000000",
               "widgetBackground": "#ffffff"}, str(WIDGET_DEFAULTS))
     check("未知 widgetType 退化成 textedit",
           normalize_variant("nope") == "textedit"
@@ -900,7 +951,7 @@ def main() -> int:
         "style": {}, "zValue": 1.0,
     }
     bare_widget = WidgetItem(minimal, wscene.projection)
-    check("缺 5 字段的老页面只读兜底、不回写",
+    check("缺 widget 字段的老页面只读兜底、不回写",
           bare_widget.to_page_record() == minimal
           and "widgetType" not in bare_widget.to_page_record())
 

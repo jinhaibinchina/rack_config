@@ -261,6 +261,70 @@ def main() -> int:
         check("控件编辑写回图元并标脏",
               rect.get_name() == "控件链路改名" and scene.is_modified(),
               f"name={rect.get_name()}")
+        # 名称整页唯一：改成已存在的名字要**拒绝 + 回滚 + 提示**（面板入口）
+        occupied_item = scene.create_item("rect", center=(900.0, 900.0))
+        occupied_item.set_name("已被占用的名字")
+        occupied = occupied_item.get_name()
+        before_name = rect.get_name()
+        name_edit.setText(occupied)
+        name_edit.editingFinished.emit()
+        app.processEvents()
+        check("面板改成已存在的名字被拒绝",
+              rect.get_name() == before_name,
+              f"{before_name} -> {rect.get_name()}")
+        check("被拒后输入框回滚到图元真名",
+              name_edit.text() == before_name, name_edit.text())
+        check("同名冲突能指到占用者",
+              getattr(scene.name_conflict(occupied, rect.item_id), "item_id", None)
+              == occupied_item.item_id)
+        edited = scene.find_item(rect.item_id)
+        depth_before = len(window.history._states)
+        name_edit.setText(occupied)
+        name_edit.editingFinished.emit()
+        app.processEvents()
+        check("被拒的改名不产生撤销点 / 不改记录",
+              edited.get_name() == before_name
+              and edited.to_page_record().get("name") == before_name
+              and len(window.history._states) == depth_before,
+              f"undo {depth_before} -> {len(window.history._states)}")
+
+        # F2 / 右键重命名：重名先弹提示，改成不冲突的名字才落盘
+        import Designer.CoreQGraphics.ui.design_window as _dw  # noqa: E402
+
+        class _FakeBox:
+            calls: list = []
+
+            @staticmethod
+            def warning(parent, title, text):
+                _FakeBox.calls.append((title, text))
+
+        class _FakeInput:
+            replies: list = []
+
+            @staticmethod
+            def getText(*args, **kwargs):
+                return _FakeInput.replies.pop(0)
+
+        real_box, real_input = _dw.QMessageBox, _dw.QInputDialog
+        _dw.QMessageBox, _dw.QInputDialog = _FakeBox, _FakeInput
+        try:
+            _FakeBox.calls = []
+            _FakeInput.replies = [(occupied, True), ("", False)]
+            window._rename([rect.item_id])
+            check("F2 重命名重名被拒绝并弹出提示",
+                  rect.get_name() == before_name
+                  and any("已存在同名图元" in t for _t, t in _FakeBox.calls),
+                  str(_FakeBox.calls))
+            _FakeBox.calls = []
+            _FakeInput.replies = [(occupied, True), ("改名成功_ok", True)]
+            window._rename([rect.item_id])
+            check("提示后改成不冲突的名字即生效",
+                  rect.get_name() == "改名成功_ok" and len(_FakeBox.calls) == 1,
+                  rect.get_name())
+        finally:
+            _dw.QMessageBox, _dw.QInputDialog = real_box, real_input
+        rect.set_name(before_name)     # 后面的断言按旧名字找它
+        scene.delete_items([occupied_item])   # 临时占位图元用完删掉
 
     print("\n=== 4. 创建 / 删除 ===")
     base_count = len(scene.all_items())
@@ -1731,8 +1795,16 @@ def main() -> int:
     app.processEvents()
     wpage = _page_by_key("widget")
     check("widget 图元有「控件」页", wpage is not None)
-    variants = wpage.findChildren(QComboBox) if wpage else []
+    # 控件页现在有两个下拉：变体 + 字体族，按 objectName 精确定位
+    variants = ([c for c in wpage.findChildren(QComboBox)
+                 if c.objectName() == "widgetVariant"] if wpage else [])
     check("控件页提供变体下拉", len(variants) == 1, str(len(variants)))
+    font_combos = ([c for c in wpage.findChildren(QComboBox)
+                    if c.objectName() == "propFontFamily"] if wpage else [])
+    check("控件页提供字体下拉（默认项为空 = 跟随系统字体）",
+          len(font_combos) == 1
+          and str(font_combos[0].currentData()) == "",
+          str([c.currentData() for c in font_combos]))
     if variants:
         check("变体下拉含 9 项且当前为 combobox",
               variants[0].count() == 9
@@ -1858,6 +1930,45 @@ def main() -> int:
 
     scene.clearSelection()
     scene.delete_items([wg, dropped, *extras])
+    app.processEvents()
+
+    print("\n=== 8.22b 文本图元字体下拉：两页同步 / 写回 style.font_family ===")
+    tfont = scene.create_item("text", center=(11800.0, 8600.0),
+                              context="字体测试")
+    scene.clearSelection()
+    tfont.setSelected(True)
+    app.processEvents()
+    ctx_page = _page_by_key("context")
+
+    def _font_combos(page):
+        return ([c for c in page.findChildren(QComboBox)
+                 if c.objectName() == "propFontFamily"] if page else [])
+
+    ctx_combos = _font_combos(ctx_page)
+    check("文本「文本内容」页有字体下拉", len(ctx_combos) == 1,
+          str(len(ctx_combos)))
+    check("字体下拉默认显示 Arial（旧 Core 口径）",
+          bool(ctx_combos) and str(ctx_combos[0].currentData()) == "Arial",
+          str(ctx_combos[0].currentData() if ctx_combos else None))
+    ap_combos = _font_combos(_page_by_key("appearance"))
+    check("文本「外观」页也有字体下拉（与字号同样是双入口）",
+          len(ap_combos) == 1, str(len(ap_combos)))
+    if ctx_combos:
+        combo = ctx_combos[0]
+        # 离屏平台字体库为空，补一项走完整的写回 + 跨页同步链路
+        combo.addItem("SimSun", "SimSun")
+        combo.setCurrentIndex(combo.findData("SimSun"))
+        app.processEvents()
+        check("选字体写回 style.font_family",
+              tfont.style_value("font_family") == "SimSun",
+              str(tfont.style_value("font_family")))
+        check("另一页的字体下拉同步到同一族",
+              bool(ap_combos) and str(ap_combos[0].currentData()) == "SimSun",
+              str(ap_combos[0].currentData() if ap_combos else None))
+        check("字体写进 page JSON 的 style",
+              tfont.to_page_record()["style"].get("font_family") == "SimSun")
+    scene.clearSelection()
+    scene.delete_items([tfont])
     app.processEvents()
 
     print("\n=== 8.23 运行预览真实控件与图元矩形逐点对齐 ===")
@@ -2708,14 +2819,25 @@ def main() -> int:
           and window.actions["toggle_rulers"].isChecked())
 
     on_img = window.view.viewport().grab().toImage()
+
+    def _bg_ratio(img, x0, y0, x1, y1):
+        """带子底色占比：刻度线 / 数字是少数像素，用占比判断不受位置影响。"""
+        total = same = 0
+        want = _RULER_BG.getRgb()[:3]
+        for y in range(y0, min(y1, img.height()), 2):
+            for x in range(x0, min(x1, img.width()), 2):
+                total += 1
+                if img.pixelColor(x, y).getRgb()[:3] == want:
+                    same += 1
+        return same / max(total, 1)
+
     corner = on_img.pixelColor(5, 5).getRgb()[:3]
-    hbar = on_img.pixelColor(T + 40, 5).getRgb()[:3]
-    vbar = on_img.pixelColor(5, T + 40).getRgb()[:3]
+    hbar = _bg_ratio(on_img, T, 0, T + 160, T)
+    vbar = _bg_ratio(on_img, 0, T, T, T + 160)
     check("水平 / 垂直 / 交叉块都画出来",
           corner == _RULER_CORNER_BG.getRgb()[:3]
-          and hbar == _RULER_BG.getRgb()[:3]
-          and vbar == _RULER_BG.getRgb()[:3],
-          f"{corner} / {hbar} / {vbar}")
+          and hbar > 0.5 and vbar > 0.5,
+          f"{corner} / h={hbar:.2f} v={vbar:.2f}")
     xmax = min(on_img.width(), 300)
     ticks = sum(
         on_img.pixelColor(x, y).getRgb()[:3] != _RULER_BG.getRgb()[:3]
@@ -2727,7 +2849,10 @@ def main() -> int:
     app.processEvents()
     off_img = window.view.viewport().grab().toImage()
     check("菜单关掉后不再画刻度条",
-          off_img.pixelColor(T + 40, 5) != on_img.pixelColor(T + 40, 5))
+          _bg_ratio(off_img, T, 0, T + 160, T) < 0.2
+          and _bg_ratio(off_img, 0, T, T, T + 160) < 0.2,
+          f"h={_bg_ratio(off_img, T, 0, T + 160, T):.2f} "
+          f"v={_bg_ratio(off_img, 0, T, T, T + 160):.2f}")
     window.actions["toggle_rulers"].setChecked(True)
     window._do("toggle_rulers")
     app.processEvents()
@@ -2751,13 +2876,105 @@ def main() -> int:
     window.view.viewport().update()
     app.processEvents()
 
+    # 红线跟随鼠标：位置来自 mouseMoveEvent 记下的视口坐标，不再用
+    # QCursor.pos() / underMouse()（拖拽中被抓取时 underMouse 不可靠，
+    # 且没有任何重绘触发，红线会卡住不动）
+    from Designer.CoreQGraphics.g_view import _RULER_CURSOR  # noqa: E402
+
+    rvp = window.view.viewport()
+    rcx, rcy = rvp.width() // 2, rvp.height() // 2
+    window.view._ruler_cursor = None
+    QTest.mouseMove(rvp, QPoint(rcx, rcy))
+    app.processEvents()
+    rcur = window.view._ruler_cursor
+    check("刻度条记下鼠标位置（红线跟随的输入口径）",
+          rcur is not None
+          and abs(rcur.x() - rcx) <= 1 and abs(rcur.y() - rcy) <= 1,
+          str(rcur))
+    rimg = rvp.grab().toImage()
+    want_red = _RULER_CURSOR.getRgb()[:3]
+    hred = [x for x in range(max(T, rcx - 3), min(rimg.width(), rcx + 4))
+            if rimg.pixelColor(x, T - 2).getRgb()[:3] == want_red]
+    check("水平标尺在光标处画红线", bool(hred), str(hred))
+
+    QTest.mouseMove(rvp, QPoint(rcx + 60, rcy + 40))
+    app.processEvents()
+    rimg2 = rvp.grab().toImage()
+    stale = [x for x in range(max(T, rcx - 3), min(rimg2.width(), rcx + 4))
+             if rimg2.pixelColor(x, T - 2).getRgb()[:3] == want_red]
+    check("红线跟着走，旧位置不残留", not stale, str(stale))
+
+    # 平移纠偏：QGraphicsView 平移是「整块 blit + 只重画新露出的窄条」，
+    # 刻度带若跟着搬就会一路滑走，所以 scrollContentsBy 里必须重画两条带
+    refresh_hits = []
+    orig_refresh = window.view._refresh_ruler_strips
+
+    def _spy_refresh():
+        refresh_hits.append(1)
+        orig_refresh()
+
+    window.view._refresh_ruler_strips = _spy_refresh
+    rhb = window.view.horizontalScrollBar()
+    rhb.setValue(rhb.value() + 37)
+    app.processEvents()
+    window.view._refresh_ruler_strips = orig_refresh
+    check("平移后刻度带重新标脏（不随 blit 滑走）",
+          bool(refresh_hits), str(len(refresh_hits)))
+
+    # blit 会把刻度带像素往画布里推 |dy| / |dx|：重画范围必须连这一截一起盖住，
+    # 否则几帧下来画布上叠出刻度带残影（重场景拖画布时肉眼可见）
+    dview = window.view
+    dview._ruler_scroll_pad = [0, 0]
+    r0 = dview._ruler_strip_rects()
+    dview._ruler_scroll_pad = [11, 7]
+    r1 = dview._ruler_strip_rects()
+    check("刻度带重绘范围随平移推出量加厚",
+          r0[0].height() == T + 1 and r0[1].width() == T + 1
+          and r1[0].height() == T + 8 and r1[1].width() == T + 12,
+          f"{r0[0].height()},{r0[1].width()} -> "
+          f"{r1[0].height()},{r1[1].width()}")
+    dview._ruler_scroll_pad = [0, 0]
+    dvb = dview.verticalScrollBar()
+    dvb.setValue(dvb.value() + 23)
+    acc_y = dview._ruler_scroll_pad[1]
+    dview.viewport().grab()          # 全量重绘：两条带都真刷到了
+    app.processEvents()
+    check("平移推动量累计，整带重绘后清零",
+          acc_y >= 23 and dview._ruler_scroll_pad == [0, 0],
+          f"acc={acc_y} now={dview._ruler_scroll_pad}")
+
+    # 平移后刻度数值仍按真实映射算：把算出来的主刻度列拿去比像素，
+    # 该列在带子下部必须有刻度线（不是背景色）
+    mp0 = window.view.mapToScene(QPoint(0, 0))
+    mp1 = window.view.mapToScene(QPoint(1, 0))
+    mdx = mp1.x() - mp0.x()
+    mstep = nice_ruler_step(abs(mdx))
+    mval = math.ceil(mp0.x() / mstep) * mstep
+    mx = -1
+    for _ in range(40):
+        cand = int(round((mval - mp0.x()) / mdx))
+        if cand >= T + 2:       # 落在左侧竖带外面的第一个主刻度
+            mx = cand
+            break
+        mval += mstep
+    pimg = rvp.grab().toImage()
+    bg_rgb = _RULER_BG.getRgb()[:3]
+    col_has_tick = (T + 2 <= mx < pimg.width()
+                    and any(pimg.pixelColor(mx, y).getRgb()[:3] != bg_rgb
+                            for y in range(T - 9, T)))
+    check("平移后刻度值仍按真实映射画在算出的像素列上",
+          col_has_tick, f"p0={mp0.x():.1f} step={mstep} x={mx}")
+
     # 只切标志，不真的挂 / 销毁运行态 proxy，避免影响后续断言
     old_run = scene.is_run_mode
     scene.is_run_mode = True
     app.processEvents()
     run_img = window.view.viewport().grab().toImage()
     check("运行态不显示刻度条",
-          run_img.pixelColor(T + 40, 5) != on_img.pixelColor(T + 40, 5))
+          _bg_ratio(run_img, T, 0, T + 160, T) < 0.2
+          and _bg_ratio(run_img, 0, T, T, T + 160) < 0.2,
+          f"h={_bg_ratio(run_img, T, 0, T + 160, T):.2f} "
+          f"v={_bg_ratio(run_img, 0, T, T, T + 160):.2f}")
     scene.is_run_mode = old_run
     app.processEvents()
 
@@ -2973,6 +3190,300 @@ def main() -> int:
     scene.clearSelection()
     scene.delete_items([bz_item, rect_for_bool] + drawn)
     app.processEvents()
+
+    print("\n=== 8.34 有父图元的图元改名（属性面板 / 右键菜单） ===")
+    # 组成员在画布上点不出自己（左键 / 右键都重定向到根组），改名入口：
+    # 图层树选中 + 属性面板、树右键（未先选中行）、画布右键的成员直达项。
+    ra = scene.create_item("rect", center=(2000.0, 1000.0), size=(400.0, 200.0))
+    rb = scene.create_item("rect", center=(2200.0, 1100.0), size=(300.0, 150.0))
+    scene.clearSelection()
+    ra.setSelected(True)
+    rb.setSelected(True)
+    window._do("group")
+    app.processEvents()
+    grp = next(i for i in scene.all_items()
+               if i.TYPE == "group" and ra.item_id in i.children_ids)
+    member = next(i for i in scene.all_items() if i.parent_id == grp.item_id)
+    other = next(i for i in scene.all_items()
+                 if i.parent_id == grp.item_id and i is not member)
+    member_name0 = member.get_name()
+    grp_name0 = grp.get_name()
+    other_name0 = other.get_name()
+    check("组成员构造：成员名带组前缀", member_name0.startswith(grp.get_name()))
+
+    # 1) 属性面板：树选中成员 -> 面板绑定成员 -> 名称可改
+    window._select_from_tree([member.item_id])
+    app.processEvents()
+    check("树选中成员后属性面板绑定成员本身",
+          getattr(window.property_panel._target, "item_id", None)
+          == member.item_id)
+    window.property_panel._commit(
+        lambda: scene.find_item(member.item_id).set_name("member_panel"))
+    app.processEvents()
+    check("属性面板改成员名生效",
+          scene.find_item(member.item_id).get_name() == "member_panel")
+    check("改成员名不牵动组名与其它成员",
+          scene.find_item(grp.item_id).get_name() == grp_name0
+          and scene.find_item(other.item_id).get_name() == other_name0)
+
+    # 2) 树右键未先选中行：菜单目标 = 光标下的行
+    window.layers.mode_box.setCurrentIndex(1)
+    app.processEvents()
+    scene.clearSelection()
+    app.processEvents()
+    tree = window.layers.tree
+    node = None
+    stack = [tree.topLevelItem(i) for i in range(tree.topLevelItemCount())]
+    while stack:
+        n = stack.pop()
+        stack.extend(n.child(i) for i in range(n.childCount()))
+        if n.data(0, Qt.UserRole) == member.item_id:
+            node = n
+            break
+    check("分组树含成员行", node is not None)
+    rect_m = tree.visualItemRect(node)
+    pos_m = QPoint(rect_m.center().x(), rect_m.center().y())
+    ids = window.layers._menu_target_ids(pos_m)
+    check("右键未选中的成员行：菜单目标改成该行", ids == [member.item_id],
+          f"ids={ids}")
+    check("静默改树选中不发场景联动信号",
+          [i.item_id for i in scene.selected_items()] == [])
+    # 空白处（所有行之下）不改目标
+    max_bottom = 0
+    stack = [tree.topLevelItem(i) for i in range(tree.topLevelItemCount())]
+    while stack:
+        n = stack.pop()
+        stack.extend(n.child(i) for i in range(n.childCount()))
+        max_bottom = max(max_bottom, tree.visualItemRect(n).bottom())
+    blank_pos = QPoint(5, max_bottom + 20)
+    window.layers._menu_target_ids(blank_pos)
+    check("右键空白处保持现有选中", window.layers.selected_ids() == [member.item_id])
+    # 选中组行时右键成员行：目标也切到成员行（不再错位改组）
+    tree.clearSelection()
+    grp_node = None
+    stack = [tree.topLevelItem(i) for i in range(tree.topLevelItemCount())]
+    while stack:
+        n = stack.pop()
+        stack.extend(n.child(i) for i in range(n.childCount()))
+        if n.data(0, Qt.UserRole) == grp.item_id:
+            grp_node = n
+            break
+    tree.setCurrentItem(grp_node)
+    app.processEvents()
+    # ``setCurrentItem`` 会把组行滚进可视区，成员行的 y 跟着变——必须重新取
+    # 当前位置再模拟右键，否则可能点到别的行（曾经用旧坐标点到了组行）。
+    rect_m2 = tree.visualItemRect(node)
+    pos_after = QPoint(rect_m2.center().x(), rect_m2.center().y())
+    ids = window.layers._menu_target_ids(pos_after)
+    check("选中组行时右键成员行：目标切到成员行", ids == [member.item_id],
+          f"ids={ids}")
+
+    # 3) 画布右键：菜单含「重命名…」，组成员有直达「重命名成员…」
+    import Designer.CoreQGraphics.ui.design_window as _dwmod  # noqa: E402
+    from PySide6.QtGui import QMouseEvent as _QMouseEvent  # noqa: E402
+    from PySide6.QtCore import QEvent as _QEvent  # noqa: E402
+    _orig_get_text = _dwmod.QInputDialog.getText
+    _dwmod.QInputDialog.getText = staticmethod(
+        lambda *a, **k: ("member_canvas", True))
+    view = window.view
+    sp = scene.projection.point(*scene.find_item(member.item_id).page_center())
+    kp = view.mapFromScene(int(sp.x()), int(sp.y()))
+    ev = _QMouseEvent(
+        _QEvent.MouseButtonPress, QPointF(kp.x(), kp.y()),
+        view.viewport().mapToGlobal(QPoint(int(kp.x()), int(kp.y()))),
+        Qt.RightButton, Qt.RightButton, Qt.NoModifier)
+    view._prepare_context_target(ev)
+    check("右键组成员：选中重定向到根组（CAD 语义保持）",
+          [i.item_id for i in scene.selected_items()] == [grp.item_id])
+    check("右键组成员：记录被遮挡的成员", view._context_member_id == member.item_id)
+    menu = view.build_context_menu()
+    texts = [a.text() for a in menu.actions() if a.text()]
+    check("画布右键菜单含「重命名…」", "重命名…" in texts, str(texts[:6]))
+    member_acts = [a for a in menu.actions() if "重命名成员" in a.text()]
+    check("画布右键成员行提供「重命名成员…」直达项", len(member_acts) == 1)
+    fired = []
+    view.memberRenameRequested.connect(
+        lambda iid: fired.append(int(iid)))
+    member_acts[0].trigger()
+    app.processEvents()
+    check("成员直达项只发该成员 id", fired == [member.item_id], str(fired))
+    window._rename([fired[0]])
+    app.processEvents()
+    check("画布右键改成员名生效", scene.find_item(member.item_id).get_name()
+          == "member_canvas")
+    window._do("undo")
+    app.processEvents()
+    check("成员改名可撤销", scene.find_item(member.item_id).get_name()
+          == "member_panel")
+    # 顶层图元：右键只有通用重命名，无成员项
+    rc = scene.create_item("circle", center=(3000.0, 1000.0), size=(300.0, 300.0))
+    scene.emit_structure_changed()
+    scene.clearSelection()
+    app.processEvents()
+    sp2 = scene.projection.point(*rc.page_center())
+    kp2 = view.mapFromScene(int(sp2.x()), int(sp2.y()))
+    ev2 = _QMouseEvent(
+        _QEvent.MouseButtonPress, QPointF(kp2.x(), kp2.y()),
+        view.viewport().mapToGlobal(QPoint(int(kp2.x()), int(kp2.y()))),
+        Qt.RightButton, Qt.RightButton, Qt.NoModifier)
+    view._prepare_context_target(ev2)
+    menu2 = view.build_context_menu()
+    check("右键顶层图元：无成员直达项",
+          view._context_member_id == 0
+          and not [a for a in menu2.actions() if "重命名成员" in a.text()])
+    # 非组父对象：画布点选子图元本身，通用重命名可用
+    rp = scene.create_item("rect", center=(4000.0, 1000.0), size=(600.0, 400.0))
+    rk = scene.create_item("rect", center=(4100.0, 1100.0), size=(200.0, 100.0))
+    rk.set_page_parent(rp.item_id)
+    scene.emit_structure_changed()
+    app.processEvents()
+    rk = scene.find_item(rk.item_id)
+    scene.clearSelection()
+    app.processEvents()
+    sp3 = scene.projection.point(*rk.page_center())
+    kp3 = view.mapFromScene(int(sp3.x()), int(sp3.y()))
+    QTest.mouseClick(view.viewport(), Qt.LeftButton, Qt.NoModifier,
+                     QPoint(int(kp3.x()), int(kp3.y())))
+    app.processEvents()
+    check("非组父的子图元：画布点选它自己",
+          [i.item_id for i in scene.selected_items()] == [rk.item_id])
+    window._do("rename")
+    app.processEvents()
+    check("非组父的子图元：通用重命名生效",
+          scene.find_item(rk.item_id).get_name() == "member_canvas")
+    _dwmod.QInputDialog.getText = _orig_get_text
+    scene.clearSelection()
+    scene.delete_items([rp, rc])
+    app.processEvents()
+
+    # --- 场景模式切换：视图订阅 sceneModeChanged，运行态不画设计网格 ---------
+    print("\n=== 8.35 场景模式切换：网格只属于设计态 ===")
+    mode_view, mode_scene = window.view, window.scene
+    pref_grid = (mode_view.show_grid, mode_view.snap.grid_enabled)
+    mode_hits: list = []
+    mode_scene.sceneModeChanged.connect(lambda r: mode_hits.append(r))
+    drawn: list = []
+
+    def _spy_grid(painter_, rect_):
+        drawn.append(1)
+
+    real_grid = mode_view._draw_grid
+    mode_view._draw_grid = _spy_grid
+    mode_view.show_grid = True
+    mode_view.snap.grid_enabled = True
+    canvas = QImage(320, 240, QImage.Format_ARGB32)
+    painter = QPainter(canvas)
+    try:
+        mode_scene.set_scene_mode(True)
+        mode_view.drawBackground(painter, QRectF(0.0, 0.0, 320.0, 240.0))
+        check("运行态不画设计网格", not drawn, str(len(drawn)))
+        check("set_scene_mode 发出 sceneModeChanged(True)",
+              mode_hits == [True], str(mode_hits))
+        mode_scene.set_scene_mode(False)
+        mode_view.drawBackground(painter, QRectF(0.0, 0.0, 320.0, 240.0))
+        check("回设计态网格照画", len(drawn) == 1, str(len(drawn)))
+        check("运行态不改写用户的网格偏好",
+              mode_view.show_grid and mode_view.snap.grid_enabled)
+        # 切页换场景后要能重新订阅（只在构造里连一次的话，切页后就断供）
+        other = type(mode_scene)(mode_scene.projection)
+        other_hits: list = []
+        other.sceneModeChanged.connect(lambda r: other_hits.append(r))
+        mode_view.setScene(other)
+        other.set_scene_mode(True)
+        check("换场景后运行态信号重新接上", other_hits == [True], str(other_hits))
+    finally:
+        mode_view.setScene(mode_scene)
+        mode_view._draw_grid = real_grid
+        painter.end()
+        mode_scene.set_scene_mode(False)
+        mode_view.show_grid, mode_view.snap.grid_enabled = pref_grid
+
+    print("\n=== 8.36 框选性能：拖动中不重建面板 / 只标脏标记区域 ===")
+    perf_view = window.view
+    perf_scene = scene
+    perf_items = perf_scene.all_items()
+    check("页面里有足够的图元做框选断言", len(perf_items) >= 6, str(len(perf_items)))
+
+    # 选中变化只把「标记占的区域」标脏（updateScene），不再整屏 update()：
+    # 整屏重画在 1618 图元的页面上是 ~90ms/帧，框选时每格都会触发。
+    dirty_batches: list = []
+    full_updates: list = []
+    real_update_scene = perf_view.updateScene
+    real_vp_update = perf_view.viewport().update
+
+    def spy_update_scene(rects):
+        dirty_batches.append(list(rects))
+        return real_update_scene(rects)
+
+    def spy_vp_update(*args):
+        full_updates.append(args)
+        return real_vp_update(*args)
+
+    perf_view.updateScene = spy_update_scene
+    perf_view.viewport().update = spy_vp_update
+    try:
+        perf_scene.clearSelection()
+        app.processEvents()
+        perf_view._sel_geom_dirty = False    # 清掉前面小节留下的整屏刷标记
+        dirty_batches.clear()
+        full_updates.clear()
+        perf_scene.select_items([perf_items[0]])
+        app.processEvents()
+        check("选中 1 个只标脏标记区域，不整屏刷新",
+              bool(dirty_batches) and not full_updates,
+              f"batch={len(dirty_batches)} full={len(full_updates)}")
+        dirty_batches.clear()
+        full_updates.clear()
+        perf_scene.select_items(perf_items[:3])
+        app.processEvents()
+        check("换选中同样只刷标记区域",
+              bool(dirty_batches) and not full_updates,
+              f"batch={len(dirty_batches)} full={len(full_updates)}")
+    finally:
+        perf_view.updateScene = real_update_scene
+        perf_view.viewport().update = real_vp_update
+
+    # 框选中（左键还按着）不重建属性面板 / 图层树，松手一次补齐
+    panel_calls: list = []
+    real_panel_update = window.property_panel.update_for_selected
+
+    def spy_panel_update(target):
+        panel_calls.append(target)
+        return real_panel_update(target)
+
+    window.property_panel.update_for_selected = spy_panel_update
+    try:
+        perf_scene.clearSelection()
+        app.processEvents()
+        window._selection_pending = False
+        panel_calls.clear()
+        perf_view._band_selecting = True
+        perf_scene.select_items(perf_items[:2])
+        app.processEvents()
+        check("框选中不重建属性面板，只记「待同步」",
+              not panel_calls and window._selection_pending is True,
+              f"calls={len(panel_calls)} pending={window._selection_pending}")
+        tree_before = window.layers.selected_ids()
+        window.layers.sync_selection()
+        check("框选中图层树也不同步（探针挡住）",
+              window.layers.selected_ids() == tree_before,
+              str(window.layers.selected_ids()))
+        perf_view._band_selecting = False
+        perf_view.selectionSettled.emit()
+        app.processEvents()
+        check("松手后一次性同步属性面板",
+              len(panel_calls) == 1 and window._selection_pending is False,
+              f"calls={len(panel_calls)} pending={window._selection_pending}")
+        check("松手后图层树同步到真实选中",
+              set(window.layers.selected_ids())
+              == {it.item_id for it in perf_scene.selected_items()},
+              str(window.layers.selected_ids()))
+    finally:
+        window.property_panel.update_for_selected = real_panel_update
+        perf_view._band_selecting = False
+        window._selection_pending = False
+        perf_scene.clearSelection()
+        app.processEvents()
 
     print("\n=== 9. 关窗不重写页面文件 ===")
     page_hash = digest(TMP_PAGE)

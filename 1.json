@@ -1,0 +1,70 @@
+{
+    "sceneRect": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 0.0,
+        "height": 0.0
+    },
+    "items": [
+        {
+            "id": 1,
+            "name": "1",
+            "type": "rect",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1741.73,
+                "y": 552.815
+            },
+            "origin_pos": {
+                "x": 1589.347,
+                "y": -10.401
+            },
+            "width": 306.6262943941649,
+            "height": 1127.042173411179,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 1.0
+        },
+        {
+            "id": 2,
+            "name": "1",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 2595.026,
+                "y": 1325.203
+            },
+            "origin_pos": {
+                "x": 2595.026,
+                "y": 1325.203
+            },
+            "width": 84.0,
+            "height": 383.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 45.0,
+                "font_size": 10,
+                "font_family": "汇文明朝体"
+            },
+            "zValue": 2.0,
+            "context": "文本大大大22"
+        }
+    ]
+}

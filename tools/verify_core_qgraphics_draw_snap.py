@@ -156,6 +156,58 @@ view.set_draw_tool(None)
 view.close()
 app.processEvents()
 
+print("\n=== 2b. 门控粘性开着也不自动吸附：自由落点 / 一次 T 只吸一个点 ===")
+scene, view = new_pair()
+rect = add_rect(scene, view)
+target = off_grid_target(view, rect)
+view.snap.enabled = True            # 模拟「之前按过 T」的粘性门控状态
+view.set_draw_tool("line")
+check("激活绘制工具不预置吸附武装", view._draw_snap_armed is False)
+hov, vp = hover_near(view, target)
+QTest.mouseMove(view.viewport(), vp)
+app.processEvents()
+if view.snap.hover is None:      # QTest 全局光标去重，见第 3 段注释
+    view._set_hover(view.mapToScene(vp))
+marked, active = view._hover_marker()
+check("未武装时红十字只是预告（细十字，不表示会吸）",
+      close_pt(marked, target) and active is False,
+      f"marker={marked} active={active}")
+QTest.mouseClick(view.viewport(), Qt.LeftButton, pos=vp)
+app.processEvents()
+raw = view.mapToScene(vp)
+check("门控开着但没按 T：第一点 = 原始光标（不自动吸）",
+      close_pt(first_point_scene(scene), raw, 1.0),
+      f"landed={first_point_scene(scene)} raw={raw} target={target}")
+
+hov2, vp2 = hover_near(view, target)
+QTest.mouseMove(view.viewport(), vp2)
+app.processEvents()
+if view.snap.hover is None:
+    view._set_hover(view.mapToScene(vp2))
+QTest.keyClick(view, Qt.Key_T)
+app.processEvents()
+check("按 T 武装下一个落点（绘制中）",
+      view._draw_snap_armed and view.snap.enabled)
+expect2, _k2 = view.snap.aim(
+    view.mapToScene(vp2), exclude=view._snap_scan_exclude(), always=True)
+QTest.mouseClick(view.viewport(), Qt.LeftButton, pos=vp2)
+app.processEvents()
+armed_lines = [it for it in scene.all_items() if it.TYPE == "line"]
+if armed_lines:
+    rec = armed_lines[0].page_record()
+    end = rec.get("end_pos") or {}
+    pe = scene.projection.inverse_point(expect2.x(), expect2.y())
+    check("武装的那个点精确吸到捕捉点",
+          math.hypot(end.get("x", 0) - pe[0], end.get("y", 0) - pe[1]) < 1.0,
+          f"end={end} expect={pe}")
+else:
+    check("武装的那个点精确吸到捕捉点", False, "没画出直线")
+check("落点后武装自动失效（下一次恢复自由绘制）",
+      view._draw_snap_armed is False and not scene.drawing_active())
+scene.clearSelection()
+view.close()
+app.processEvents()
+
 print("\n=== 3. 按 T 后第一个点 / 后续点都落在可见红十字 ===")
 scene, view = new_pair()
 rect = add_rect(scene, view)

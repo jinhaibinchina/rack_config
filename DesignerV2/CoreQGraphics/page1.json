@@ -1,0 +1,740 @@
+{
+    "sceneRect": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 0.0,
+        "height": 0.0
+    },
+    "items": [
+        {
+            "id": 1,
+            "name": "group_8_矩形_1",
+            "type": "rect",
+            "parent_id": 8,
+            "children_ids": [],
+            "group_id": 8,
+            "center_pos": {
+                "x": 3489.656,
+                "y": 1851.296
+            },
+            "origin_pos": {
+                "x": 3489.656,
+                "y": 1851.296
+            },
+            "width": 503.15938673419794,
+            "height": 593.8976341555801,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 1.0
+        },
+        {
+            "id": 2,
+            "name": "group_8_矩形_2",
+            "type": "rect",
+            "parent_id": 8,
+            "children_ids": [],
+            "group_id": 8,
+            "center_pos": {
+                "x": 2874.539,
+                "y": 1487.078
+            },
+            "origin_pos": {
+                "x": 2874.539,
+                "y": 1487.078
+            },
+            "width": 597.9375329793515,
+            "height": 591.5703404952924,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 2.0
+        },
+        {
+            "id": 3,
+            "name": "group_8_圆_3",
+            "type": "circle",
+            "parent_id": 8,
+            "children_ids": [],
+            "group_id": 8,
+            "center_pos": {
+                "x": 3626.106,
+                "y": 1317.201
+            },
+            "origin_pos": {
+                "x": 3626.106,
+                "y": 1317.201
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 3.0,
+            "radius_w": 209.98073099932466,
+            "radius_h": 101.54884284065024
+        },
+        {
+            "id": 5,
+            "name": "group_8_矩形_5",
+            "type": "rect",
+            "parent_id": 8,
+            "children_ids": [],
+            "group_id": 8,
+            "center_pos": {
+                "x": 3666.402,
+                "y": 110.807
+            },
+            "origin_pos": {
+                "x": 3666.402,
+                "y": 110.807
+            },
+            "width": 355.5304250147498,
+            "height": 852.5572554196881,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 5.0
+        },
+        {
+            "id": 6,
+            "name": "group_8_三角形_6",
+            "type": "triangle",
+            "parent_id": 8,
+            "children_ids": [],
+            "group_id": 8,
+            "center_pos": {
+                "x": 3048.263,
+                "y": 711.077
+            },
+            "origin_pos": {
+                "x": 2999.782,
+                "y": 686.718
+            },
+            "width": 379.77599999999984,
+            "height": 598.534,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 6.0,
+            "vertices": [
+                {
+                    "x": 2890.629,
+                    "y": 1010.342
+                },
+                {
+                    "x": 3238.152,
+                    "y": 835.517
+                },
+                {
+                    "x": 2858.376,
+                    "y": 411.808
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "name": "group_8_直线_7",
+            "type": "line",
+            "parent_id": 8,
+            "children_ids": [],
+            "group_id": 8,
+            "origin_pos": {
+                "x": 2375.584,
+                "y": 951.185
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 7.0,
+            "head_pos": {
+                "x": 2329.123,
+                "y": 1476.638
+            },
+            "end_pos": {
+                "x": 2422.046,
+                "y": 425.731
+            },
+            "length": 1055.0072068843886,
+            "center_pos": {
+                "x": 2375.584,
+                "y": 951.185
+            }
+        },
+        {
+            "id": 8,
+            "name": "group_8",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                7,
+                6,
+                2,
+                5,
+                3,
+                1
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 3086.645,
+                "y": 916.386
+            },
+            "origin_pos": {
+                "x": 3184.816,
+                "y": 857.483
+            },
+            "width": 1515.0444247787618,
+            "height": 2463.716419476561,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 8.0
+        },
+        {
+            "id": 9,
+            "name": "文本_9",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -176.99115044247787,
+                "y": -785.8407079646018
+            },
+            "origin_pos": {
+                "x": -176.99115044247787,
+                "y": -785.8407079646018
+            },
+            "width": 400.0,
+            "height": 120.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 9.0,
+            "context": "文本"
+        },
+        {
+            "id": 10,
+            "name": "图片_10",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 42.47787610619469,
+                "y": -1989.3805309734514
+            },
+            "origin_pos": {
+                "x": 42.47787610619469,
+                "y": -1989.3805309734514
+            },
+            "width": 320.0,
+            "height": 240.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 10.0,
+            "image_path": "dji_fly_20251017_155356_0065_1760704902105_photo.jpg"
+        },
+        {
+            "id": 11,
+            "name": "图片_11",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -467.2566371681416,
+                "y": -1536.283185840708
+            },
+            "origin_pos": {
+                "x": -467.2566371681416,
+                "y": -1536.283185840708
+            },
+            "width": 320.0,
+            "height": 240.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 11.0,
+            "image_path": ""
+        },
+        {
+            "id": 12,
+            "name": "图片_12",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 7.079646017699115,
+                "y": -1975.2212389380531
+            },
+            "origin_pos": {
+                "x": 7.079646017699115,
+                "y": -1975.2212389380531
+            },
+            "width": 320.0,
+            "height": 240.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 12.0,
+            "image_path": ""
+        },
+        {
+            "id": 13,
+            "name": "图片_13",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -7.079646017699115,
+                "y": -1961.0619469026549
+            },
+            "origin_pos": {
+                "x": -7.079646017699115,
+                "y": -1961.0619469026549
+            },
+            "width": 320.0,
+            "height": 240.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 13.0,
+            "image_path": ""
+        },
+        {
+            "id": 14,
+            "name": "图片_14",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -14.15929203539823,
+                "y": -1946.9026548672568
+            },
+            "origin_pos": {
+                "x": -14.15929203539823,
+                "y": -1946.9026548672568
+            },
+            "width": 320.0,
+            "height": 240.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 14.0,
+            "image_path": ""
+        },
+        {
+            "id": 15,
+            "name": "图片_15",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 141.59292035398232,
+                "y": -2017.699115044248
+            },
+            "origin_pos": {
+                "x": 141.59292035398232,
+                "y": -2017.699115044248
+            },
+            "width": 320.0,
+            "height": 240.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 15.0,
+            "image_path": ""
+        },
+        {
+            "id": 16,
+            "name": "图片_16",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 148.67256637168143,
+                "y": -2081.41592920354
+            },
+            "origin_pos": {
+                "x": 148.67256637168143,
+                "y": -2081.41592920354
+            },
+            "width": 320.0,
+            "height": 240.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 16.0,
+            "image_path": ""
+        },
+        {
+            "id": 17,
+            "name": "图片_17",
+            "type": "image",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 710.658,
+                "y": -3859.339
+            },
+            "origin_pos": {
+                "x": 739.023,
+                "y": -3816.792
+            },
+            "width": 4941.592920353984,
+            "height": 10612.389380530969,
+            "rotate": 42.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 17.0,
+            "image_path": "bg.jpg"
+        },
+        {
+            "id": 18,
+            "name": "group_8_2",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                19,
+                20,
+                23,
+                21,
+                22,
+                24
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": 359.879,
+                "y": 5034.228
+            },
+            "origin_pos": {
+                "x": 359.879,
+                "y": 4911.483
+            },
+            "width": 3586.369541154836,
+            "height": 4264.601823821818,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 18.0
+        },
+        {
+            "id": 19,
+            "name": "group_8_2_直线_7",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "origin_pos": {
+                "x": -1323.323,
+                "y": 5094.463
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 19.0,
+            "head_pos": {
+                "x": -1433.305,
+                "y": 6004.003
+            },
+            "end_pos": {
+                "x": -1213.341,
+                "y": 4184.922
+            },
+            "length": 1832.331956519158,
+            "center_pos": {
+                "x": -1323.323,
+                "y": 5094.463
+            }
+        },
+        {
+            "id": 20,
+            "name": "group_8_2_三角形_6",
+            "type": "triangle",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "center_pos": {
+                "x": -149.278,
+                "y": 4542.9
+            },
+            "origin_pos": {
+                "x": -264.041,
+                "y": 4500.736
+            },
+            "width": 898.9970000000001,
+            "height": 1036.0379999999996,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 20.0,
+            "vertices": [
+                {
+                    "x": -522.413,
+                    "y": 5060.923
+                },
+                {
+                    "x": 300.234,
+                    "y": 4758.319
+                },
+                {
+                    "x": -598.763,
+                    "y": 4024.885
+                }
+            ]
+        },
+        {
+            "id": 21,
+            "name": "group_8_2_矩形_5",
+            "type": "rect",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "center_pos": {
+                "x": 1684.135,
+                "y": 3639.8
+            },
+            "origin_pos": {
+                "x": 1708.199,
+                "y": 3639.8
+            },
+            "width": 841.6013856576689,
+            "height": 1475.7450157951976,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 21.0
+        },
+        {
+            "id": 22,
+            "name": "group_8_2_圆_3",
+            "type": "circle",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "center_pos": {
+                "x": 1636.876,
+                "y": 5728.024
+            },
+            "origin_pos": {
+                "x": 1636.876,
+                "y": 5728.024
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 22.0,
+            "radius_w": 497.06034065329374,
+            "radius_h": 175.77728384715675
+        },
+        {
+            "id": 23,
+            "name": "group_8_2_矩形_2",
+            "type": "rect",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "center_pos": {
+                "x": -142.212,
+                "y": 6022.074
+            },
+            "origin_pos": {
+                "x": -142.212,
+                "y": 6022.074
+            },
+            "width": 1415.4205122424428,
+            "height": 1023.9863374905431,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 23.0
+        },
+        {
+            "id": 24,
+            "name": "group_8_2_矩形_1",
+            "type": "rect",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "center_pos": {
+                "x": 1313.875,
+                "y": 6652.522
+            },
+            "origin_pos": {
+                "x": 1313.875,
+                "y": 6652.522
+            },
+            "width": 1191.0644133047017,
+            "height": 1028.0147965736471,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 24.0
+        }
+    ]
+}

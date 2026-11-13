@@ -351,7 +351,7 @@ stage.tags.update_many({...}); stage.tags.flush_now()
 |---|---|
 | 直接写 `scene._widget_layer_on` | 集中封装在 `RuntimeStage.enter_run_mode()` **一处**。核心若日后给 `set_scene_mode` 加 `widgets=` 参数，只改这一处。 |
 | `geometry_profile` 选错 | 迁移既有 model 先按现状选（rack / safety），**别用默认 strict 硬套**；跑一次几何对拍再切。 |
-| `set_page_center` 对带父图元被拒绝 | 子图元位姿只能由父带动（`translate_locked()`）。`RuntimeElement.setPos` / `set_angle` 对有父图元可能不生效，与核心语义一致。 |
+| `set_page_center` 对有父图元 | **设计态**拒绝（`translate_locked()`），位置只由父对象带动；**运行态放行**，`RuntimeElement.setPos` / `set_angle` 可让子图元自行平移 / 在旋转后回正中心，父对象之后运动仍刚体带动它。 |
 | proxy 与内置 layer 同时开 | `widget_mode` 互斥保证不会；若业务手动调 `scene.set_scene_mode(True)` 会破坏，文档已标注。 |
 | `ChainedProvider` 归属判定 | `signature()` 只查 mapping 的 lookup，不真的造控件；自定义 provider 请同时实现 `signature()`，否则字段变化可能不触发重建。 |
 | 门面跨换页复用但 name 变了 | `rebuild()` 会 `reindex_names()`，`by_name` 全量刷新；业务若按名字缓存对象，应在 `pageLoaded` 后重取（或用 `bind_*` 的解析式绑定）。 |

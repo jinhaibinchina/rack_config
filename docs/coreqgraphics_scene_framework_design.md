@@ -113,15 +113,15 @@ g_projection ← g_style ← g_widgets
 | 模块 | 行数 | 职责 | 对外关键 API |
 | --- | ---: | --- | --- |
 | `g_projection.py` | 98 | 页面坐标 ↔ 视图坐标（AGV 轴交换 + 双轴取反） | `point/rect/size/angle/inverse_*` |
-| `g_style.py` | 169 | 画笔/画刷/字体/文字度量，带缓存 | `pen_for/brush_for/font_for/text_metrics` |
+| `g_style.py` | 255 | 画笔/画刷/字体/文字度量，带缓存；字体下拉候选族过滤位图字体 | `pen_for/brush_for/font_for/text_metrics/available_font_families` |
 | `g_widgets.py` | 323 | 7 种控件变体：字段解析、样式表、真实控件、设计态占位绘制 | `create_control/paint_variant` |
-| `g_element.py` | 912 | 图元基类：位姿模型、双坐标系、记录回写、缩放旋转 | `live_page_pose/set_page_*/to_page_record` |
+| `g_element.py` | 956 | 图元基类：位姿模型、双坐标系、记录回写、缩放旋转 | `live_page_pose/set_page_*/to_page_record` |
 | `g_elements.py` | 1 071 | 12 类图元绘制与几何（顶点类烘焙、文本双向联动） | `ITEM_TYPES` |
-| `g_scene.py` | 1 411 | 装载保存、索引、分组、复制粘贴、绘制控制器、widget proxy、撤销快照 | `load_page/save_page/create_item/...` |
+| `g_scene.py` | 1 727 | 装载保存、索引、分组、复制粘贴、绘制控制器、widget proxy、撤销快照 | `load_page/save_page/create_item/...` |
 | `g_snap.py` | 283 | 捕捉点空间哈希、网格自适应、`aim()` 决策 | `update_points/aim/candidates` |
 | `g_view.py` | 1 942 | 全部鼠标键盘交互、绘制覆盖层、导航门控、拖角手柄 | `_snap_action/begin_follow/...` |
-| `ui/design_window.py` | 695 | 主窗口装配 + 命令分发 `_do()` | `DesignerWindow` |
-| `ui/property_panel.py` | 691 | 分页属性面板（通用/外观/布局/专用/控件/场景/多选） | `update_for_selected` |
+| `ui/design_window.py` | 795 | 主窗口装配 + 命令分发 `_do()` | `DesignerWindow` |
+| `ui/property_panel.py` | 863 | 分页属性面板（通用/外观/布局/专用/控件/场景/多选） | `update_for_selected` |
 | `ui/layer_tree.py` | 194 | 图层树（平铺 / 分组两种模式 + 过滤） | `refresh/sync_selection` |
 | `ui/toolbox.py` | 449 | 图元工具箱 + 组合模板按钮 + 缩略图自绘 | `ElementToolboxDock` |
 | `ui/template_store.py` | 312 | 组合模板存取（与旧设计器共用一份 JSON） | `TemplateStore.add_from_group` |
@@ -174,10 +174,14 @@ sequenceDiagram
 | `center_pos` / `origin_pos` | `{x,y}` | 页面坐标：可视中心 / 旋转支点 |
 | `width` / `height`（`circle` 用 `radius_w/radius_h`，`line` 用 `head_pos`/`end_pos`，顶点类用 `vertices`） | float / list | 几何 |
 | `rotate` | float | 页面角度（度） |
-| `style` | dict | `stroke/strokeWidth/fill/fill_color/opacity/font_size/cornerRadius` |
+| `style` | dict | `stroke/strokeWidth/fill/fill_color/opacity/font_size/font_family/cornerRadius`；`font_family` 是可选键，缺省 `Arial`（旧 Core `text_element` 口径），只有用户真换字体才写 |
 | `zValue` | float | 绘制层级；**1573 项重复、仅 207 个不同值**，真实层级靠数组顺序稳定排序 |
 | `context` / `image_path` / `checked` / `widgetType` 等 | — | 类型专有字段 |
-| `widgetType/widgetText/widgetFontSize/widgetColor/widgetBackground` | — | widget 的 5 个**顶层**字段（不在 `style` 里） |
+| `widgetType/widgetText/widgetFontSize/widgetFontFamily/widgetColor/widgetBackground` | — | widget 的 6 个**顶层**字段（不在 `style` 里）；前 5 个与旧 Core 逐字一致，`widgetFontFamily` 为可选扩展，空串 = 跟随应用默认字体 |
+
+字体下拉的两个入口都走 `g_style.available_font_families()`，它把 **GDI 位图字体**（`Terminal` / `Fixedsys` / `System` / `Modern` / `Roman` / `Script` / `Small Fonts` / `Courier` / `MS Serif` / `MS Sans Serif`）剔除掉了：DirectWrite 没有这些族的字体文件，给它们设 `Qt.FontRole` 做预览会刷 `CreateFontFaceFromHDC() failed` 告警，而且位图字体本来就不缩放。存量 page 若存了这类族名，仍插到下拉最前（保持所见即真值）但不给预览字体。
+
+`name` 是**整页唯一**的键（图层树、`find_item_by_name`、运行态按名绑定都依赖它）。改名统一走 `BaseItem.set_name` → `GraphicsScene.rename_item`，由 `rename_problem()` 判定：空名、与别的图元重名（去空白后全等、区分大小写）一律**拒绝**，被拒时一个字段都不写、不产生撤销点。属性面板把输入框回滚到真名并弹气泡；F2 / 右键重命名弹提示后留在对话框里。组改名在写之前校验，重名时组名与成员前缀都不动，不留半成品。存量 page 若本身是历史重名数据，**加载不校验、不自动改名**——只有显式改名才检查，保证 1618 图元对拍与 round-trip 零改动。
 
 存量页面实测分布（`page_1.json`，1618 项）：
 
@@ -243,7 +247,7 @@ item.setRotation(θ)
 1. `mapToScene(QPointF(0,0)) == 可视中心`，与支点是否自定义无关 —— 这是 `has_explicit_geometry()` 判定与文本/控件对齐的基础。
 2. **平移必须用 `pos()` 而不是 `scenePos()`**：自定义支点时两者恒差 `o − R·o`。同理，改角度只动 `rotation()`，`pos` 不动，于是「支点处不动」天然成立。
 
-有父图元还有第二套读数：**父坐标系**（`page_local_center/angle/origin`）。存储仍是场景绝对坐标，靠 `local_to_world` / `world_to_local` 互换。属性面板的「布局」页在设父后显示的就是父系坐标，中心 X/Y 只读（子图元不能自行平移）。
+有父图元还有第二套读数：**父坐标系**（`page_local_center/angle/origin`）。存储仍是场景绝对坐标，靠 `local_to_world` / `world_to_local` 互换。属性面板的「布局」页在设父后显示的就是父系坐标，中心 X/Y 只读（**设计态**子图元不能自行平移）。运行态会放行子图元自身平移：`set_page_center` / `RuntimeElement.setPos` 可让子控件在父图元内部偏移，父对象之后运动仍按刚体带着它走。
 
 ---
 
@@ -338,6 +342,10 @@ p' = R(Δθ)·(p − C_old) + C_new
 - 不进 `SceneIndex`（`all_items` / `page_data` 都看不到它，INV-8）；
 - 对齐方式：控件本地矩形恒 `(0,0,w,h)`，`resize` 只改尺寸，`setTransformOriginPoint(w/2,h/2)` 把旋转支点钉在控件中心，`pos = mapToScene(0,0) − (w/2,h/2)`。**不要用 `setGeometry(-w/2,-h/2,w,h)` 再 `setPos`** —— 前者会同步改写 pos，控件左上角跑到中心并绕左上角转。
 
+模式切换的通知口径：`set_scene_mode(run)` 只发自己的 `sceneModeChanged = Signal(bool)`。**别拿 Qt 内置的 `sceneRectChanged` 代发**——它的载荷是 `QRectF`，用 `bool` 去 emit 会直接抛 `TypeError`，还会把 `sceneRect` 的语义搞乱。视图侧在 `setScene()` 里连 / 断这个信号（切页换场景会重新接一遍，只在 `__init__` 里连一次的话换页后就断供），槽只负责刷新画面。
+
+网格的显隐**不由信号改 `show_grid`**：`show_grid` / `snap.grid_enabled` 表达的是用户在「视图 → 显示网格」里的偏好（`toggle_grid` 同时改这两个），运行态只是不画（`drawBackground` 里判 `is_run_mode`），切回设计态自动恢复用户原来的选择。旧 Core 的 `set_scene_mode(Run)` 直接 `show_grid(False)`、回设计态又无条件 `True`，等于抹掉用户选择，这里刻意不照抄。判断放在绘制处还有一个好处：`R` 键预览、`RuntimeView.apply_run_mode` 都是直接写 `is_run_mode`、不经过信号，也不会漏。
+
 ### 4.7 运行态适配层
 
 三条业务线都采用「薄包装」而非改业务代码：
@@ -425,6 +433,30 @@ contentChanged 链          44 ms   ← 又一次 tree.refresh（notify_edit 路
 **关键观察：这三块都是 O(n) 全量工作，且与「改了什么」无关。** 改一个像素的描边宽度，也要重建整页快照 + 整棵树 + 全部吸附点。
 
 按帧预算看：拖动单个图元 6.2 ms + 绘制，尚在一帧 16.7 ms 内；但任何「提交型」操作都会让界面卡 0.2 s，连续拖旋转 spinbox 会掉到 5 fps 以下。
+
+### 6.2 框选（橡皮筋）每帧成本
+
+实测口径：`page_1.json`（1618 图元，其中 103 个 text）、Windows 平台、1600×900 窗口（视口 956×569）、`fit_content()` 之后，QTest 模拟按住左键拖 20~24 步取每步中位。
+
+| 场景 | 修复前 | 修复后 |
+| --- | ---: | ---: |
+| 整屏框选（选中 1457） | 193 ms | 99 ms |
+| 中等区域（选中 129） | 63 ms | 20 ms |
+| 小方块（选中 30） | 37 ms | 19 ms |
+
+三条独立成因（都不是「图元多所以慢」这么笼统）：
+
+1. **Qt 的橡皮筋画在视口画布上**，`RubberBandDrag` 每移动一格都要重画整个视口——`drawBackground` 收到的暴露矩形恒等于整页（实测 6645×3955），所以每帧成本就是「一帧全画 1618 个图元」。这一点改不了，只能压低单帧成本。
+2. **每改一次选中就重建面板 + 整表同步图层树**。框选期间选中集合每格都在变，一屏拖下来触发 17 次：属性面板重建 12 ms/次、`LayerTreeDock.sync_selection` 21 ms/次，合计约 700 ms 纯 UI 重建，且中间那些半成品多选状态用户根本看不清。
+3. **`TextItem.paint` 每帧给同一串字排两次版**：先 `painter.boundingRect(r, AlignCenter, text)` 量出紧凑矩形，再 `drawText` 进那个矩形。实测单次 text paint 168 µs，rect 只有 19 µs；103 个 text 就是每帧 17 ms。这也是「框选 text 图元特别卡」的直接原因。
+
+对应修法：
+
+- `GraphicsView._refresh_selection_dirty()`：选中变化不再 `viewport().update()`，改成 `updateScene()` 只标脏「标记占的区域」（每个选中项的红点 / 支点环 / 中心→支点虚线 / 单选框手柄）。超过 `_MAX_SELECTION_MARKS`(200) 时前景层本来就不画标记，只需把上一批标记擦掉。图元自己那条选中虚线框由 Qt 在选中状态变化时 update 图元区域，不归这里管。
+- `GraphicsView.selectionSettled` + `is_band_selecting()`：左键按在空白处 → 框选开始，主窗口 `_on_selection_changed` 只置 `_selection_pending`；松手发信号后 `_flush_selection()` 一次性重建面板 / 同步图层树。图层树自己也通过 `set_defer_probe()` 用同一个探针跳过拖动中的同步。
+- `TextItem.paint` 改成一次 `drawText(r, Qt.AlignCenter | Qt.TextDontClip, text)`。`TextDontClip` 保住了旧行为「文字超出边框也不裁」；六种情形（短文本 / 溢出 / 多行 / 0.4~3.0 倍缩放 / 中文混排）逐像素比对与旧写法完全一致。300 个 text 的单帧从 83 ms 降到 52 ms。
+
+**剩余瓶颈**：修完之后每步 ≈ 一帧全画（19~20 ms，热态），这是 Qt 橡皮筋整屏重绘的固有成本。要再往下走只有两条路：自绘橡皮筋（把 band 画进 `drawForeground`，移动时只标脏 band 的两条窄条），或给重图元开 `DeviceCoordinateCache`（实测全部图元开缓存 90 → 51 ms，但每次缩放都要重建缓存）。
 
 ---
 
@@ -720,7 +752,7 @@ Designer/CoreQGraphics/
 ├── __init__.py            384   包文档（口径大全）+ 延迟导出
 ├── __main__.py             48   python -m 入口
 ├── g_projection.py         98   投影
-├── g_style.py             169   画笔/字体/度量缓存
+├── g_style.py             255   画笔/字体/度量缓存
 ├── g_widgets.py           323   控件变体
 ├── g_element.py           912   图元基类
 ├── g_elements.py        1 071   12 类图元

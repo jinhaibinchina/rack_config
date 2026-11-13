@@ -9,11 +9,11 @@
 存在的 OPC UA 节点导出文件；而本图元给控件的逻辑尺寸只有 468×345。
 
 这里是一块自包含、随图元尺寸自适应的普通 ``QWidget``，通过统一运行态的
-:class:`~Designer.CoreQGraphics.runtime.ControlProvider` 挂进 ``WidgetHost``：
+:class:`~DesignerV2.CoreQGraphics.runtime.ControlProvider` 挂进 ``WidgetHost``：
 
 .. code-block:: python
 
-    from Designer.CoreQGraphics.runtime import ControlProvider
+    from DesignerV2.CoreQGraphics.runtime import ControlProvider
     from App_test_fixture.servo_panel import ServoPanelProvider
 
     stage.set_mapping({"电机监控窗口": ServoPanelProvider()})
@@ -68,7 +68,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from Designer.CoreQGraphics.runtime import ControlProvider
+from DesignerV2.CoreQGraphics.runtime import ControlProvider
 
 from . import fixture_config as cfg
 

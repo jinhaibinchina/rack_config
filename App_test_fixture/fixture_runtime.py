@@ -58,7 +58,7 @@ from PySide6.QtCore import QObject, QPointF, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QSpinBox
 
-from Designer.CoreQGraphics.runtime import RuntimeStage
+from DesignerV2.CoreQGraphics.runtime import RuntimeStage
 
 from . import fixture_config as cfg
 from .datasource import DataSource

@@ -79999,6 +79999,2707 @@
                     ]
                 }
             ]
+        },
+        {
+            "id": "tpl_5",
+            "name": "group_89",
+            "root_id": 89,
+            "width": 1085.6862359022666,
+            "height": 1071.784786086293,
+            "created_at": "2026-11-13T13:53:27",
+            "items": [
+                {
+                    "id": 89,
+                    "name": "group_89",
+                    "type": "group",
+                    "parent_id": 0,
+                    "children_ids": [
+                        69,
+                        77,
+                        76,
+                        65,
+                        60,
+                        72,
+                        75,
+                        87,
+                        70,
+                        80,
+                        63,
+                        61,
+                        83,
+                        79,
+                        62,
+                        84,
+                        81,
+                        85,
+                        71,
+                        67,
+                        78,
+                        64,
+                        82,
+                        73,
+                        74,
+                        86,
+                        68
+                    ],
+                    "group_id": 0,
+                    "center_pos": {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "origin_pos": {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "width": 1085.6862359022666,
+                    "height": 1071.784786086293,
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": false,
+                        "fill_color": "#00ff00",
+                        "opacity": 255,
+                        "cornerRadius": 0.0
+                    },
+                    "zValue": 69.0
+                },
+                {
+                    "id": 60,
+                    "name": "group_89_矩形_45",
+                    "type": "rect",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "origin_pos": {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "width": 1085.6862359022666,
+                    "height": 1071.7847860862937,
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#aaaaff",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 41.0
+                },
+                {
+                    "id": 61,
+                    "name": "group_89_直线_19",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": -336.093,
+                        "y": 193.751
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 5,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 42.0,
+                    "head_pos": {
+                        "x": -287.891,
+                        "y": 133.65
+                    },
+                    "end_pos": {
+                        "x": -384.294,
+                        "y": 253.852
+                    },
+                    "length": 154.08458460534032,
+                    "center_pos": {
+                        "x": -336.093,
+                        "y": 193.751
+                    }
+                },
+                {
+                    "id": 62,
+                    "name": "group_89_矩形_18",
+                    "type": "rect",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": -262.279,
+                        "y": -57.728
+                    },
+                    "origin_pos": {
+                        "x": -262.279,
+                        "y": -51.868
+                    },
+                    "width": 271.4682029967003,
+                    "height": 380.89894099097023,
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#55aaff",
+                        "opacity": 255,
+                        "cornerRadius": 48.0,
+                        "font_size": 10
+                    },
+                    "zValue": 43.0
+                },
+                {
+                    "id": 63,
+                    "name": "group_89_圆_2",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 8.393,
+                        "y": -72.167
+                    },
+                    "origin_pos": {
+                        "x": -4.823,
+                        "y": -61.978
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#ffff7f",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 44.0,
+                    "radius_w": 162.7277375513593,
+                    "radius_h": 160.68059827779595
+                },
+                {
+                    "id": 64,
+                    "name": "group_89_group_5_圆_3",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 46.702,
+                        "y": -11.575
+                    },
+                    "origin_pos": {
+                        "x": 46.702,
+                        "y": -11.575
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#000000",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 45.0,
+                    "radius_w": 25.86660799587929,
+                    "radius_h": 25.88759993238021
+                },
+                {
+                    "id": 65,
+                    "name": "group_89_group_5_圆_3_2",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 53.376,
+                        "y": -20.193
+                    },
+                    "origin_pos": {
+                        "x": 53.376,
+                        "y": -20.193
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#ffffff",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#ffffff",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 46.0,
+                    "radius_w": 9.579025397831861,
+                    "radius_h": 9.806445792657845
+                },
+                {
+                    "id": 67,
+                    "name": "group_89_group_5_2_圆_3",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 44.507,
+                        "y": -114.273
+                    },
+                    "origin_pos": {
+                        "x": 44.507,
+                        "y": -114.273
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#000000",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 48.0,
+                    "radius_w": 25.86660799587929,
+                    "radius_h": 25.88759993238021
+                },
+                {
+                    "id": 68,
+                    "name": "group_89_group_5_2_圆_3_2",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 51.18,
+                        "y": -122.891
+                    },
+                    "origin_pos": {
+                        "x": 51.18,
+                        "y": -122.891
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#ffffff",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#ffffff",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 49.0,
+                    "radius_w": 9.579025397831861,
+                    "radius_h": 9.806445792657845
+                },
+                {
+                    "id": 69,
+                    "name": "group_89_圆_9",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": -30.263,
+                        "y": -167.703
+                    },
+                    "origin_pos": {
+                        "x": -27.172,
+                        "y": -169.253
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#ff007f",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 50.0,
+                    "radius_w": 22.654645906068218,
+                    "radius_h": 23.894004726738086
+                },
+                {
+                    "id": 70,
+                    "name": "group_89_圆_9_2",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": -35.812,
+                        "y": 35.45
+                    },
+                    "origin_pos": {
+                        "x": 10.568,
+                        "y": 50.948
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#ff007f",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 51.0,
+                    "radius_w": 21.718426532765864,
+                    "radius_h": 22.537037568355462
+                },
+                {
+                    "id": 71,
+                    "name": "group_89_贝塞尔曲线_12",
+                    "type": "bezier",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": -109.846,
+                        "y": -62.173
+                    },
+                    "origin_pos": {
+                        "x": -109.846,
+                        "y": -62.173
+                    },
+                    "width": 12.676309907691689,
+                    "height": 102.89800000000105,
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 5,
+                        "fill": false,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 52.0,
+                    "path_segments": [
+                        {
+                            "kind": "move",
+                            "x": -104.512,
+                            "y": -10.726
+                        },
+                        {
+                            "kind": "curve",
+                            "c1x": -126.891,
+                            "c1y": -60.641,
+                            "c2x": -111.651,
+                            "c2y": -100.382,
+                            "x": -103.507,
+                            "y": -113.624
+                        }
+                    ],
+                    "path_fill_rule": "odd_even",
+                    "vertices": [
+                        {
+                            "x": -104.512,
+                            "y": -10.726,
+                            "move": true
+                        },
+                        {
+                            "x": -108.278,
+                            "y": -19.962
+                        },
+                        {
+                            "x": -111.228,
+                            "y": -28.935
+                        },
+                        {
+                            "x": -113.427,
+                            "y": -37.623
+                        },
+                        {
+                            "x": -114.941,
+                            "y": -46.0
+                        },
+                        {
+                            "x": -115.836,
+                            "y": -54.042
+                        },
+                        {
+                            "x": -116.176,
+                            "y": -61.727
+                        },
+                        {
+                            "x": -116.027,
+                            "y": -69.03
+                        },
+                        {
+                            "x": -115.456,
+                            "y": -75.927
+                        },
+                        {
+                            "x": -113.305,
+                            "y": -88.408
+                        },
+                        {
+                            "x": -110.247,
+                            "y": -98.979
+                        },
+                        {
+                            "x": -106.806,
+                            "y": -107.448
+                        },
+                        {
+                            "x": -103.507,
+                            "y": -113.624
+                        }
+                    ]
+                },
+                {
+                    "id": 72,
+                    "name": "group_89_布尔差集_15",
+                    "type": "path",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 170.872,
+                        "y": -73.71
+                    },
+                    "origin_pos": {
+                        "x": 170.872,
+                        "y": -73.71
+                    },
+                    "width": 208.2600000000001,
+                    "height": 301.22099999999955,
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#ff5500",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 53.0,
+                    "path_segments": [
+                        {
+                            "kind": "move",
+                            "x": 82.616,
+                            "y": -224.324
+                        },
+                        {
+                            "kind": "line",
+                            "x": 77.588,
+                            "y": -224.277
+                        },
+                        {
+                            "kind": "line",
+                            "x": 72.589,
+                            "y": -224.14
+                        },
+                        {
+                            "kind": "line",
+                            "x": 70.566,
+                            "y": -224.032
+                        },
+                        {
+                            "kind": "line",
+                            "x": 72.084,
+                            "y": -220.779
+                        },
+                        {
+                            "kind": "line",
+                            "x": 74.772,
+                            "y": -214.756
+                        },
+                        {
+                            "kind": "line",
+                            "x": 77.314,
+                            "y": -208.621
+                        },
+                        {
+                            "kind": "line",
+                            "x": 79.721,
+                            "y": -202.376
+                        },
+                        {
+                            "kind": "line",
+                            "x": 82.072,
+                            "y": -196.096
+                        },
+                        {
+                            "kind": "line",
+                            "x": 84.263,
+                            "y": -189.673
+                        },
+                        {
+                            "kind": "line",
+                            "x": 86.327,
+                            "y": -183.201
+                        },
+                        {
+                            "kind": "line",
+                            "x": 88.314,
+                            "y": -176.645
+                        },
+                        {
+                            "kind": "line",
+                            "x": 90.139,
+                            "y": -170.028
+                        },
+                        {
+                            "kind": "line",
+                            "x": 91.845,
+                            "y": -163.303
+                        },
+                        {
+                            "kind": "line",
+                            "x": 93.449,
+                            "y": -156.522
+                        },
+                        {
+                            "kind": "line",
+                            "x": 94.909,
+                            "y": -149.674
+                        },
+                        {
+                            "kind": "line",
+                            "x": 96.22,
+                            "y": -142.758
+                        },
+                        {
+                            "kind": "line",
+                            "x": 97.419,
+                            "y": -135.784
+                        },
+                        {
+                            "kind": "line",
+                            "x": 98.487,
+                            "y": -128.706
+                        },
+                        {
+                            "kind": "line",
+                            "x": 99.399,
+                            "y": -121.616
+                        },
+                        {
+                            "kind": "line",
+                            "x": 100.174,
+                            "y": -114.447
+                        },
+                        {
+                            "kind": "line",
+                            "x": 100.82,
+                            "y": -107.213
+                        },
+                        {
+                            "kind": "line",
+                            "x": 101.336,
+                            "y": -99.934
+                        },
+                        {
+                            "kind": "line",
+                            "x": 101.7,
+                            "y": -92.627
+                        },
+                        {
+                            "kind": "line",
+                            "x": 101.918,
+                            "y": -85.228
+                        },
+                        {
+                            "kind": "line",
+                            "x": 101.995,
+                            "y": -77.812
+                        },
+                        {
+                            "kind": "line",
+                            "x": 101.918,
+                            "y": -70.367
+                        },
+                        {
+                            "kind": "line",
+                            "x": 101.7,
+                            "y": -63.0
+                        },
+                        {
+                            "kind": "line",
+                            "x": 101.336,
+                            "y": -55.659
+                        },
+                        {
+                            "kind": "line",
+                            "x": 100.82,
+                            "y": -48.383
+                        },
+                        {
+                            "kind": "line",
+                            "x": 100.174,
+                            "y": -41.151
+                        },
+                        {
+                            "kind": "line",
+                            "x": 99.399,
+                            "y": -33.981
+                        },
+                        {
+                            "kind": "line",
+                            "x": 98.487,
+                            "y": -26.89
+                        },
+                        {
+                            "kind": "line",
+                            "x": 97.419,
+                            "y": -19.826
+                        },
+                        {
+                            "kind": "line",
+                            "x": 96.22,
+                            "y": -12.855
+                        },
+                        {
+                            "kind": "line",
+                            "x": 94.909,
+                            "y": -5.922
+                        },
+                        {
+                            "kind": "line",
+                            "x": 93.449,
+                            "y": 0.925
+                        },
+                        {
+                            "kind": "line",
+                            "x": 91.845,
+                            "y": 7.696
+                        },
+                        {
+                            "kind": "line",
+                            "x": 90.139,
+                            "y": 14.422
+                        },
+                        {
+                            "kind": "line",
+                            "x": 88.314,
+                            "y": 21.047
+                        },
+                        {
+                            "kind": "line",
+                            "x": 86.327,
+                            "y": 27.605
+                        },
+                        {
+                            "kind": "line",
+                            "x": 84.263,
+                            "y": 34.078
+                        },
+                        {
+                            "kind": "line",
+                            "x": 82.072,
+                            "y": 40.466
+                        },
+                        {
+                            "kind": "line",
+                            "x": 79.721,
+                            "y": 46.783
+                        },
+                        {
+                            "kind": "line",
+                            "x": 77.314,
+                            "y": 52.996
+                        },
+                        {
+                            "kind": "line",
+                            "x": 74.772,
+                            "y": 59.128
+                        },
+                        {
+                            "kind": "line",
+                            "x": 72.084,
+                            "y": 65.186
+                        },
+                        {
+                            "kind": "line",
+                            "x": 69.343,
+                            "y": 71.113
+                        },
+                        {
+                            "kind": "line",
+                            "x": 66.734,
+                            "y": 76.407
+                        },
+                        {
+                            "kind": "line",
+                            "x": 67.588,
+                            "y": 76.434
+                        },
+                        {
+                            "kind": "line",
+                            "x": 72.589,
+                            "y": 76.717
+                        },
+                        {
+                            "kind": "line",
+                            "x": 77.588,
+                            "y": 76.849
+                        },
+                        {
+                            "kind": "line",
+                            "x": 82.616,
+                            "y": 76.897
+                        },
+                        {
+                            "kind": "line",
+                            "x": 87.658,
+                            "y": 76.849
+                        },
+                        {
+                            "kind": "line",
+                            "x": 92.714,
+                            "y": 76.717
+                        },
+                        {
+                            "kind": "line",
+                            "x": 97.675,
+                            "y": 76.434
+                        },
+                        {
+                            "kind": "line",
+                            "x": 102.611,
+                            "y": 76.091
+                        },
+                        {
+                            "kind": "line",
+                            "x": 107.519,
+                            "y": 75.672
+                        },
+                        {
+                            "kind": "line",
+                            "x": 112.402,
+                            "y": 75.105
+                        },
+                        {
+                            "kind": "line",
+                            "x": 117.218,
+                            "y": 74.492
+                        },
+                        {
+                            "kind": "line",
+                            "x": 121.978,
+                            "y": 73.754
+                        },
+                        {
+                            "kind": "line",
+                            "x": 126.738,
+                            "y": 72.919
+                        },
+                        {
+                            "kind": "line",
+                            "x": 131.46,
+                            "y": 72.033
+                        },
+                        {
+                            "kind": "line",
+                            "x": 136.117,
+                            "y": 71.021
+                        },
+                        {
+                            "kind": "line",
+                            "x": 140.694,
+                            "y": 69.943
+                        },
+                        {
+                            "kind": "line",
+                            "x": 145.27,
+                            "y": 68.761
+                        },
+                        {
+                            "kind": "line",
+                            "x": 149.753,
+                            "y": 67.475
+                        },
+                        {
+                            "kind": "line",
+                            "x": 154.191,
+                            "y": 66.143
+                        },
+                        {
+                            "kind": "line",
+                            "x": 158.605,
+                            "y": 64.72
+                        },
+                        {
+                            "kind": "line",
+                            "x": 162.95,
+                            "y": 63.182
+                        },
+                        {
+                            "kind": "line",
+                            "x": 167.248,
+                            "y": 61.612
+                        },
+                        {
+                            "kind": "line",
+                            "x": 171.461,
+                            "y": 59.92
+                        },
+                        {
+                            "kind": "line",
+                            "x": 175.644,
+                            "y": 58.167
+                        },
+                        {
+                            "kind": "line",
+                            "x": 179.731,
+                            "y": 56.332
+                        },
+                        {
+                            "kind": "line",
+                            "x": 183.771,
+                            "y": 54.438
+                        },
+                        {
+                            "kind": "line",
+                            "x": 187.733,
+                            "y": 52.458
+                        },
+                        {
+                            "kind": "line",
+                            "x": 191.675,
+                            "y": 50.409
+                        },
+                        {
+                            "kind": "line",
+                            "x": 195.477,
+                            "y": 48.301
+                        },
+                        {
+                            "kind": "line",
+                            "x": 199.269,
+                            "y": 46.106
+                        },
+                        {
+                            "kind": "line",
+                            "x": 202.963,
+                            "y": 43.821
+                        },
+                        {
+                            "kind": "line",
+                            "x": 206.589,
+                            "y": 41.465
+                        },
+                        {
+                            "kind": "line",
+                            "x": 210.129,
+                            "y": 39.072
+                        },
+                        {
+                            "kind": "line",
+                            "x": 213.62,
+                            "y": 36.62
+                        },
+                        {
+                            "kind": "line",
+                            "x": 216.998,
+                            "y": 34.087
+                        },
+                        {
+                            "kind": "line",
+                            "x": 220.301,
+                            "y": 31.474
+                        },
+                        {
+                            "kind": "line",
+                            "x": 223.53,
+                            "y": 28.842
+                        },
+                        {
+                            "kind": "line",
+                            "x": 226.709,
+                            "y": 26.101
+                        },
+                        {
+                            "kind": "line",
+                            "x": 229.754,
+                            "y": 23.346
+                        },
+                        {
+                            "kind": "line",
+                            "x": 232.734,
+                            "y": 20.5
+                        },
+                        {
+                            "kind": "line",
+                            "x": 235.626,
+                            "y": 17.607
+                        },
+                        {
+                            "kind": "line",
+                            "x": 238.458,
+                            "y": 14.653
+                        },
+                        {
+                            "kind": "line",
+                            "x": 241.151,
+                            "y": 11.63
+                        },
+                        {
+                            "kind": "line",
+                            "x": 243.794,
+                            "y": 8.585
+                        },
+                        {
+                            "kind": "line",
+                            "x": 246.315,
+                            "y": 5.461
+                        },
+                        {
+                            "kind": "line",
+                            "x": 248.728,
+                            "y": 2.302
+                        },
+                        {
+                            "kind": "line",
+                            "x": 251.09,
+                            "y": -0.905
+                        },
+                        {
+                            "kind": "line",
+                            "x": 253.33,
+                            "y": -4.168
+                        },
+                        {
+                            "kind": "line",
+                            "x": 255.474,
+                            "y": -7.479
+                        },
+                        {
+                            "kind": "line",
+                            "x": 257.48,
+                            "y": -10.81
+                        },
+                        {
+                            "kind": "line",
+                            "x": 259.422,
+                            "y": -14.229
+                        },
+                        {
+                            "kind": "line",
+                            "x": 261.248,
+                            "y": -17.663
+                        },
+                        {
+                            "kind": "line",
+                            "x": 262.957,
+                            "y": -21.173
+                        },
+                        {
+                            "kind": "line",
+                            "x": 264.602,
+                            "y": -24.685
+                        },
+                        {
+                            "kind": "line",
+                            "x": 266.107,
+                            "y": -28.247
+                        },
+                        {
+                            "kind": "line",
+                            "x": 267.481,
+                            "y": -31.85
+                        },
+                        {
+                            "kind": "line",
+                            "x": 268.768,
+                            "y": -35.502
+                        },
+                        {
+                            "kind": "line",
+                            "x": 269.915,
+                            "y": -39.19
+                        },
+                        {
+                            "kind": "line",
+                            "x": 270.965,
+                            "y": -42.898
+                        },
+                        {
+                            "kind": "line",
+                            "x": 271.913,
+                            "y": -46.636
+                        },
+                        {
+                            "kind": "line",
+                            "x": 272.729,
+                            "y": -50.423
+                        },
+                        {
+                            "kind": "line",
+                            "x": 273.43,
+                            "y": -54.224
+                        },
+                        {
+                            "kind": "line",
+                            "x": 273.97,
+                            "y": -58.075
+                        },
+                        {
+                            "kind": "line",
+                            "x": 274.435,
+                            "y": -61.951
+                        },
+                        {
+                            "kind": "line",
+                            "x": 274.747,
+                            "y": -65.85
+                        },
+                        {
+                            "kind": "line",
+                            "x": 274.976,
+                            "y": -69.769
+                        },
+                        {
+                            "kind": "line",
+                            "x": 274.994,
+                            "y": -73.709
+                        },
+                        {
+                            "kind": "line",
+                            "x": 274.976,
+                            "y": -77.656
+                        },
+                        {
+                            "kind": "line",
+                            "x": 274.747,
+                            "y": -81.576
+                        },
+                        {
+                            "kind": "line",
+                            "x": 274.435,
+                            "y": -85.478
+                        },
+                        {
+                            "kind": "line",
+                            "x": 273.97,
+                            "y": -89.366
+                        },
+                        {
+                            "kind": "line",
+                            "x": 273.43,
+                            "y": -93.185
+                        },
+                        {
+                            "kind": "line",
+                            "x": 272.729,
+                            "y": -96.995
+                        },
+                        {
+                            "kind": "line",
+                            "x": 271.913,
+                            "y": -100.796
+                        },
+                        {
+                            "kind": "line",
+                            "x": 270.965,
+                            "y": -104.541
+                        },
+                        {
+                            "kind": "line",
+                            "x": 269.915,
+                            "y": -108.238
+                        },
+                        {
+                            "kind": "line",
+                            "x": 268.768,
+                            "y": -111.929
+                        },
+                        {
+                            "kind": "line",
+                            "x": 267.481,
+                            "y": -115.582
+                        },
+                        {
+                            "kind": "line",
+                            "x": 266.107,
+                            "y": -119.189
+                        },
+                        {
+                            "kind": "line",
+                            "x": 264.602,
+                            "y": -122.747
+                        },
+                        {
+                            "kind": "line",
+                            "x": 262.957,
+                            "y": -126.263
+                        },
+                        {
+                            "kind": "line",
+                            "x": 261.248,
+                            "y": -129.774
+                        },
+                        {
+                            "kind": "line",
+                            "x": 259.422,
+                            "y": -133.208
+                        },
+                        {
+                            "kind": "line",
+                            "x": 257.48,
+                            "y": -136.617
+                        },
+                        {
+                            "kind": "line",
+                            "x": 255.474,
+                            "y": -139.947
+                        },
+                        {
+                            "kind": "line",
+                            "x": 253.33,
+                            "y": -143.273
+                        },
+                        {
+                            "kind": "line",
+                            "x": 251.09,
+                            "y": -146.522
+                        },
+                        {
+                            "kind": "line",
+                            "x": 248.728,
+                            "y": -149.733
+                        },
+                        {
+                            "kind": "line",
+                            "x": 246.315,
+                            "y": -152.877
+                        },
+                        {
+                            "kind": "line",
+                            "x": 243.794,
+                            "y": -156.014
+                        },
+                        {
+                            "kind": "line",
+                            "x": 241.151,
+                            "y": -159.064
+                        },
+                        {
+                            "kind": "line",
+                            "x": 238.458,
+                            "y": -162.087
+                        },
+                        {
+                            "kind": "line",
+                            "x": 235.626,
+                            "y": -165.034
+                        },
+                        {
+                            "kind": "line",
+                            "x": 232.734,
+                            "y": -167.934
+                        },
+                        {
+                            "kind": "line",
+                            "x": 229.754,
+                            "y": -170.77
+                        },
+                        {
+                            "kind": "line",
+                            "x": 226.709,
+                            "y": -173.533
+                        },
+                        {
+                            "kind": "line",
+                            "x": 223.53,
+                            "y": -176.276
+                        },
+                        {
+                            "kind": "line",
+                            "x": 220.301,
+                            "y": -178.897
+                        },
+                        {
+                            "kind": "line",
+                            "x": 216.998,
+                            "y": -181.512
+                        },
+                        {
+                            "kind": "line",
+                            "x": 213.62,
+                            "y": -184.05
+                        },
+                        {
+                            "kind": "line",
+                            "x": 210.129,
+                            "y": -186.507
+                        },
+                        {
+                            "kind": "line",
+                            "x": 206.589,
+                            "y": -188.899
+                        },
+                        {
+                            "kind": "line",
+                            "x": 202.963,
+                            "y": -191.245
+                        },
+                        {
+                            "kind": "line",
+                            "x": 199.269,
+                            "y": -193.521
+                        },
+                        {
+                            "kind": "line",
+                            "x": 195.477,
+                            "y": -195.722
+                        },
+                        {
+                            "kind": "line",
+                            "x": 191.675,
+                            "y": -197.84
+                        },
+                        {
+                            "kind": "line",
+                            "x": 187.733,
+                            "y": -199.884
+                        },
+                        {
+                            "kind": "line",
+                            "x": 183.771,
+                            "y": -201.877
+                        },
+                        {
+                            "kind": "line",
+                            "x": 179.731,
+                            "y": -203.771
+                        },
+                        {
+                            "kind": "line",
+                            "x": 175.644,
+                            "y": -205.592
+                        },
+                        {
+                            "kind": "line",
+                            "x": 171.461,
+                            "y": -207.346
+                        },
+                        {
+                            "kind": "line",
+                            "x": 167.248,
+                            "y": -209.04
+                        },
+                        {
+                            "kind": "line",
+                            "x": 162.95,
+                            "y": -210.616
+                        },
+                        {
+                            "kind": "line",
+                            "x": 158.605,
+                            "y": -212.13
+                        },
+                        {
+                            "kind": "line",
+                            "x": 154.191,
+                            "y": -213.563
+                        },
+                        {
+                            "kind": "line",
+                            "x": 149.753,
+                            "y": -214.901
+                        },
+                        {
+                            "kind": "line",
+                            "x": 145.27,
+                            "y": -216.19
+                        },
+                        {
+                            "kind": "line",
+                            "x": 140.694,
+                            "y": -217.37
+                        },
+                        {
+                            "kind": "line",
+                            "x": 136.117,
+                            "y": -218.46
+                        },
+                        {
+                            "kind": "line",
+                            "x": 131.46,
+                            "y": -219.454
+                        },
+                        {
+                            "kind": "line",
+                            "x": 126.738,
+                            "y": -220.353
+                        },
+                        {
+                            "kind": "line",
+                            "x": 121.978,
+                            "y": -221.184
+                        },
+                        {
+                            "kind": "line",
+                            "x": 117.218,
+                            "y": -221.917
+                        },
+                        {
+                            "kind": "line",
+                            "x": 112.402,
+                            "y": -222.54
+                        },
+                        {
+                            "kind": "line",
+                            "x": 107.519,
+                            "y": -223.101
+                        },
+                        {
+                            "kind": "line",
+                            "x": 102.611,
+                            "y": -223.519
+                        },
+                        {
+                            "kind": "line",
+                            "x": 97.675,
+                            "y": -223.871
+                        },
+                        {
+                            "kind": "line",
+                            "x": 92.714,
+                            "y": -224.14
+                        },
+                        {
+                            "kind": "line",
+                            "x": 87.658,
+                            "y": -224.277
+                        },
+                        {
+                            "kind": "line",
+                            "x": 82.616,
+                            "y": -224.324
+                        }
+                    ],
+                    "path_fill_rule": "odd_even",
+                    "vertices": [
+                        {
+                            "x": 82.616,
+                            "y": -224.324,
+                            "move": true
+                        },
+                        {
+                            "x": 77.588,
+                            "y": -224.277
+                        },
+                        {
+                            "x": 72.589,
+                            "y": -224.14
+                        },
+                        {
+                            "x": 70.566,
+                            "y": -224.032
+                        },
+                        {
+                            "x": 72.084,
+                            "y": -220.779
+                        },
+                        {
+                            "x": 74.772,
+                            "y": -214.756
+                        },
+                        {
+                            "x": 77.314,
+                            "y": -208.621
+                        },
+                        {
+                            "x": 79.721,
+                            "y": -202.376
+                        },
+                        {
+                            "x": 82.072,
+                            "y": -196.096
+                        },
+                        {
+                            "x": 84.263,
+                            "y": -189.673
+                        },
+                        {
+                            "x": 86.327,
+                            "y": -183.201
+                        },
+                        {
+                            "x": 88.314,
+                            "y": -176.645
+                        },
+                        {
+                            "x": 90.139,
+                            "y": -170.028
+                        },
+                        {
+                            "x": 91.845,
+                            "y": -163.303
+                        },
+                        {
+                            "x": 93.449,
+                            "y": -156.522
+                        },
+                        {
+                            "x": 94.909,
+                            "y": -149.674
+                        },
+                        {
+                            "x": 96.22,
+                            "y": -142.758
+                        },
+                        {
+                            "x": 97.419,
+                            "y": -135.784
+                        },
+                        {
+                            "x": 98.487,
+                            "y": -128.706
+                        },
+                        {
+                            "x": 99.399,
+                            "y": -121.616
+                        },
+                        {
+                            "x": 100.174,
+                            "y": -114.447
+                        },
+                        {
+                            "x": 100.82,
+                            "y": -107.213
+                        },
+                        {
+                            "x": 101.336,
+                            "y": -99.934
+                        },
+                        {
+                            "x": 101.7,
+                            "y": -92.627
+                        },
+                        {
+                            "x": 101.918,
+                            "y": -85.228
+                        },
+                        {
+                            "x": 101.995,
+                            "y": -77.812
+                        },
+                        {
+                            "x": 101.918,
+                            "y": -70.367
+                        },
+                        {
+                            "x": 101.7,
+                            "y": -63.0
+                        },
+                        {
+                            "x": 101.336,
+                            "y": -55.659
+                        },
+                        {
+                            "x": 100.82,
+                            "y": -48.383
+                        },
+                        {
+                            "x": 100.174,
+                            "y": -41.151
+                        },
+                        {
+                            "x": 99.399,
+                            "y": -33.981
+                        },
+                        {
+                            "x": 98.487,
+                            "y": -26.89
+                        },
+                        {
+                            "x": 97.419,
+                            "y": -19.826
+                        },
+                        {
+                            "x": 96.22,
+                            "y": -12.855
+                        },
+                        {
+                            "x": 94.909,
+                            "y": -5.922
+                        },
+                        {
+                            "x": 93.449,
+                            "y": 0.925
+                        },
+                        {
+                            "x": 91.845,
+                            "y": 7.696
+                        },
+                        {
+                            "x": 90.139,
+                            "y": 14.422
+                        },
+                        {
+                            "x": 88.314,
+                            "y": 21.047
+                        },
+                        {
+                            "x": 86.327,
+                            "y": 27.605
+                        },
+                        {
+                            "x": 84.263,
+                            "y": 34.078
+                        },
+                        {
+                            "x": 82.072,
+                            "y": 40.466
+                        },
+                        {
+                            "x": 79.721,
+                            "y": 46.783
+                        },
+                        {
+                            "x": 77.314,
+                            "y": 52.996
+                        },
+                        {
+                            "x": 74.772,
+                            "y": 59.128
+                        },
+                        {
+                            "x": 72.084,
+                            "y": 65.186
+                        },
+                        {
+                            "x": 69.343,
+                            "y": 71.113
+                        },
+                        {
+                            "x": 66.734,
+                            "y": 76.407
+                        },
+                        {
+                            "x": 67.588,
+                            "y": 76.434
+                        },
+                        {
+                            "x": 72.589,
+                            "y": 76.717
+                        },
+                        {
+                            "x": 77.588,
+                            "y": 76.849
+                        },
+                        {
+                            "x": 82.616,
+                            "y": 76.897
+                        },
+                        {
+                            "x": 87.658,
+                            "y": 76.849
+                        },
+                        {
+                            "x": 92.714,
+                            "y": 76.717
+                        },
+                        {
+                            "x": 97.675,
+                            "y": 76.434
+                        },
+                        {
+                            "x": 102.611,
+                            "y": 76.091
+                        },
+                        {
+                            "x": 107.519,
+                            "y": 75.672
+                        },
+                        {
+                            "x": 112.402,
+                            "y": 75.105
+                        },
+                        {
+                            "x": 117.218,
+                            "y": 74.492
+                        },
+                        {
+                            "x": 121.978,
+                            "y": 73.754
+                        },
+                        {
+                            "x": 126.738,
+                            "y": 72.919
+                        },
+                        {
+                            "x": 131.46,
+                            "y": 72.033
+                        },
+                        {
+                            "x": 136.117,
+                            "y": 71.021
+                        },
+                        {
+                            "x": 140.694,
+                            "y": 69.943
+                        },
+                        {
+                            "x": 145.27,
+                            "y": 68.761
+                        },
+                        {
+                            "x": 149.753,
+                            "y": 67.475
+                        },
+                        {
+                            "x": 154.191,
+                            "y": 66.143
+                        },
+                        {
+                            "x": 158.605,
+                            "y": 64.72
+                        },
+                        {
+                            "x": 162.95,
+                            "y": 63.182
+                        },
+                        {
+                            "x": 167.248,
+                            "y": 61.612
+                        },
+                        {
+                            "x": 171.461,
+                            "y": 59.92
+                        },
+                        {
+                            "x": 175.644,
+                            "y": 58.167
+                        },
+                        {
+                            "x": 179.731,
+                            "y": 56.332
+                        },
+                        {
+                            "x": 183.771,
+                            "y": 54.438
+                        },
+                        {
+                            "x": 187.733,
+                            "y": 52.458
+                        },
+                        {
+                            "x": 191.675,
+                            "y": 50.409
+                        },
+                        {
+                            "x": 195.477,
+                            "y": 48.301
+                        },
+                        {
+                            "x": 199.269,
+                            "y": 46.106
+                        },
+                        {
+                            "x": 202.963,
+                            "y": 43.821
+                        },
+                        {
+                            "x": 206.589,
+                            "y": 41.465
+                        },
+                        {
+                            "x": 210.129,
+                            "y": 39.072
+                        },
+                        {
+                            "x": 213.62,
+                            "y": 36.62
+                        },
+                        {
+                            "x": 216.998,
+                            "y": 34.087
+                        },
+                        {
+                            "x": 220.301,
+                            "y": 31.474
+                        },
+                        {
+                            "x": 223.53,
+                            "y": 28.842
+                        },
+                        {
+                            "x": 226.709,
+                            "y": 26.101
+                        },
+                        {
+                            "x": 229.754,
+                            "y": 23.346
+                        },
+                        {
+                            "x": 232.734,
+                            "y": 20.5
+                        },
+                        {
+                            "x": 235.626,
+                            "y": 17.607
+                        },
+                        {
+                            "x": 238.458,
+                            "y": 14.653
+                        },
+                        {
+                            "x": 241.151,
+                            "y": 11.63
+                        },
+                        {
+                            "x": 243.794,
+                            "y": 8.585
+                        },
+                        {
+                            "x": 246.315,
+                            "y": 5.461
+                        },
+                        {
+                            "x": 248.728,
+                            "y": 2.302
+                        },
+                        {
+                            "x": 251.09,
+                            "y": -0.905
+                        },
+                        {
+                            "x": 253.33,
+                            "y": -4.168
+                        },
+                        {
+                            "x": 255.474,
+                            "y": -7.479
+                        },
+                        {
+                            "x": 257.48,
+                            "y": -10.81
+                        },
+                        {
+                            "x": 259.422,
+                            "y": -14.229
+                        },
+                        {
+                            "x": 261.248,
+                            "y": -17.663
+                        },
+                        {
+                            "x": 262.957,
+                            "y": -21.173
+                        },
+                        {
+                            "x": 264.602,
+                            "y": -24.685
+                        },
+                        {
+                            "x": 266.107,
+                            "y": -28.247
+                        },
+                        {
+                            "x": 267.481,
+                            "y": -31.85
+                        },
+                        {
+                            "x": 268.768,
+                            "y": -35.502
+                        },
+                        {
+                            "x": 269.915,
+                            "y": -39.19
+                        },
+                        {
+                            "x": 270.965,
+                            "y": -42.898
+                        },
+                        {
+                            "x": 271.913,
+                            "y": -46.636
+                        },
+                        {
+                            "x": 272.729,
+                            "y": -50.423
+                        },
+                        {
+                            "x": 273.43,
+                            "y": -54.224
+                        },
+                        {
+                            "x": 273.97,
+                            "y": -58.075
+                        },
+                        {
+                            "x": 274.435,
+                            "y": -61.951
+                        },
+                        {
+                            "x": 274.747,
+                            "y": -65.85
+                        },
+                        {
+                            "x": 274.976,
+                            "y": -69.769
+                        },
+                        {
+                            "x": 274.994,
+                            "y": -73.709
+                        },
+                        {
+                            "x": 274.976,
+                            "y": -77.656
+                        },
+                        {
+                            "x": 274.747,
+                            "y": -81.576
+                        },
+                        {
+                            "x": 274.435,
+                            "y": -85.478
+                        },
+                        {
+                            "x": 273.97,
+                            "y": -89.366
+                        },
+                        {
+                            "x": 273.43,
+                            "y": -93.185
+                        },
+                        {
+                            "x": 272.729,
+                            "y": -96.995
+                        },
+                        {
+                            "x": 271.913,
+                            "y": -100.796
+                        },
+                        {
+                            "x": 270.965,
+                            "y": -104.541
+                        },
+                        {
+                            "x": 269.915,
+                            "y": -108.238
+                        },
+                        {
+                            "x": 268.768,
+                            "y": -111.929
+                        },
+                        {
+                            "x": 267.481,
+                            "y": -115.582
+                        },
+                        {
+                            "x": 266.107,
+                            "y": -119.189
+                        },
+                        {
+                            "x": 264.602,
+                            "y": -122.747
+                        },
+                        {
+                            "x": 262.957,
+                            "y": -126.263
+                        },
+                        {
+                            "x": 261.248,
+                            "y": -129.774
+                        },
+                        {
+                            "x": 259.422,
+                            "y": -133.208
+                        },
+                        {
+                            "x": 257.48,
+                            "y": -136.617
+                        },
+                        {
+                            "x": 255.474,
+                            "y": -139.947
+                        },
+                        {
+                            "x": 253.33,
+                            "y": -143.273
+                        },
+                        {
+                            "x": 251.09,
+                            "y": -146.522
+                        },
+                        {
+                            "x": 248.728,
+                            "y": -149.733
+                        },
+                        {
+                            "x": 246.315,
+                            "y": -152.877
+                        },
+                        {
+                            "x": 243.794,
+                            "y": -156.014
+                        },
+                        {
+                            "x": 241.151,
+                            "y": -159.064
+                        },
+                        {
+                            "x": 238.458,
+                            "y": -162.087
+                        },
+                        {
+                            "x": 235.626,
+                            "y": -165.034
+                        },
+                        {
+                            "x": 232.734,
+                            "y": -167.934
+                        },
+                        {
+                            "x": 229.754,
+                            "y": -170.77
+                        },
+                        {
+                            "x": 226.709,
+                            "y": -173.533
+                        },
+                        {
+                            "x": 223.53,
+                            "y": -176.276
+                        },
+                        {
+                            "x": 220.301,
+                            "y": -178.897
+                        },
+                        {
+                            "x": 216.998,
+                            "y": -181.512
+                        },
+                        {
+                            "x": 213.62,
+                            "y": -184.05
+                        },
+                        {
+                            "x": 210.129,
+                            "y": -186.507
+                        },
+                        {
+                            "x": 206.589,
+                            "y": -188.899
+                        },
+                        {
+                            "x": 202.963,
+                            "y": -191.245
+                        },
+                        {
+                            "x": 199.269,
+                            "y": -193.521
+                        },
+                        {
+                            "x": 195.477,
+                            "y": -195.722
+                        },
+                        {
+                            "x": 191.675,
+                            "y": -197.84
+                        },
+                        {
+                            "x": 187.733,
+                            "y": -199.884
+                        },
+                        {
+                            "x": 183.771,
+                            "y": -201.877
+                        },
+                        {
+                            "x": 179.731,
+                            "y": -203.771
+                        },
+                        {
+                            "x": 175.644,
+                            "y": -205.592
+                        },
+                        {
+                            "x": 171.461,
+                            "y": -207.346
+                        },
+                        {
+                            "x": 167.248,
+                            "y": -209.04
+                        },
+                        {
+                            "x": 162.95,
+                            "y": -210.616
+                        },
+                        {
+                            "x": 158.605,
+                            "y": -212.13
+                        },
+                        {
+                            "x": 154.191,
+                            "y": -213.563
+                        },
+                        {
+                            "x": 149.753,
+                            "y": -214.901
+                        },
+                        {
+                            "x": 145.27,
+                            "y": -216.19
+                        },
+                        {
+                            "x": 140.694,
+                            "y": -217.37
+                        },
+                        {
+                            "x": 136.117,
+                            "y": -218.46
+                        },
+                        {
+                            "x": 131.46,
+                            "y": -219.454
+                        },
+                        {
+                            "x": 126.738,
+                            "y": -220.353
+                        },
+                        {
+                            "x": 121.978,
+                            "y": -221.184
+                        },
+                        {
+                            "x": 117.218,
+                            "y": -221.917
+                        },
+                        {
+                            "x": 112.402,
+                            "y": -222.54
+                        },
+                        {
+                            "x": 107.519,
+                            "y": -223.101
+                        },
+                        {
+                            "x": 102.611,
+                            "y": -223.519
+                        },
+                        {
+                            "x": 97.675,
+                            "y": -223.871
+                        },
+                        {
+                            "x": 92.714,
+                            "y": -224.14
+                        },
+                        {
+                            "x": 87.658,
+                            "y": -224.277
+                        }
+                    ]
+                },
+                {
+                    "id": 73,
+                    "name": "group_89_贝塞尔曲线_16",
+                    "type": "bezier",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 162.138,
+                        "y": -63.211
+                    },
+                    "origin_pos": {
+                        "x": 162.138,
+                        "y": -63.211
+                    },
+                    "width": 28.435198457275995,
+                    "height": 154.52300000000105,
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#ffffff",
+                        "strokeWidth": 9,
+                        "fill": false,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 54.0,
+                    "path_segments": [
+                        {
+                            "kind": "move",
+                            "x": 147.908,
+                            "y": 14.051
+                        },
+                        {
+                            "kind": "curve",
+                            "c1x": 183.071,
+                            "c1y": -26.644,
+                            "c2x": 188.476,
+                            "c2y": -99.822,
+                            "x": 147.908,
+                            "y": -140.472
+                        }
+                    ],
+                    "path_fill_rule": "odd_even",
+                    "vertices": [
+                        {
+                            "x": 147.908,
+                            "y": 14.051,
+                            "move": true
+                        },
+                        {
+                            "x": 154.148,
+                            "y": 6.056
+                        },
+                        {
+                            "x": 159.668,
+                            "y": -2.605
+                        },
+                        {
+                            "x": 164.442,
+                            "y": -11.837
+                        },
+                        {
+                            "x": 168.447,
+                            "y": -21.545
+                        },
+                        {
+                            "x": 171.66,
+                            "y": -31.633
+                        },
+                        {
+                            "x": 174.057,
+                            "y": -42.006
+                        },
+                        {
+                            "x": 175.614,
+                            "y": -52.569
+                        },
+                        {
+                            "x": 176.307,
+                            "y": -63.227
+                        },
+                        {
+                            "x": 176.113,
+                            "y": -73.885
+                        },
+                        {
+                            "x": 175.007,
+                            "y": -84.446
+                        },
+                        {
+                            "x": 172.967,
+                            "y": -94.817
+                        },
+                        {
+                            "x": 169.967,
+                            "y": -104.901
+                        },
+                        {
+                            "x": 165.986,
+                            "y": -114.604
+                        },
+                        {
+                            "x": 160.998,
+                            "y": -123.83
+                        },
+                        {
+                            "x": 154.98,
+                            "y": -132.485
+                        },
+                        {
+                            "x": 147.908,
+                            "y": -140.472
+                        }
+                    ]
+                },
+                {
+                    "id": 74,
+                    "name": "group_89_圆_21",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": -387.872,
+                        "y": 258.976
+                    },
+                    "origin_pos": {
+                        "x": -387.872,
+                        "y": 258.976
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#0055ff",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 55.0,
+                    "radius_w": 32.3281764358769,
+                    "radius_h": 32.40522509849073
+                },
+                {
+                    "id": 75,
+                    "name": "group_89_直线_23",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": -300.541,
+                        "y": -278.715
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 5,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 56.0,
+                    "head_pos": {
+                        "x": -273.373,
+                        "y": -271.841
+                    },
+                    "end_pos": {
+                        "x": -351.069,
+                        "y": -376.365
+                    },
+                    "length": 130.23799365776443,
+                    "center_pos": {
+                        "x": -312.221,
+                        "y": -324.103
+                    }
+                },
+                {
+                    "id": 76,
+                    "name": "group_89_矩形_24",
+                    "type": "rect",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": -369.081,
+                        "y": -364.603
+                    },
+                    "origin_pos": {
+                        "x": -369.081,
+                        "y": -364.603
+                    },
+                    "width": 69.51685569326531,
+                    "height": 71.732023581179,
+                    "rotate": 56.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#5555ff",
+                        "opacity": 255,
+                        "cornerRadius": 22.0,
+                        "font_size": 10
+                    },
+                    "zValue": 57.0
+                },
+                {
+                    "id": 77,
+                    "name": "group_89_group_42_圆_28",
+                    "type": "circle",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 273.66,
+                        "y": 325.603
+                    },
+                    "origin_pos": {
+                        "x": 273.66,
+                        "y": 325.603
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#ffff00",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 58.0,
+                    "radius_w": 72.32748384201942,
+                    "radius_h": 72.49986399192686
+                },
+                {
+                    "id": 78,
+                    "name": "group_89_group_42_直线_29",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": 337.562,
+                        "y": 220.714
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 59.0,
+                    "head_pos": {
+                        "x": 342.266,
+                        "y": 248.997
+                    },
+                    "end_pos": {
+                        "x": 384.589,
+                        "y": 192.431
+                    },
+                    "length": 70.6466466649356,
+                    "center_pos": {
+                        "x": 363.427,
+                        "y": 220.714
+                    }
+                },
+                {
+                    "id": 79,
+                    "name": "group_89_group_42_直线_30",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": 388.116,
+                        "y": 272.566
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 60.0,
+                    "head_pos": {
+                        "x": 368.13,
+                        "y": 312.634
+                    },
+                    "end_pos": {
+                        "x": 422.21,
+                        "y": 284.351
+                    },
+                    "length": 61.02929205717498,
+                    "center_pos": {
+                        "x": 395.17,
+                        "y": 298.492
+                    }
+                },
+                {
+                    "id": 80,
+                    "name": "group_89_group_42_直线_31",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": 383.413,
+                        "y": 382.163
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 61.0,
+                    "head_pos": {
+                        "x": 370.48,
+                        "y": 362.128
+                    },
+                    "end_pos": {
+                        "x": 424.561,
+                        "y": 397.482
+                    },
+                    "length": 64.61160791220041,
+                    "center_pos": {
+                        "x": 397.52,
+                        "y": 379.805
+                    }
+                },
+                {
+                    "id": 81,
+                    "name": "group_89_group_42_直线_32",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": 334.035,
+                        "y": 432.835
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 62.0,
+                    "head_pos": {
+                        "x": 311.698,
+                        "y": 402.196
+                    },
+                    "end_pos": {
+                        "x": 356.373,
+                        "y": 463.475
+                    },
+                    "length": 75.83515982708725,
+                    "center_pos": {
+                        "x": 334.035,
+                        "y": 432.835
+                    }
+                },
+                {
+                    "id": 82,
+                    "name": "group_89_group_42_直线_33",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": 189.43,
+                        "y": 421.051
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 63.0,
+                    "head_pos": {
+                        "x": 208.241,
+                        "y": 399.839
+                    },
+                    "end_pos": {
+                        "x": 170.62,
+                        "y": 442.264
+                    },
+                    "length": 56.70291232379724,
+                    "center_pos": {
+                        "x": 189.43,
+                        "y": 421.051
+                    }
+                },
+                {
+                    "id": 83,
+                    "name": "group_89_group_42_直线_34",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": 190.605,
+                        "y": 246.64
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 64.0,
+                    "head_pos": {
+                        "x": 205.889,
+                        "y": 263.138
+                    },
+                    "end_pos": {
+                        "x": 175.322,
+                        "y": 230.142
+                    },
+                    "length": 44.978633872094726,
+                    "center_pos": {
+                        "x": 190.605,
+                        "y": 246.64
+                    }
+                },
+                {
+                    "id": 84,
+                    "name": "group_89_group_42_直线_36",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": 264.673,
+                        "y": 201.859
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 65.0,
+                    "head_pos": {
+                        "x": 264.673,
+                        "y": 232.499
+                    },
+                    "end_pos": {
+                        "x": 264.673,
+                        "y": 171.219
+                    },
+                    "length": 61.279999999998836,
+                    "center_pos": {
+                        "x": 264.673,
+                        "y": 201.859
+                    }
+                },
+                {
+                    "id": 85,
+                    "name": "group_89_group_42_直线_37",
+                    "type": "line",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "origin_pos": {
+                        "x": 256.442,
+                        "y": 448.155
+                    },
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": true,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 66.0,
+                    "head_pos": {
+                        "x": 255.267,
+                        "y": 421.051
+                    },
+                    "end_pos": {
+                        "x": 257.618,
+                        "y": 475.26
+                    },
+                    "length": 54.259956524124526,
+                    "center_pos": {
+                        "x": 256.442,
+                        "y": 448.155
+                    }
+                },
+                {
+                    "id": 86,
+                    "name": "group_89_group_42",
+                    "type": "group",
+                    "parent_id": 89,
+                    "children_ids": [
+                        77,
+                        81,
+                        83,
+                        82,
+                        80,
+                        84,
+                        79,
+                        85,
+                        78
+                    ],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": 297.591,
+                        "y": 323.24
+                    },
+                    "origin_pos": {
+                        "x": 297.591,
+                        "y": 323.24
+                    },
+                    "width": 253.94107847451818,
+                    "height": 304.04103890685184,
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 2,
+                        "fill": false,
+                        "fill_color": "#00ff00",
+                        "opacity": 255,
+                        "cornerRadius": 0.0
+                    },
+                    "zValue": 67.0
+                },
+                {
+                    "id": 87,
+                    "name": "group_89_矩形_43",
+                    "type": "rect",
+                    "parent_id": 89,
+                    "children_ids": [],
+                    "group_id": 89,
+                    "center_pos": {
+                        "x": -1.11,
+                        "y": -1.984
+                    },
+                    "origin_pos": {
+                        "x": -1.11,
+                        "y": -1.984
+                    },
+                    "width": 945.8630085512186,
+                    "height": 972.8508058321745,
+                    "rotate": 0.0,
+                    "style": {
+                        "stroke": "#000000",
+                        "strokeWidth": 3,
+                        "fill": false,
+                        "fill_color": "#919191",
+                        "opacity": 255,
+                        "cornerRadius": 0.0,
+                        "font_size": 10
+                    },
+                    "zValue": 68.0
+                }
+            ]
         }
     ]
 }

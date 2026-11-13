@@ -37,6 +37,9 @@ _ID_DOT_COLOR = QColor(214, 51, 46)
 # 旋转支点标记（蓝色十字圆环，固定屏幕像素）
 _ORIGIN_COLOR = QColor(22, 119, 255)
 _ORIGIN_RING_RADIUS = 5.0
+# 选中变化时按「标记占的区域」标脏（见 _refresh_selection_dirty）：标记是固定
+# 屏幕像素画的，这里给 10px 余量，再按缩放换算成场景单位。
+_SELECT_DIRTY_PAD = 10.0
 
 # 背景网格（画在场景坐标里，步长与 SnapSystem.grid_step 共用同一份）
 _GRID_MINOR = QColor(90, 120, 150, 48)
@@ -123,7 +126,11 @@ class GraphicsView(QGraphicsView):
     elementDropped = Signal(str, QPointF)   # (type_key, 视图场景坐标)
     templateDropped = Signal(str, QPointF)  # (template_id, 视图场景坐标)
     actionTriggered = Signal(str)           # 右键菜单的统一命令名
+    memberRenameRequested = Signal(int)     # 右键组成员：直接改名被组遮挡的成员
     orthoModeChanged = Signal(bool)         # 正交开关（F8 / 菜单）状态变化
+    # 框选松手：选中集合到这里才「定下来」。框选期间每移动一格都会改选中，
+    # 订阅方（主窗口的属性面板 / 图层树）应该只在收到这个信号时重建一次。
+    selectionSettled = Signal()
 
     def __init__(self, scene=None, parent=None) -> None:
         super().__init__(parent)
@@ -145,11 +152,21 @@ class GraphicsView(QGraphicsView):
         # 坐标刻度条：默认关，由 DesignerWindow 显式打开；运行态 / 其它视图
         # 一律保持关闭，标尺不进 scene 渲染、不影响几何对拍与页面数据。
         self.show_rulers = False
+        # 光标在**视口像素**坐标里的位置：标尺上那两条红色指示线跟着它走。
+        # 只认 mouseMoveEvent 送来的位置（含平移 / 拖动中被抓取的移动），不用
+        # QCursor.pos() —— 拖拽时 underMouse() 并不可靠，且没有重绘触发。
+        self._ruler_cursor: QPointF | None = None
+        # 平移把刻度带往画布里推出去的距离（视口像素，x/y 各记一份）。每次
+        # 平移累加，真正把这一截刷掉后归零（见 scrollContentsBy/_draw_rulers）。
+        self._ruler_scroll_pad = [0, 0]
         # O 键作为「设置旋转中心」的修饰键：按住 O 时右键把选中图元的旋转中心
         # 钉到点击处（见 mousePressEvent），取代原右键菜单项。
         self._origin_key_held = False
         # 按 O + 右键已消费右键菜单，避免随后弹出的 contextMenuEvent 再画菜单
         self._origin_suppress_menu = False
+        # 右键点在组成员上：选中被重定向到根组（CAD 块语义），但成员本身
+        # 记在这里，右键菜单要能直接对它「重命名成员…」。0 = 没有遮挡成员。
+        self._context_member_id = 0
         # 历史名沿用 show_ids：现在只控制「选中图元的红色旋转中心点」，
         # ID 文字标签已移除；视图菜单 Ctrl+Shift+I 切换的就是这个红点。
         self.show_ids = True
@@ -160,6 +177,8 @@ class GraphicsView(QGraphicsView):
         # 最后一次落在画布上的光标位置：光标移出画布（leaveEvent 会清 snap.hover）
         # 后按 T 仍能按上一次位置吸附，不必先把鼠标挪回来
         self._last_hover: QPointF | None = None
+        #当前抓手图元
+        self._grabbed =None
         # 上一次画出去的捕捉十字（重绘区并集用，省一次全量 aim）
         self._drawn_marker: QPointF | None = None
         # 选中项自身捕捉点的缓存（见 _selection_own_points）
@@ -172,6 +191,9 @@ class GraphicsView(QGraphicsView):
         self._snap_grab_point: QPointF | None = None
         # 绘制模式（CAD 式分点）：激活工具后图元跟随鼠标，点击画布落点
         self._draw_type = ""
+        # 绘制期吸附的「武装」标记：默认关（基本图元自由落点）。按一次 T 武装
+        # 下一个落点，落点后 / 换工具 / 取消绘制即失效。
+        self._draw_snap_armed = False
         # CAD 正交开关：绘制点列图元时只出屏幕水平 / 竖直段。默认关，
         # 不改变既有绘制语义；按住 Shift 临时反转（见 _ortho_for_event）。
         self._ortho_mode = False
@@ -182,6 +204,13 @@ class GraphicsView(QGraphicsView):
         # 拖角改尺寸：按下时冻结的逆变换 / 固定对角 / 上一次的总缩放比例
         self._resize_state: dict | None = None
         self._press_modified = False
+        # 框选进行中（左键按在空白处）：选中集合每一格都在变，主窗口据此把
+        # 「属性面板 / 图层树重建」推迟到松手那一下（见 selectionSettled）。
+        self._band_selecting = False
+        # 选中项 → 它在视觉上占的脏区（只在增量重绘时用，见 _refresh_selection_dirty）
+        self._sel_regions: dict[int, QRectF] = {}
+        # 选中项的位姿 / 尺寸变过：缓存的脏区作废，下一次选中变化整屏刷一次
+        self._sel_geom_dirty = False
         # 方向键微调：按键集合 + 延迟/连发两个定时器。步长默认跟随当前网格，
         # 可用 set_nudge_step() 固定（见 nudge_step）。
         self._nudge_step: float | None = None
@@ -215,6 +244,8 @@ class GraphicsView(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.NoAnchor)
         self.setMouseTracking(True)
         self.setAcceptDrops(True)
+        # 场景相关信号统一在 setScene() 里连 / 断（切页换场景时会重新接一遍），
+        # 这里不单独连，避免页面切换后新场景没人订阅。
         if scene is not None:
             self.setScene(scene)
 
@@ -237,9 +268,10 @@ class GraphicsView(QGraphicsView):
         if old is not None:
             for name, slot in (
                     ("selectionChanged", self._on_scene_selection_changed),
-                    ("geometryChanged", self._invalidate_own_points),
+                    ("geometryChanged", self._on_geometry_changed),
                     ("structureChanged", self._on_structure_changed),
-                    ("itemChanged", self._on_items_changed)):
+                    ("itemChanged", self._on_items_changed),
+                    ("sceneModeChanged", self.on_scene_mode_changed)):
                 sig = getattr(old, name, None)
                 if sig is not None:
                     try:
@@ -247,20 +279,27 @@ class GraphicsView(QGraphicsView):
                     except (RuntimeError, TypeError):
                         pass
         self._invalidate_own_points()
+        self._sel_regions.clear()
+        self._sel_geom_dirty = False
         self._snap_full_dirty = True
         super().setScene(scene)
         if scene is not None:
             scene.selectionChanged.connect(self._on_scene_selection_changed)
             geo = getattr(scene, "geometryChanged", None)
             if geo is not None:
-                # 图元被改位姿（跟手 / 属性面板 / 撤销）后，自身捕捉点缓存必须失效
-                geo.connect(self._invalidate_own_points)
+                # 图元被改位姿（跟手 / 属性面板 / 撤销）后，自身捕捉点缓存必须
+                # 失效，选中标记的脏区缓存也要作废（见 _on_geometry_changed）
+                geo.connect(self._on_geometry_changed)
             st = getattr(scene, "structureChanged", None)
             if st is not None:
                 st.connect(self._on_structure_changed)
             ic = getattr(scene, "itemChanged", None)
             if ic is not None:
                 ic.connect(self._on_items_changed)
+            mc = getattr(scene, "sceneModeChanged", None)
+            if mc is not None:
+                # 设计态 / 运行态切换：网格属于设计辅助层，运行态一律不画
+                mc.connect(self.on_scene_mode_changed)
             self._sync_grid_origin()
         self._sync_view_metrics()
 
@@ -286,7 +325,14 @@ class GraphicsView(QGraphicsView):
         self.snap.threshold = self.snap.pixel_threshold / scale
 
     def _on_scene_selection_changed(self) -> None:
-        """选中集合变化时整屏重绘：中心点标记只覆盖选中项，局部更新会留残影。"""
+        """选中集合变化：刷新抓手状态，并按「标记占的那几块」增量重画。
+
+        以前这里是无条件 ``viewport().update()``。框选时每移动一格都会改一次
+        选中，整屏重画在 page_1（1618 图元）上实测 ~90 ms/帧，表现为「框选卡
+        顿」。真正需要重画的只有视图前景层画的那些标记——每个选中项一个红点
+        （支点上）、最多 200 个蓝色支点环 + 中心连线、单选框四个手柄；图元自己
+        那条选中虚线框由 Qt 在选中状态变化时自己 update 图元区域，不归这里管。
+        """
         self._invalidate_own_points()
         # 图层树 / 属性面板改了选中、或抓手图元被删掉：抓手就此作废，
         # 别把「已经不在选中里」的图元继续挂着。
@@ -309,7 +355,79 @@ class GraphicsView(QGraphicsView):
             if not alive or not still:
                 self.end_follow()
         if getattr(self, "show_ids", True):
+            self._refresh_selection_dirty()
+
+    def is_band_selecting(self) -> bool:
+        """左键框选是否正在进行（按下点在空白处、还没松手）。
+
+        框选期间选中集合每一格都在变，订阅方（主窗口）应该在收到
+        :attr:`selectionSettled` 时才重建属性面板 / 图层树。
+        """
+        return bool(self._band_selecting)
+
+    def _selection_region(self, it) -> QRectF:
+        """一个选中项可能画上标记的场景区域（含中心→支点这条虚线）。"""
+        try:
+            rect = QRectF(it.sceneBoundingRect())
+        except RuntimeError:            # 图元已被销毁
+            return QRectF()
+        try:
+            # 自定义支点可以离图元很远（O + 右键设过），中心到支点的虚线也要
+            # 算进来，否则取消选中后那条线会留在画布上。
+            rect = rect.united(
+                QRectF(it.center_scene_point(), it.pivot_scene_point()).normalized())
+        except (AttributeError, RuntimeError, TypeError):
+            pass
+        pad = _SELECT_DIRTY_PAD / max(self._view_scale(), 1e-9)
+        return rect.adjusted(-pad, -pad, pad, pad)
+
+    def _refresh_selection_dirty(self) -> None:
+        """只把「标记占的区域」标脏。
+
+        选中项超过 ``_MAX_SELECTION_MARKS`` 时前景层根本不画标记（旧口径就是
+        为了让大选中不掉帧），此时唯一要做的是把上一批标记擦掉。
+        """
+        scene = self.scene()
+        if scene is None or not hasattr(scene, "selected_items"):
+            self._sel_regions = {}
             self.viewport().update()
+            return
+        if self._sel_geom_dirty:
+            # 有选中项动过（拖动 / 属性面板改尺寸）：缓存区域已经不是画面真值，
+            # 整屏刷一次，别去猜哪些像素还算数。
+            self._sel_geom_dirty = False
+            self._sel_regions = {}
+            self.viewport().update()
+            return
+        old = list(self._sel_regions.values())
+        try:
+            items = scene.selected_items()
+        except RuntimeError:            # 场景已销毁
+            self._sel_regions = {}
+            self.viewport().update()
+            return
+        if len(items) > _MAX_SELECTION_MARKS:
+            self._sel_regions = {}
+            if old:
+                self.updateScene(old)
+            return
+        regions = {}
+        for it in items:
+            regions[it.item_id] = self._selection_region(it)
+        self._sel_regions = regions
+        dirty = old + [r for r in regions.values() if not r.isNull()]
+        if dirty:
+            self.updateScene(dirty)
+
+    def _on_geometry_changed(self, _payload=None) -> None:
+        """图元位姿 / 尺寸变了：标记位置随之改变，缓存的脏区不再可信。
+
+        不清缓存的话，拖动一个选中项再取消选中，旧红点那片区域不会被重画，
+        画布上会留一个残点。真正重画推迟到下一次选中变化（那时整屏刷一次）。
+        """
+        self._invalidate_own_points()
+        if self._sel_regions:
+            self._sel_geom_dirty = True
 
     def fit_content(self) -> None:
         scene = self.scene()
@@ -345,6 +463,18 @@ class GraphicsView(QGraphicsView):
             ends, mids = scene.snap_points()
             self.snap.update_points(ends, mids)
         self._snap_full_dirty = False
+
+    def on_scene_mode_changed(self, run: bool) -> None:
+        """场景在 设计态 / 运行态 之间切换。
+
+        这里刻意**不改** ``show_grid``：它表达的是用户在「视图」菜单里的偏好
+        （``toggle_grid`` 同时改 ``show_grid`` 与 ``snap.grid_enabled``），
+        被运行态改成 False 再改回 True 会把用户的选择抹掉。运行态不画网格改
+        由 ``drawBackground`` 里的 ``is_run_mode`` 判断完成——``is_run_mode``
+        还可能被 ``R`` 键预览、运行视图直接写（不经过本信号），判断放在绘制
+        处才不会有漏网路径。本槽只负责把画面立即刷新一次。
+        """
+        self.viewport().update()
 
     # ------------------------------------------------------------------
     # 吸附点表：按 owner 增量维护
@@ -443,6 +573,8 @@ class GraphicsView(QGraphicsView):
         """激活/取消绘制工具。空值取消，恢复框选与默认光标。"""
         self._clear_snap_grab()
         self._ortho_axis = ""
+        # 换 / 退工具：上一支工具按 T 武装的那个落点作废
+        self._draw_snap_armed = False
         scene = self.scene()
         if type_key and getattr(scene, "is_run_mode", False):
             type_key = None
@@ -483,11 +615,16 @@ class GraphicsView(QGraphicsView):
         return self._ortho_mode
 
     def _draw_page_point(self, event) -> QPointF:
-        """绘制取点的唯一入口：光标 → 吸附 → page → 正交约束。
+        """绘制取点的唯一入口：光标 →（按需）吸附 → page → 正交约束。
 
         第一点与后续点都走这里，``mousePressEvent``（落点）与
         ``mouseMoveEvent``（预览）也共用，所以「十字在哪、预览在哪、点下去
         在哪」必然一致。
+
+        **绘制默认不吸附**：落点就是光标当前所在的场景点（再叠加正交约束），
+        与 CAD 的自由画线一致。想吸到已有图元的端点 / 中点 / 格点，按一次 T
+        武装「下一个落点」（``_draw_snap_armed``）——点下去武装即失效，不会
+        因为 ``snap.enabled`` 是粘性开关就变成「每一点都自动吸」。
 
         旧版只有按 T 时把 ``aim`` 的结果喂给系统光标（``QCursor.setPos``）
         和预览，落点却仍用未吸附的原始坐标；离屏 / 部分平台 setPos 不会
@@ -496,7 +633,7 @@ class GraphicsView(QGraphicsView):
         """
         scene = self.scene()
         pos_scene = self.mapToScene(event.position().toPoint())
-        if self.snap.enabled:
+        if self._draw_snap_armed and self.snap.enabled:
             self._ensure_snap_table()
             target, _kind = self.snap.aim(
                 pos_scene, exclude=self._snap_scan_exclude(), always=True)
@@ -662,6 +799,8 @@ class GraphicsView(QGraphicsView):
         return None
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        # 按下也更新一次红线（纯点击时不一定有 move 事件）
+        self._set_ruler_cursor(event.position())
         if self._follow_items and event.button() != Qt.NoButton:
             if event.button() == Qt.LeftButton:
                 # 跟手是个「抓住」状态：单击任意位置即落定，不再进入框选
@@ -686,10 +825,13 @@ class GraphicsView(QGraphicsView):
                 # 多边形 / 路径：右键闭合
                 if event.button() == Qt.RightButton and scene.drawing_polygon():
                     scene.finish_polygon(page_pt)
+                    self._draw_snap_armed = False
                 elif event.button() == Qt.LeftButton:
                     if not scene.drawing_active():
                         scene.begin_draw_tool(self._draw_type)
                     scene.draw_add_point(page_pt)
+                    # 一次 T 只武装**一个**落点：点下去就回到自由绘制
+                    self._draw_snap_armed = False
                 event.accept()
                 self.viewport().update()
                 return
@@ -745,6 +887,12 @@ class GraphicsView(QGraphicsView):
                 root.setSelected(True)
                 event.accept()
                 return
+        # 左键按在空白处：基类接下来会起橡皮筋（Qt 只在按下点没有 item 时才画）。
+        # 框选期间每移动一格都会改选中，主窗口据此把「属性面板 / 图层树重建」
+        # 推迟到松手那一下，别拿几十毫秒的控件重建去堵每一帧。
+        if event.button() == Qt.LeftButton:
+            self._band_selecting = (
+                self.itemAt(event.position().toPoint()) is None)
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
@@ -1018,6 +1166,25 @@ class GraphicsView(QGraphicsView):
         # 点在组成员上：右键目标也改成根组，避免「画布右键反而把成员选中」
         # 与左键「只能选组」的语义打架。
         root = self._group_root_at(pos)
+        # 被组重定向遮挡的成员：右键菜单要能直接对它改名（组成员在画布上
+        # 点不出自己，改名的唯一画布入口就是这个记录）。组框 z 最高、
+        # items() 先返回组自己，成员要沿命中列表往下找「根为该组、且不是
+        # 组自己」的后代；点在组框空白处（底下没有成员）则保持 0。
+        # 注意这里独立于 _group_root_at：组框盖住成员时它拿不到任何重定向。
+        self._context_member_id = 0
+        hits = [it for it in scene.items(pos)
+                if getattr(it, "item_id", None) is not None
+                and it.isVisible()
+                and (it.flags() & QGraphicsItem.ItemIsSelectable)]
+        if hits:
+            anchor = hits[0].root_parent()
+            if anchor is not None and getattr(anchor, "TYPE", "") == "group":
+                for it in hits:
+                    if it is anchor:
+                        continue
+                    if it.root_parent() is anchor:
+                        self._context_member_id = it.item_id
+                        break
         for it in scene.items(pos):
             if getattr(it, "item_id", None) is None or not it.isVisible():
                 continue
@@ -1030,6 +1197,9 @@ class GraphicsView(QGraphicsView):
             break
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        # 标尺红线：先记光标（视口像素），再走各分支——平移 / 跟手 / 拖角
+        # 期间鼠标依然在动，红线要一直跟着
+        self._set_ruler_cursor(event.position())
         # 鼠标位置先记下来：吸附目标、附近标记都基于它
         self._set_hover(self.mapToScene(event.position().toPoint()))
         if self._follow_items:
@@ -1064,13 +1234,89 @@ class GraphicsView(QGraphicsView):
 
     def leaveEvent(self, event) -> None:
         self._set_hover(None)
+        self._set_ruler_cursor(None)
         super().leaveEvent(event)
+
+    def scrollContentsBy(self, dx: int, dy: int) -> None:
+        """平移（滚轮 / 滚动条 / 中键拖拽）后重画两条刻度带。
+
+        ``QGraphicsView`` 平移走的是「整块 blit + 只重画新露出的窄条」，图元
+        跟着搬是它对，但刻度带钉在视口上、不能跟着搬：blit 会把刻度带的像素
+        往画布里推一段（每次推 |dy| 像素）。所以重画范围不能只到 ``t``：
+        必须把「已经推出去的那一截」也盖住，否则几帧下来画布上会叠出一片
+        刻度带残影（重场景拖动画布时尤其明显）。
+
+        推动距离由 ``_ruler_scroll_pad`` 累计，真正重绘到那一段后再清零
+        （见 ``_draw_rulers``）。
+        """
+        super().scrollContentsBy(dx, dy)
+        if not self._rulers_visible():
+            return
+        if dx or dy:
+            vp = self.viewport()
+            pad = self._ruler_scroll_pad
+            # 封顶在视口尺寸：再远也只需要把整条带刷一遍
+            pad[0] = min(vp.width(), pad[0] + abs(int(dx)))
+            pad[1] = min(vp.height(), pad[1] + abs(int(dy)))
+            self._refresh_ruler_strips()
+
+    # ------------------------------------------------------------------
+    # 刻度带重绘：光标红线 / 平移纠偏
+    # ------------------------------------------------------------------
+    def _rulers_visible(self) -> bool:
+        scene = self.scene()
+        return bool(self.show_rulers and scene is not None
+                    and not getattr(scene, "is_run_mode", False))
+
+    def _ruler_pad_need(self) -> tuple[int, int]:
+        """两条带子要盖多厚 / 多宽（含被 blit 推出去的那一截，按视口封顶）。"""
+        vp = self.viewport()
+        pad_x, pad_y = self._ruler_scroll_pad
+        return (min(vp.width(), _RULER_THICKNESS + int(pad_x) + 1),
+                min(vp.height(), _RULER_THICKNESS + int(pad_y) + 1))
+
+    def _ruler_strip_rects(self) -> list[QRect]:
+        """需要重绘的两条刻度带（视口像素，与绘制同口径）。
+
+        厚度都带上「平移推出去的距离」：顶带要盖到 ``t + pad_y``，左带要盖到
+        ``t + pad_x``。
+        """
+        vp = self.viewport()
+        w, h = vp.width(), vp.height()
+        t = _RULER_THICKNESS
+        if w <= t * 2 or h <= t * 2:
+            return []
+        need_x, need_y = self._ruler_pad_need()
+        return [QRect(0, 0, w, need_y), QRect(0, 0, need_x, h)]
+
+    def _refresh_ruler_strips(self) -> None:
+        """标脏顶部 / 左侧两条刻度带。"""
+        vp = self.viewport()
+        for rect in self._ruler_strip_rects():
+            vp.update(rect)
+
+    def _set_ruler_cursor(self, pos: QPointF | None) -> None:
+        """记光标并只重画两条刻度带（标尺关掉时完全不做工作）。"""
+        old = self._ruler_cursor
+        new = QPointF(pos) if pos is not None else None
+        if old is None and new is None:
+            return
+        if old is not None and new is not None:
+            if (abs(old.x() - new.x()) < 0.5 and abs(old.y() - new.y()) < 0.5):
+                return
+        self._ruler_cursor = new
+        if self._rulers_visible():
+            self._refresh_ruler_strips()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._sync_view_metrics()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        # 先收下「这次是不是框选松手」：下面几个分支会提前 return
+        band = event.button() == Qt.LeftButton and self._band_selecting
+        if event.button() == Qt.LeftButton:
+            self._band_selecting = False
         if event.button() == Qt.RightButton:
             # 右键按下未转给基类（见 mousePressEvent），抬起同样不转
             event.accept()
@@ -1091,6 +1337,9 @@ class GraphicsView(QGraphicsView):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+        if band:
+            # 选中集合到这里才定下来：属性面板 / 图层树此时一次性同步
+            self.selectionSettled.emit()
         if self._follow_items:
             if self._follow_dragged:
                 # 双击后接着按住拖过：松手就是落点（与普通拖动一致）
@@ -1285,6 +1534,7 @@ class GraphicsView(QGraphicsView):
             return
         if key == Qt.Key_Escape and self._draw_type:
             scene = self.scene()
+            self._draw_snap_armed = False      # 取消这一笔：武装一并作废
             if scene is not None and getattr(scene, "drawing_active", lambda: False)():
                 scene.cancel_draw()
                 self._ortho_axis = ""
@@ -1738,6 +1988,10 @@ class GraphicsView(QGraphicsView):
         # 先打开门控再判 hover：从工具箱切进绘制、鼠标还没进过画布时按 T，
         # 也应当让随后的第一点按同一份 aim 结果吸附。
         self.snap.enabled = True
+        # 绘制态：T 就是「武装下一个落点」。光标还没进过画布也要武装，否则
+        # 点完工具箱直接按 T、再点画布的第一点会落空。
+        if self._draw_type:
+            self._draw_snap_armed = True
         # 第一点之前 / 之后统一走这一条：结构变化只置脏才全量重建，绘制
         # 临时图元的自身点由 remove_owners 撤掉，不再分叉成两条路径。
         self._ensure_snap_table()
@@ -1759,22 +2013,28 @@ class GraphicsView(QGraphicsView):
         hover = QPointF(hover)
         if self.snap.hover is None:
             self.snap.hover = QPointF(hover)
-        target, kind = self.snap.aim(
-            hover, exclude=self._snap_scan_exclude(), always=True)
+
+        if self._grabbed is not None:
+            target, kind = self.snap.aim(
+                hover, exclude=self._snap_scan_exclude(), always=True)
+        else:
+            target, kind = self.snap.aim(
+                hover, exclude=None, always=True)
         if target is None:
             return
         target = QPointF(target)
         if self._draw_type:
-            # 绘制中按 T：只把光标 / 待落点吸附到捕捉点，**不选中已有图元、
-            # 不进入抓手跟手、也不平移任何图元**。跟手会抢走 mouseMoveEvent
-            # 的绘制预览分支，逐点落子流程直接断掉；绘制阶段 T 只是 CAD 的
-            # 「取点吸附」，不是搬图元。
+            # 绘制中按 T：武装**下一个落点**（点下去即失效），只把光标 / 待落点
+            # 吸到捕捉点，**不选中已有图元、不进入抓手跟手、也不平移任何图元**。
+            # 跟手会抢走 mouseMoveEvent 的绘制预览分支，逐点落子流程直接断掉；
+            # 绘制阶段 T 只是 CAD 的「取点吸附」，不是搬图元。
             if cursor_on_canvas or self.viewport().underMouse():
                 self._warp_cursor_to_snap(target)
             self._sync_draw_preview_to_snap(target)
             self.viewport().update()
             return
         grabbed = self._grabbed_item()
+        self._grabbed = grabbed
         if grabbed is not None and self._snap_grab_point is not None:
             self._align_grab_to(target)
         else:
@@ -1812,6 +2072,12 @@ class GraphicsView(QGraphicsView):
     def drawBackground(self, painter: QPainter, rect) -> None:
         super().drawBackground(painter, rect)
         if not self.show_grid or not self.snap.grid_enabled:
+            return
+        # 网格是设计态辅助层：运行态（``set_scene_mode(True)`` / R 键预览 /
+        # 运行视图）一律不画。只看 ``is_run_mode``，不依赖视图有没有连上
+        # ``sceneModeChanged``，任何进入运行态的路径都能生效。
+        scene = self.scene()
+        if scene is not None and getattr(scene, "is_run_mode", False):
             return
         self._draw_grid(painter, rect)
 
@@ -1869,7 +2135,7 @@ class GraphicsView(QGraphicsView):
             self._draw_hover_snap_points(painter)
         # 坐标刻度条画在最上层（设计态才有，运行预览不显示）
         if self.show_rulers and scene is not None and not getattr(scene, "is_run_mode", False):
-            self._draw_rulers(painter)
+            self._draw_rulers(painter, rect)
         # 锁定图元的同心圆标记：常显，不依赖选中；运行态一律不画
         if scene is not None and not getattr(scene, "is_run_mode", False):
             self._draw_lock_badges(painter)
@@ -1912,7 +2178,7 @@ class GraphicsView(QGraphicsView):
             painter.drawEllipse(p, _LOCK_BADGE_DOT, _LOCK_BADGE_DOT)
         painter.restore()
 
-    def _draw_rulers(self, painter: QPainter) -> None:
+    def _draw_rulers(self, painter: QPainter, exposed=None) -> None:
         """顶部 / 左侧坐标刻度条，画在**视口像素**里。
 
         ``drawForeground`` 的 painter 带着「场景→视口」变换，先
@@ -1920,6 +2186,9 @@ class GraphicsView(QGraphicsView):
         缩放都不漂移；刻度数值由 ``mapToScene`` 反算，跟着实时变。刻意不设
         ``viewportMargins``：所有命中测试、fit、resize 钉角仍用原来的视口
         口径，零改动。
+
+        ``exposed`` 是这次重绘暴露的场景矩形：只有它换算到视口后盖住了
+        「带子 + 被 blit 推出去的那一截」，才把 ``_ruler_scroll_pad`` 清零。
         """
         vp = self.viewport()
         w, h = vp.width(), vp.height()
@@ -2002,15 +2271,31 @@ class GraphicsView(QGraphicsView):
         painter.drawLine(QPoint(6, t // 2), QPoint(t - 6, t // 2))
         painter.drawLine(QPoint(t // 2, 6), QPoint(t // 2, t - 6))
 
-        # 当前光标位置的红色短线（截图里那条红色指示）
-        if vp.underMouse():
-            cur = vp.mapFromGlobal(QCursor.pos())
-            if 0 <= cur.x() <= w and 0 <= cur.y() <= h:
-                painter.setPen(QPen(_RULER_CURSOR, 1.0))
-                if cur.x() >= t:
-                    painter.drawLine(QPoint(cur.x(), t - 11), QPoint(cur.x(), t))
-                if cur.y() >= t:
-                    painter.drawLine(QPoint(t - 11, cur.y()), QPoint(t, cur.y()))
+        # 当前光标位置的红色短线（截图里那条红色指示）：位置由
+        # mouseMoveEvent 记下的视口像素坐标给出，平移 / 拖拽中也一直跟随
+        cur = self._ruler_cursor
+        if cur is not None and -1.0 <= cur.x() <= w + 1.0 \
+                and -1.0 <= cur.y() <= h + 1.0:
+            painter.setPen(QPen(_RULER_CURSOR, 1.0))
+            if t <= cur.x() <= w:
+                x = int(round(cur.x()))
+                painter.drawLine(QPoint(x, t - 11), QPoint(x, t))
+            if t <= cur.y() <= h:
+                y = int(round(cur.y()))
+                painter.drawLine(QPoint(t - 11, y), QPoint(t, y))
+
+        # 被 blit 推出去的那一截真刷掉了没有？整条带都重绘过才清累计量，
+        # 否则留着下次一起刷（局部重绘不能提前清零）。
+        pad = self._ruler_scroll_pad
+        if exposed is not None and (pad[0] or pad[1]):
+            cov = self.mapFromScene(exposed).boundingRect()
+            need_x, need_y = self._ruler_pad_need()
+            if (pad[1] and cov.top() <= 0 and cov.left() <= 0
+                    and cov.width() >= w - 1 and cov.height() >= need_y):
+                pad[1] = 0
+            if (pad[0] and cov.left() <= 0 and cov.top() <= 0
+                    and cov.height() >= h - 1 and cov.width() >= need_x):
+                pad[0] = 0
         painter.restore()
 
     def _hover_marker(self) -> tuple[QPointF | None, bool]:
@@ -2035,7 +2320,12 @@ class GraphicsView(QGraphicsView):
             return None, False
         target, _kind = self.snap.aim(
             hover, exclude=self._snap_scan_exclude(), always=True)
-        return target, bool(self.snap.enabled)
+        # ``active`` = 「这一下点下去真的会吸」：非绘制态看门控；绘制态还要
+        # 真正武装过（否则只是细十字预告，落点仍在光标处，得按 T 才吸）
+        will_snap = bool(self.snap.enabled)
+        if self._draw_type:
+            will_snap = will_snap and self._draw_snap_armed
+        return target, will_snap
 
     def _draw_hover_snap_points(self, painter: QPainter) -> None:
         """只画**最近的那一个**捕捉点（固定屏幕像素）。
@@ -2285,14 +2575,27 @@ class GraphicsView(QGraphicsView):
         (None, None),
         ("水平等距", "distribute_h"), ("垂直等距", "distribute_v"),
         (None, None),
-        ("成组", "group"), ("解组", "ungroup"), ("复制", "duplicate"),
-        ("删除", "delete"),
+        ("成组", "group"), ("解组", "ungroup"), ("重命名…", "rename"),
+        ("复制", "duplicate"), ("删除", "delete"),
         (None, None),
         ("全选", "select_all"), ("适应内容", "fit"),
     )
 
     def build_context_menu(self) -> QMenu:
         menu = QMenu(self)
+        # 右键点在组成员上：选中已重定向到根组（「重命名…」作用于整组），
+        # 但成员自己画布上点不出来，这里补一个直达入口改它的名字。
+        scene = self.scene()
+        member = (scene.find_item(self._context_member_id)
+                  if scene is not None and self._context_member_id else None)
+        if member is not None and not member.isSelected():
+            action = menu.addAction(f"重命名成员「{member.get_name()}」…")
+            action.setToolTip("只改这个成员的名字；选中与其余命令仍作用于整组")
+            action.triggered.connect(
+                lambda checked=False, iid=member.item_id:
+                    self.memberRenameRequested.emit(iid)
+            )
+            menu.addSeparator()
         for label, key in self._CONTEXT_ENTRIES:
             if label is None:
                 menu.addSeparator()
@@ -2302,7 +2605,6 @@ class GraphicsView(QGraphicsView):
                 lambda checked=False, k=key: self.actionTriggered.emit(k)
             )
         # 布尔与模板入口同主窗口命令表共用，操作后只记一个撤销点。
-        scene = self.scene()
         sel = scene.selected_items() if hasattr(scene, "selected_items") else []
         boolean_items = (scene.boolean_items()
                          if hasattr(scene, "boolean_items") else [])

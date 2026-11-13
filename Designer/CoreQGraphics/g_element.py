@@ -338,8 +338,20 @@ class BaseItem(QGraphicsItem):
     # 位姿锁：平移被父对象锁死，旋转仍可自行进行
     # ------------------------------------------------------------------
     def translate_locked(self) -> bool:
-        """有父对象时不能自行平移——位置只由父对象带动。"""
-        return bool(self.parent_id)
+        """有父对象时，**仅设计态**不能自行平移——位置由父对象带动。
+
+        运行态允许子图元自行平移：HMI 动画 / 业务脚本经常需要让某个
+        子控件在父图元内部偏移（``RuntimeElement.setPos`` /
+        ``set_page_center`` 都走这条门控）。运行态仍保留父子刚体联动：
+        子图元自己动不带动父对象，父对象之后平移 / 旋转时仍会带着它走。
+
+        判定只看当前场景的 ``is_run_mode``；图元尚未入场景（构造 / 离线
+        建模）按设计态处理，保持原有存储语义。
+        """
+        if not self.parent_id:
+            return False
+        scene = self.scene()
+        return not bool(getattr(scene, "is_run_mode", False))
 
     def pose_locked(self) -> bool:
         """兼容旧名的入口，语义收敛为「平移锁定」（旋转不锁）。"""
@@ -578,15 +590,19 @@ class BaseItem(QGraphicsItem):
     def get_name(self) -> str:
         return self.item_name
 
-    def set_name(self, name: str) -> None:
-        # 组改名要连成员的名字前缀一起换（旧 Core group_element.set_name）；
-        # 属性面板与 F2 都走这里，统一由场景层处理。
+    def set_name(self, name: str) -> bool:
+        """改名，返回是否成功（组的成员名字前缀由场景层一起换）。
+
+        **名字整页唯一**：改成空名或已存在的名字会被拒绝（``False``），且一个
+        字段都不写；拒绝原因由场景的 ``rename_problem()`` 统一给，属性面板 /
+        F2 重命名据此回滚输入框并提示。图元还没入场景（离线建模 / 构造）时
+        无从查重，退回直接写记录的行为。
+        """
         scene = self.scene()
-        if (self.TYPE == "group" and scene is not None
-                and hasattr(scene, "rename_group")):
-            scene.rename_group(self, str(name))
-            return
-        self.set_page_field("name", str(name))
+        if scene is not None and hasattr(scene, "rename_item"):
+            return bool(scene.rename_item(self, str(name or ""))[0])
+        self.set_page_field("name", str(name or ""))
+        return True
 
     def get_visibility(self) -> bool:
         return self._visible
@@ -677,12 +693,14 @@ class BaseItem(QGraphicsItem):
             self._visible = bool(value)
             self.setVisible(self._visible)
         elif key == "style":
-            old_font_size = self._style.font_size
+            old_font = (self._style.font_size, self._style.font_family)
             self._style = Style.from_dict(value)
-            # 只有字号真的变了才联动几何：改颜色 / 线宽不该把文本边框撑大。
+            # 只有字号 / 字体族真的变了才联动几何：改颜色 / 线宽不该把文本边框
+            # 撑大。字体族换了文字宽高就变（同一个字在「微软雅黑」和「Arial」
+            # 里不一样宽），必须按新字体把边框重算，否则文字会被裁。
             # 由尺寸反算字号时（_text_resizing）只更新样式，不再重算边框。
-            if (abs(self._style.font_size - old_font_size) > 1e-9
-                    and not self._text_resizing):
+            new_font = (self._style.font_size, self._style.font_family)
+            if new_font != old_font and not self._text_resizing:
                 self._on_text_changed()
         elif key == "context":
             self.context = value
@@ -757,10 +775,11 @@ class BaseItem(QGraphicsItem):
         return not self._pivot_is_default()
 
     def set_page_center(self, x: float, y: float) -> bool:
-        """平移图元，使可视中心落到 (x, y)。
+        """平移图元，使可视中心落到 page 坐标 (x, y)。
 
-        有父对象时直接拒绝：子图元不能自行平移，位置只能由父对象带动
-        （``translate_locked``）。要挪它请挪父对象。
+        有父对象时**仅设计态**拒绝：设计器里子图元的位置只能由父对象带动
+        （``translate_locked``）。运行态允许自行平移，供 HMI 动画 / 业务脚本
+        在父图元内部偏移子控件；父对象之后运动时仍按刚体联动带上它。
         """
         if self.translate_locked():
             return False
@@ -822,8 +841,9 @@ class BaseItem(QGraphicsItem):
 
         挂上父对象后：
 
-        * 本图元**不能自行平移**（``translate_locked``），位置只由父对象的刚体
-          运动带动（平移 + 旋转 + 支点一起走）；
+        * 本图元在**设计态不能自行平移**（``translate_locked``），位置只由父
+          对象的刚体运动带动（平移 + 旋转 + 支点一起走）；运行态允许业务脚本
+          自行平移子图元，父对象之后的运动仍会带着它走；
         * 本图元**仍可自行旋转**（``set_page_angle`` / ``rotate_by`` / 面板
           「旋转」字段），绕自己的支点转，不带动父对象和兄弟；
         * 对外暴露的坐标改为**父坐标系**（``page_local_center`` /

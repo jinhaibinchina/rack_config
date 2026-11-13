@@ -86,6 +86,8 @@ class DesignerWindow(QMainWindow):
         # 构造期 viewport 只有 98x28，fitInView 会算出错误缩放；
         # 首次 fit 必须等 showEvent 之后 viewport 有真实尺寸。
         self._initial_fit_pending = True
+        # 框选期间攒下的「选中变了」标记，松手时一次性同步（见 _on_selection_changed）
+        self._selection_pending = False
 
         self.layers = LayerTreeDock(self)
         self.toolbox = ElementToolboxDock(self)
@@ -100,6 +102,8 @@ class DesignerWindow(QMainWindow):
 
         self.layers.set_scene(self.scene)
         self.property_panel.set_scene(self.scene)
+        # 框选中（左键还按着）先别整表同步图层树，松手由 _flush_selection 补
+        self.layers.set_defer_probe(self.view.is_band_selecting)
         self.actions: dict[str, QAction] = {}
         self._build_actions()
         self._build_menus()
@@ -271,7 +275,12 @@ class DesignerWindow(QMainWindow):
         self.view.elementDropped.connect(self._on_drop)
         self.view.templateDropped.connect(self._on_template_dropped)
         self.view.actionTriggered.connect(self._do)
+        self.view.memberRenameRequested.connect(
+            lambda iid: self._rename([int(iid)]))
         self.view.orthoModeChanged.connect(self._on_ortho_changed)
+        # 框选松手才把选中「定下来」：拖动中每格都改选中，重建属性面板 +
+        # 图层树同步一次约 38 ms，一屏拖下来就是几百毫秒的卡顿。
+        self.view.selectionSettled.connect(self._flush_selection)
         self.layers.selectionRequested.connect(self._select_from_tree)
         self.layers.actionRequested.connect(self._do_tree_action)
         self.history.changed.connect(self._update_history_actions)
@@ -588,16 +597,33 @@ class DesignerWindow(QMainWindow):
         self._after_edit()
 
     def _rename(self, ids: list[int]) -> None:
+        """F2 / 右键重命名：重名或空名**拒绝并提示**，对话框留着让人改。
+
+        名字整页唯一（图层树、``find_item_by_name``、运行态按名绑定都靠它），
+        所以这里在写之前先问场景要原因；被拒时把刚输入的名字留在框里，改一个
+        能用的即可，取消则什么都不写。
+        """
         if not ids:
             return
         item = self.scene.find_item(ids[0])
         if item is None:
             return
-        name, ok = QInputDialog.getText(self, "重命名", "新名称：", text=item.get_name())
-        if ok and name.strip():
-            item.set_name(name.strip())
-            self.scene.notify_edit(item)
-            self._after_edit()
+        proposed = item.get_name()
+        while True:
+            name, ok = QInputDialog.getText(self, "重命名", "新名称：", text=proposed)
+            if not ok:
+                return
+            text = name.strip()
+            problem = self.scene.rename_problem(text, item.item_id)
+            if problem:
+                QMessageBox.warning(self, "重命名", problem)
+                proposed = name
+                continue
+            if text != str(item.get_name() or "").strip():
+                item.set_name(text)
+                self.scene.notify_edit(item)
+                self._after_edit()
+            return
 
     def _select_from_tree(self, ids: list[int]) -> None:
         wanted = set(ids or [])
@@ -740,6 +766,26 @@ class DesignerWindow(QMainWindow):
     # 状态同步
     # ------------------------------------------------------------------
     def _on_selection_changed(self) -> None:
+        """选中集合变化：同步属性面板 / 图层树 / 状态栏。
+
+        框选中（左键还按着）只记一个「待同步」标记就返回——框选每一格都会改
+        选中，面板重建 + 图层树同步实测 ~38 ms/次，全屏拖一趟会白烧几百毫秒，
+        而且中途那些半成品多选状态用户根本看不清。松手时视图发
+        ``selectionSettled``，这里一次性补齐（见 ``_flush_selection``）。
+        """
+        if self.view.is_band_selecting():
+            self._selection_pending = True
+            return
+        self._apply_selection_ui()
+
+    def _flush_selection(self) -> None:
+        """框选松手：把拖动期间攒下的选中变化一次性同步到面板 / 图层树。"""
+        if not getattr(self, "_selection_pending", False):
+            return
+        self._selection_pending = False
+        self._apply_selection_ui()
+
+    def _apply_selection_ui(self) -> None:
         sel = self.scene.selected_items()
         target = sel[0] if len(sel) == 1 else (sel if len(sel) > 1 else None)
         self.property_panel.update_for_selected(target)

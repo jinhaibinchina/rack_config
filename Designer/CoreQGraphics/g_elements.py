@@ -165,7 +165,8 @@ class TextItem(BaseItem):
         ``width``，因此用 ``SceneProjection.inverse_size`` 反算，不要手工除 kx。
         另外只在显式编辑时触发，加载 / round-trip 完全不碰存量几何。
         """
-        wpx, hpx = text_metrics(self.context or "", self._style.font_size)
+        wpx, hpx = text_metrics(self.context or "", self._style.font_size,
+                                self._style.font_family)
         w_view = wpx + 2.0 * TEXT_PAD_X
         h_view = hpx + 2.0 * TEXT_PAD_Y
         w, h = self._proj.inverse_size(w_view, h_view)
@@ -215,11 +216,12 @@ class TextItem(BaseItem):
         字号上界与属性面板 ``make_int(..., 4, 200)`` 对齐。
         """
         text = self.context or ""
+        family = self._style.font_family
         target_w = max(float(w_view) - 2.0 * TEXT_PAD_X, 1.0)
         target_h = max(float(h_view) - 2.0 * TEXT_PAD_Y, 1.0)
 
         def fits(fs: int) -> bool:
-            tw, th = text_metrics(text, fs)
+            tw, th = text_metrics(text, fs, family)
             return tw <= target_w + 1e-6 and th <= target_h + 1e-6
 
         lo, hi = self._MIN_FONT, self._MAX_FONT
@@ -239,7 +241,7 @@ class TextItem(BaseItem):
         s = self._style
         r = self._local_rect
         painter.save()
-        painter.setFont(font_for("Arial", s.font_size, True))
+        painter.setFont(font_for(s.font_family, s.font_size, True))
         # 圆角与 RectItem / 旧 Core rect_element 同口径：cornerRadius 是场景
         # 单位，AGV 投影交换了轴（场景 y -> 画笔 x、场景 x -> 画笔 y），所以
         # rx 乘 ky、ry 乘 kx，且各自夹在对应边的一半以内。属性面板本来就给
@@ -272,8 +274,13 @@ class TextItem(BaseItem):
                     painter.restore()
                 else:
                     painter.fillRect(r, s.fill_color)
-        text_rect = painter.boundingRect(r, Qt.AlignCenter, self.context or "")
-        painter.drawText(text_rect, Qt.AlignCenter, self.context or "")
+        # 一次排版搞定：先 boundingRect 量出紧凑矩形再往里面 drawText，等于
+        # 每帧对同一个字符串排两次版（实测占 text paint 的 40%+，103 个文本就是
+        # 每帧 17 ms，框选时肉眼看得到卡顿）。直接画进 r，靠 TextDontClip 保留
+        # 「文字超出边框也不裁」的旧观感——六种情形（短文本 / 溢出 / 多行 /
+        # 0.4~3.0 倍缩放 / 中文混排）逐像素比对与旧写法完全一致。
+        painter.drawText(r, Qt.AlignCenter | Qt.TextDontClip,
+                         self.context or "")
         painter.restore()
         _selection_overlay(painter, self)
 

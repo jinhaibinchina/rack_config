@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QFileInfo, QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QListWidget, QPushButton, QSplitter, QStackedWidget,
     QToolTip, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
@@ -27,7 +27,10 @@ from Designer.Core.property_widgets import (
 )
 
 from ..g_scene import TYPE_LABELS
-from ..g_style import color_str, parse_color
+from ..g_style import (
+    FONT_FAMILY_DEFAULT, available_font_families, color_str,
+    is_scalable_font_family, normalize_font_family, parse_color,
+)
 from ..g_widgets import (
     WIDGET_DEFAULTS, WIDGET_VARIANTS, WIDGET_VARIANT_LABELS, normalize_variant,
 )
@@ -50,6 +53,8 @@ class PropertyPanel(QWidget):
         self._pose_widgets: list[tuple[object, bool]] = []
         # 字号在「文本内容」页和「外观」页各有一个输入，跨页保持同步
         self._font_boxes: list = []
+        # 字体族同理：文本的「文本内容」/「外观」两页各一个下拉，跨页同步
+        self._family_boxes: list = []
         self._last_page: dict[str, str] = {}
 
         outer = QVBoxLayout(self)
@@ -93,6 +98,7 @@ class PropertyPanel(QWidget):
         self._geo_bindings.clear()
         self._pose_widgets.clear()
         self._font_boxes.clear()
+        self._family_boxes.clear()
         if isinstance(target, (list, tuple)):
             self._build_multi(target)
             self.header.set_object("多", f"{len(target)} 个图元", "多选 · 只做汇总")
@@ -272,6 +278,119 @@ class PropertyPanel(QWidget):
             box.setValue(value)
             box.blockSignals(False)
 
+    # ------------------------------------------------------------------
+    # 字体族：文本图元存 style.font_family，widget 存顶层 widgetFontFamily
+    # ------------------------------------------------------------------
+    def _make_family_combo(self, current: str, allow_default: bool) -> QComboBox:
+        """系统字体下拉，每行用该字体自绘预览（所见即所得）。
+
+        ``allow_default`` 给 widget 用：第一项是空串「（默认字体）」，对应
+        存量页面「不写这个字段、跟随应用默认」的语义；文本图元的默认字体是
+        具体族名（旧 Core 恒用 Arial），所以不放这一项。
+        当前字体不在系统字体库里（换机器 / 字体被删）时把它插到列表最前，
+        便于用户看出真实值并改掉，而不是被悄悄换成第一项。
+
+        列表来自 ``available_font_families()``，**已剔除 GDI 位图字体**
+        （Terminal / Fixedsys / System 这类）：DirectWrite 没有它们的字体
+        文件，一旦给它们设 ``Qt.FontRole`` 预览就会刷
+        ``CreateFontFaceFromHDC() failed`` 告警。存量 page 若真存了这类族名，
+        仍会插到最前（保持所见即真值），但不给预览字体。
+        """
+        combo = QComboBox()
+        combo.setObjectName("propFontFamily")
+        combo.setMaxVisibleItems(18)
+        combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        combo.setMinimumContentsLength(8)
+        if allow_default:
+            combo.addItem("（默认字体）", "")
+        families = available_font_families()
+        if current and current not in families:
+            families.insert(0, current)
+        for family in families:
+            combo.addItem(family, family)
+            if is_scalable_font_family(family):
+                combo.setItemData(combo.count() - 1, QFont(family), Qt.FontRole)
+        index = combo.findData(current)
+        combo.setCurrentIndex(index if index >= 0 else 0)
+        return combo
+
+    def _font_family_combo(self, it) -> QComboBox:
+        """文本图元的字体下拉：「文本内容」页与「外观」页各一个，跨页同步。"""
+        current = normalize_font_family(
+            it.style_value("font_family", FONT_FAMILY_DEFAULT))
+        combo = self._make_family_combo(current, allow_default=False)
+        combo.currentIndexChanged.connect(
+            lambda _i, box=combo: self._set_font_family(
+                it, box, str(box.currentData() or "")))
+        self._family_boxes.append(combo)
+        return combo
+
+    def _set_font_family(self, it, source, value: str) -> None:
+        """写 ``style.font_family``；换字体后文字宽高会变，边框由 TextItem 重算。"""
+        family = normalize_font_family(value)
+        current = normalize_font_family(
+            it.style_value("font_family", FONT_FAMILY_DEFAULT))
+        if family != current:
+            self._commit(lambda: it.set_style_value("font_family", family))
+        for box in self._family_boxes:
+            if box is source or str(box.currentData() or "") == family:
+                continue
+            box.blockSignals(True)
+            index = box.findData(family)
+            if index < 0:
+                # 两个下拉各自在面板重建时取的字体快照可能不同（字体中途安装 /
+                # 当前字体不在库里）：补一项而不是把选择置成 -1 空值。
+                box.addItem(family, family)
+                index = box.count() - 1
+                if is_scalable_font_family(family):
+                    box.setItemData(index, QFont(family), Qt.FontRole)
+            box.setCurrentIndex(index)
+            box.blockSignals(False)
+
+    def _widget_family_combo(self, it) -> QComboBox:
+        """widget 的字体下拉：写顶层 ``widgetFontFamily``（空串 = 默认字体）。"""
+        current = str(it.page_record().get(
+            "widgetFontFamily", WIDGET_DEFAULTS["widgetFontFamily"]) or "")
+        combo = self._make_family_combo(current, allow_default=True)
+        combo.currentIndexChanged.connect(
+            lambda _i, box=combo: self._set_widget_family(
+                it, str(box.currentData() or "")))
+        return combo
+
+    def _set_widget_family(self, it, value: str) -> None:
+        current = str(it.page_record().get("widgetFontFamily", "") or "")
+        if value == current:
+            return
+        # 设计态占位文字从记录里现读字体，运行预览按样式表签名自动重建控件
+        self._commit(lambda: it.set_page_field("widgetFontFamily", value))
+
+    def _rename_item(self, it, edit) -> None:
+        """改名：重名 / 空名**拒绝**并把输入框回滚，用气泡说明原因。
+
+        拒绝时**不调 ``_commit``**——一次被拒的编辑不该产生撤销快照 / 脏标记
+        （与宽高同时为 0 的拒绝口径一致）。名字是否合法由场景
+        ``rename_problem()`` 判定，文案与 F2 / 右键重命名共用。
+        """
+        text = edit.text().strip()
+        scene = it.scene()
+        problem = ""
+        if scene is not None and hasattr(scene, "rename_problem"):
+            problem = scene.rename_problem(text, it.item_id)
+        if not problem and text == str(it.get_name() or "").strip():
+            # 没真的改（只是失焦）不提交，避免凭空多一个撤销点
+            edit.setText(it.get_name())
+            return
+        if problem:
+            edit.blockSignals(True)
+            edit.setText(it.get_name())
+            edit.blockSignals(False)
+            QToolTip.showText(
+                edit.mapToGlobal(QPoint(0, edit.height())), problem, edit)
+            return
+        self._commit(lambda: it.set_name(text))
+        # 组改名只动组名 + 成员前缀，组名本身即 text；这里统一回显真值
+        edit.setText(it.get_name())
+
     def _set_size_field(self, it, source, is_width: bool, value: float) -> None:
         """提交 W/H；直线不允许两轴同时为 0（线段会退化成一个点）。
 
@@ -320,12 +439,14 @@ class PropertyPanel(QWidget):
         page = PropertyPage()
         basic = self._card(page, "基本信息")
         name_edit = make_line(it.get_name(), tooltip="图元名称，图层树按它显示")
+        name_edit.setObjectName("propName")
         name_edit.editingFinished.connect(
-            lambda: self._commit(lambda: it.set_name(name_edit.text()))
-        )
+            lambda: self._rename_item(it, name_edit))
         basic.add_row(("名称", name_edit))
         basic.add_row(("类型", make_value_label(TYPE_LABELS.get(it.TYPE, it.TYPE))),
                       ("ID", make_value_label(str(it.item_id))))
+        basic.add_hint("名称在整页内唯一：改成已存在的名字会被拒绝并提示，输入框"
+                       "回到原名（组改名会连同成员的名称前缀一起换）。")
         # 父对象：可设 / 可清空（逻辑父对象，父移动时自身随动）
         parent_combo = self._make_parent_combo(it)
         basic.add_row(("父对象", parent_combo),
@@ -395,10 +516,12 @@ class PropertyPanel(QWidget):
                 lambda v: self._commit(lambda: it.set_style_value("cornerRadius", float(v)))
             )
             card.add_row(("圆角", radius))
-        # widget 变体的字号是顶层 widgetFontSize（不是 style.font_size），
-        # 统一放到「控件」页编辑，这里只给 text 留 style.font_size 入口。
+        # widget 变体的字号 / 字体族是顶层 widgetFontSize / widgetFontFamily
+        # （不是 style.font_size / style.font_family），统一放到「控件」页编辑，
+        # 这里只给 text 留 style.* 入口。
         if it.TYPE == "text":
-            card.add_row(("字号", self._font_size_box(it)))
+            card.add_row(("字体", self._font_family_combo(it)),
+                         ("字号", self._font_size_box(it)))
         card.add_hint("颜色控件里的不透明度会写进 style.opacity，与旧 Core 一致。")
         return page
 
@@ -543,9 +666,11 @@ class PropertyPanel(QWidget):
                 lambda: self._commit(lambda: it.set_page_field("context", edit.toPlainText()))
             )
             card.add_widget(edit)
-            card.add_row(("字体大小", self._font_size_box(it)))
-            card.add_hint("改字体大小或文字后，边框 / 背景会按文字实际尺寸自动重算，"
-                          "中心与旋转支点保持不动。想手动指定边框请在「布局」页改宽高"
+            card.add_row(("字体", self._font_family_combo(it)),
+                         ("字体大小", self._font_size_box(it)))
+            card.add_hint("改字体 / 字体大小或文字后，边框 / 背景会按文字实际尺寸自动重算"
+                          "（不同字体下同一个字的宽高不同），中心与旋转支点保持不动。"
+                          "想手动指定边框请在「布局」页改宽高"
                           "（下次改字号会再次按文字重算）。")
             return "context", "文本内容", page
 
@@ -581,6 +706,7 @@ class PropertyPanel(QWidget):
             rec = it.page_record()
             cur = normalize_variant(rec.get("widgetType"))
             combo = QComboBox()
+            combo.setObjectName("widgetVariant")
             for key in WIDGET_VARIANTS:
                 combo.addItem(WIDGET_VARIANT_LABELS[key], key)
             combo.setCurrentIndex(combo.findData(cur))
@@ -608,7 +734,7 @@ class PropertyPanel(QWidget):
                 lambda v: self._commit(
                     lambda: it.set_page_field("widgetFontSize", int(v)))
             )
-            card.add_row(("字号", fs))
+            card.add_row(("字体", self._widget_family_combo(it)), ("字号", fs))
 
             fg = ColorField(parse_color(str(rec.get(
                 "widgetColor", WIDGET_DEFAULTS["widgetColor"]))))
@@ -640,8 +766,9 @@ class PropertyPanel(QWidget):
                           "标签推值会调用控件的 setValue。",
             }
             card.add_hint(hints.get(cur, "") +
-                          " 这 5 个字段都在 page JSON 顶层，与旧 Core 完全同构；"
-                          "运行预览会挂载对应的真实 Qt 控件。")
+                          " 这些字段都在 page JSON 顶层，与旧 Core 同构"
+                          "（widgetFontFamily 为可选键，选「（默认字体）」即不写具体字体）；"
+                          "运行预览会挂载对应的真实 Qt 控件，字体族同步生效。")
             return "widget", "控件", page
 
         if it.TYPE == "group":

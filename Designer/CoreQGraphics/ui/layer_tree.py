@@ -32,6 +32,10 @@ class LayerTreeDock(QDockWidget):
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.scene = None
         self._syncing = False
+        # 可选的「先别同步」探针：主窗口传入视图的框选状态。框选期间每移动
+        # 一格都会改选中，这棵树整表同步一次 ~20 ms，全屏拖一趟白烧三四百
+        # 毫秒；主窗口松手后会再调一次 sync_selection，这里跳过即可。
+        self._defer_probe = None
         # 记录「本树实际连过」的 (signal, slot)，换场景时只断这些。
         # 盲目 disconnect 未连接的槽会让 PySide6 打 RuntimeWarning。
         self._bound: list[tuple] = []
@@ -189,8 +193,15 @@ class LayerTreeDock(QDockWidget):
         return [int(n.data(0, ID_ROLE)) for n in self.tree.selectedItems()
                 if n.data(0, ID_ROLE) is not None]
 
+    def set_defer_probe(self, probe) -> None:
+        """设置「现在先别同步选中」的探针（``() -> bool``），``None`` 表示不延迟。"""
+        self._defer_probe = probe
+
     def sync_selection(self) -> None:
         if self.scene is None or self._syncing:
+            return
+        probe = self._defer_probe
+        if probe is not None and probe():
             return
         wanted = {it.item_id for it in self.scene.selected_items()}
         # Qt 不允许选中隐藏（setVisible(False)）图元，scene.selectedItems() 会漏掉
@@ -239,8 +250,32 @@ class LayerTreeDock(QDockWidget):
             return
         self.selectionRequested.emit(self.selected_ids())
 
+    def _menu_target_ids(self, pos) -> list[int]:
+        """右键菜单的目标：光标下的行优先，其次当前选中集合。
+
+        Qt 右键不改选中，但用户预期「菜单作用于光标下的行」：若该行不在
+        当前选中集合里（甚至什么都没选），静默把树选中改成它——否则右键
+        组内的成员行时，菜单会作用于上一选中（比如整组），重命名改的
+        是组名，成员看起来「改不动名」。静默（blockSignals）不发
+        ``selectionRequested``；真正同步场景选中由 ``_do_tree_action`` 的
+        ``_select_from_tree`` 完成。
+        """
+        node = self.tree.itemAt(pos)
+        if node is not None and node.data(0, ID_ROLE) is not None:
+            iid = int(node.data(0, ID_ROLE))
+            if iid not in set(self.selected_ids()):
+                index = self.tree.indexFromItem(node, 0)
+                self.tree.blockSignals(True)
+                try:
+                    self.tree.selectionModel().select(
+                        index, QItemSelectionModel.ClearAndSelect
+                        | QItemSelectionModel.Rows)
+                finally:
+                    self.tree.blockSignals(False)
+        return self.selected_ids()
+
     def _show_menu(self, pos) -> None:
-        ids = self.selected_ids()
+        ids = self._menu_target_ids(pos)
         if not ids:
             return
         menu = QMenu(self)
