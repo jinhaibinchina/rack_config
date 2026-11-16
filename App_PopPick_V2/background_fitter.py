@@ -112,16 +112,14 @@ class BackgroundElement:
     def change_size(self, width: float, height: float) -> None:
         """把背景尺寸改成 ``width×height``（page 坐标）。
 
-        ``fit_widget_size`` 收的是**视图像素**尺寸，先按同一份投影把 page
-        宽高换算过去；``inverse_size(size(w,h))`` 严格等于 ``(w,h)``，不会
-        因为 AGV 轴交换把宽高对调错。
+        DesignerV2 起 page 坐标 == 场景坐标（SceneProjection 已删除），
+        ``fit_widget_size`` 收的像素尺寸就是 page 宽高本身，不用再换算。
         """
         element = self.element()
         it = self.item()
         if element is None or it is None:
             return
-        vw, vh = it._proj.size(float(width), float(height))
-        element.fit_widget_size(QSizeF(vw, vh))
+        element.fit_widget_size(QSizeF(float(width), float(height)))
 
 
 class BackgroundFitter(QObject):
@@ -188,8 +186,8 @@ class BackgroundFitter(QObject):
         vp = view.viewport().rect()
         if vp.width() < 8 or vp.height() < 8:
             return QRectF()
-        view_rect = QRectF(view.mapToScene(vp).boundingRect())
-        return view.projection.inverse_rect(view_rect)
+        # DesignerV2 没有投影层，``mapToScene`` 出来的就是 page 坐标。
+        return QRectF(view.mapToScene(vp).boundingRect())
 
     def target_rect(self) -> QRectF:
         """本次同步的目标矩形（可见矩形外扩一圈，防亚像素露边）。"""

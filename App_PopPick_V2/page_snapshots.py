@@ -16,7 +16,7 @@
 
 与框架的分工
 ============
-``Designer/CoreQGraphics/runtime`` 的 :class:`~.widgets.WidgetHost` 只管
+``DesignerV2/CoreQGraphics/runtime`` 的 :class:`~.widgets.WidgetHost` 只管
 「造控件 / 对齐 proxy / 回收」，**不含位图缓存**（见设计文档 §9「未覆盖能力」）。
 本模块就是文档里说的业务侧 ``SnapshotPolicy``：它不碰 proxy 的位姿计算，
 只读 proxy 已经落好的 ``pos / rotation / zValue`` 再抄给位图，因此
@@ -79,7 +79,7 @@ except AttributeError:  # pragma: no cover - 旧式枚举别名
 class PageSnapshots(QObject):
     """把 widget 图元的真实控件烘成位图并在需要时顶替它。
 
-    :param stage: :class:`Designer.CoreQGraphics.runtime.RuntimeStage`；
+    :param stage: :class:`DesignerV2.CoreQGraphics.runtime.RuntimeStage`；
     :param enabled: ``False`` 时所有方法退化为空操作（等价于关闭优化）。
     """
 

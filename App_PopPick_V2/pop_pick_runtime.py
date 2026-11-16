@@ -5,7 +5,7 @@
 .. code-block:: text
 
     PopPickRuntime                 ← 本模块：装配 / 数据 / 生命周期
-      ├─ RuntimeStage              （Designer.CoreQGraphics.runtime）
+      ├─ RuntimeStage              （DesignerV2.CoreQGraphics.runtime）
       │    ├─ RuntimeScene/RuntimeView   画面与取景
       │    ├─ RuntimeRegistry            图元门面（卡片就是 RuntimeElement）
       │    ├─ WidgetHost                 卡片 → QGraphicsProxyWidget
@@ -51,8 +51,8 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Signal
 
-from Designer.CoreQGraphics.runtime import RuntimeStage
-from Designer.CoreQGraphics.runtime.widgets import ControlProvider
+from DesignerV2.CoreQGraphics.runtime import RuntimeStage
+from DesignerV2.CoreQGraphics.runtime.widgets import ControlProvider
 
 from . import pop_pick_config as cfg
 from .background_fitter import BackgroundFitter

@@ -9,7 +9,7 @@
 
     PopPickWindow
       ├─ PopPickRuntime           stage + 位图顶替 + HMI 数据
-      │    ├─ RuntimeStage        （Designer.CoreQGraphics.runtime）
+      │    ├─ RuntimeStage        （DesignerV2.CoreQGraphics.runtime）
       │    ├─ PageSnapshots       动画期 / 后台页位图
       │    └─ HmiPagesHost        7 个页面 + OPC UA 订阅
       └─ PageDeck                 卡片堆叠交互（接 stage.pages_manager）
@@ -37,9 +37,9 @@
     python App_PopPick_V2/pop_pick_entry.py --scene <绝对路径>.json
     python -m App_PopPick_V2 --no-plc --seconds 5      # 离屏自测
 
-页面文件查找顺序：``--scene`` 指定 → 设计工程 ``pages/page_9.json``（源码
-运行，设计器改完直接生效）→ ``res/myDesigner/scene/pop_pick_scene.json``
-（打包后的运行态快照）。
+页面文件查找顺序：``--scene`` 指定 → 设计工程 ``pages/page_9.v2.json``（Native
+口径副本，见 :func:`_page_file_candidates`）→ ``pages/page_9.json``（旧 AGV 口径
+原文件）→ ``res/myDesigner/scene/pop_pick_scene[.v2].json``（打包后的运行态快照）。
 """
 
 from __future__ import annotations
@@ -138,21 +138,31 @@ class _DeferredNativeClose:
 
 
 def _page_file_candidates(page: str) -> list[str]:
-    """页面文件的候选路径（源码运行 → 打包后的运行态场景副本）。"""
+    """页面文件的候选路径（源码运行 → 打包后的运行态场景副本）。
+
+    DesignerV2 起 page JSON 里的坐标**就是** Qt 场景坐标（AGV 投影已删除），
+    旧口径页面直接喂进去会整体转 90°。所以每个页面都优先取 Native 副本
+    ``<page>.v2.json``（由 ``DesignerV2/tools/convert_page_to_native.py`` 生成；
+    文件名不以 ``page_<数字>`` 结尾，设计器枚举页面时不会把它当成新页面），
+    取不到才退回原始 ``<page>.json``。
+    """
+    pages_dir = os.path.join(
+        cfg.PROJECT_ROOT, "Designer", "Core", "data.json", "datas", "design",
+        "pages",
+    )
     candidates = [
-        os.path.join(
-            cfg.PROJECT_ROOT, "Designer", "Core", "data.json", "datas", "design",
-            "pages", f"{page}.json",
-        )
+        os.path.join(pages_dir, f"{page}.v2.json"),
+        os.path.join(pages_dir, f"{page}.json"),
     ]
     if getattr(sys, "frozen", False):
-        # 打包后设计工程不一定跟着走，退到 res 下的运行态场景副本。
+        # 打包后设计工程不一定跟着走，退到 res 下的运行态场景副本（同样先取 Native 版）。
         try:
             from res.designer_resource_manager import resource_manager as res_mng
 
-            path = res_mng.get_json_path("pop_pick_scene.json")
-            if path and os.path.isfile(path):
-                candidates.append(path)
+            for name in ("pop_pick_scene.v2.json", "pop_pick_scene.json"):
+                path = res_mng.get_json_path(name)
+                if path and os.path.isfile(path):
+                    candidates.append(path)
         except Exception:  # noqa: BLE001 - 资源包缺失时按"没找到"处理
             pass
     return candidates

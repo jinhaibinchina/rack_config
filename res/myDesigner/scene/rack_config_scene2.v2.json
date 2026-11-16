@@ -46732,318 +46732,124 @@
             "zValue": 1641
         },
         {
-            "id": 1647,
-            "name": "组_95_控件_4",
-            "type": "widget",
-            "parent_id": 1658,
-            "children_ids": [],
-            "group_id": 1658,
-            "center_pos": {
-                "x": -2157.88125,
-                "y": -517.369
-            },
-            "origin_pos": {
-                "x": -2157.88125,
-                "y": -517.369
-            },
-            "width": 456.0,
-            "height": 97.0,
-            "rotate": -6.999999999999999,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 0.0,
-            "widgetText": "缓存料架监控",
-            "widgetType": "label",
-            "widgetFontSize": 57,
-            "widgetColor": "#000000",
-            "widgetBackground": "#e1f59b"
-        },
-        {
-            "id": 1655,
-            "name": "组_95_多边形_1",
-            "type": "polygon",
-            "parent_id": 1658,
-            "children_ids": [],
-            "group_id": 1658,
-            "center_pos": {
-                "x": -2166.1255,
-                "y": -436.058
-            },
-            "origin_pos": {
-                "x": -2166.1255,
-                "y": -436.058
-            },
-            "width": 483.41824999999994,
-            "height": 119.5265,
-            "rotate": -0.0,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": true,
-                "fill_color": "#00aa00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 8.0,
-            "vertices": [
-                {
-                    "x": -1924.41625,
-                    "y": -495.82125
-                },
-                {
-                    "x": -1983.73675,
-                    "y": -436.50075
-                },
-                {
-                    "x": -2407.8345,
-                    "y": -376.29475
-                },
-                {
-                    "x": -2377.07775,
-                    "y": -439.97625
-                }
-            ]
-        },
-        {
-            "id": 1656,
-            "name": "组_95_多边形_2",
-            "type": "polygon",
-            "parent_id": 1658,
-            "children_ids": [],
-            "group_id": 1658,
-            "center_pos": {
-                "x": -2400.3275,
-                "y": -454.9075
-            },
-            "origin_pos": {
-                "x": -2400.32775,
-                "y": -454.9075
-            },
-            "width": 42.36175000000003,
-            "height": 160.14074999999997,
-            "rotate": -0.0,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": true,
-                "fill_color": "#005500",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 9.0,
-            "vertices": [
-                {
-                    "x": -2391.12275,
-                    "y": -534.978
-                },
-                {
-                    "x": -2421.5085,
-                    "y": -468.458
-                },
-                {
-                    "x": -2410.01125,
-                    "y": -374.83725
-                },
-                {
-                    "x": -2379.14675,
-                    "y": -438.44175
-                }
-            ]
-        },
-        {
-            "id": 1658,
-            "name": "组_95",
-            "type": "group",
+            "id": 1663,
+            "name": "文本_1663",
+            "type": "text",
             "parent_id": 0,
-            "children_ids": [
-                1656,
-                1647,
-                1655
-            ],
+            "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": -2172.96225,
-                "y": -484.0655
+                "x": -177.993,
+                "y": -939.931
             },
             "origin_pos": {
-                "x": -2172.96225,
-                "y": -484.0655
+                "x": -177.993,
+                "y": -939.931
             },
-            "width": 497.0922499999999,
-            "height": 218.45644865097768,
-            "rotate": -0.0,
+            "width": 795.6568280117768,
+            "height": 133.1347342099949,
+            "rotate": -5.0,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 2,
-                "fill": false,
-                "fill_color": "#00ff00",
+                "fill": true,
+                "fill_color": "#ff5500",
                 "opacity": 255,
-                "cornerRadius": 0.0
+                "cornerRadius": 0.0,
+                "font_size": 71,
+                "font_family": "汇文明朝体"
             },
-            "zValue": 1658
+            "zValue": -1.0,
+            "context": "缓存料架状态监视"
         },
         {
-            "id": 1659,
-            "name": "组_95_2",
-            "type": "group",
+            "id": 1664,
+            "name": "矩形_1664",
+            "type": "rect",
             "parent_id": 0,
-            "children_ids": [
-                1660,
-                1662,
-                1661
-            ],
+            "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": -2120.24875,
-                "y": 1773.44075
+                "x": -156.621,
+                "y": -927.064
             },
             "origin_pos": {
-                "x": -2120.24875,
-                "y": 1773.44075
+                "x": -156.621,
+                "y": -927.064
             },
-            "width": 497.0922499999999,
-            "height": 218.45644865097768,
-            "rotate": 27.499999999999982,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 1658
-        },
-        {
-            "id": 1660,
-            "name": "组_95_2_多边形_1",
-            "type": "polygon",
-            "parent_id": 1659,
-            "children_ids": [],
-            "group_id": 1658,
-            "center_pos": {
-                "x": -2136.3515,
-                "y": 1819.181
-            },
-            "origin_pos": {
-                "x": -2136.35175,
-                "y": 1819.18075
-            },
-            "width": 483.4182485475243,
-            "height": 119.52667533884096,
-            "rotate": 27.499999999999982,
+            "width": 792.7849960040919,
+            "height": 142.67134861935105,
+            "rotate": -5.0,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 2,
                 "fill": true,
-                "fill_color": "#00aa00",
+                "fill_color": "#000000",
                 "opacity": 255,
-                "cornerRadius": 0.0
+                "cornerRadius": 0.0,
+                "font_size": 10
             },
-            "zValue": 8.0,
-            "vertices": [
-                {
-                    "x": -1894.35725,
-                    "y": 1877.779
-                },
-                {
-                    "x": -1974.3665,
-                    "y": 1903.00575
-                },
-                {
-                    "x": -2378.34575,
-                    "y": 1760.58275
-                },
-                {
-                    "x": -2321.65925,
-                    "y": 1718.29825
-                }
-            ]
+            "zValue": -2.0
         },
         {
-            "id": 1661,
-            "name": "组_95_2_控件_4",
-            "type": "widget",
-            "parent_id": 1659,
+            "id": 1665,
+            "name": "矩形_1664_2",
+            "type": "rect",
+            "parent_id": 0,
             "children_ids": [],
-            "group_id": 1658,
+            "group_id": 0,
             "center_pos": {
-                "x": -2091.49375,
-                "y": 1750.86375
+                "x": -159.57,
+                "y": 2362.21
             },
             "origin_pos": {
-                "x": -2091.49375,
-                "y": 1750.86375
+                "x": -159.57,
+                "y": 2362.21
             },
-            "width": 456.0,
-            "height": 97.0,
-            "rotate": 20.49999999999999,
-            "style": {
-                "stroke": "#000000",
-                "strokeWidth": 2,
-                "fill": false,
-                "fill_color": "#00ff00",
-                "opacity": 255,
-                "cornerRadius": 0.0
-            },
-            "zValue": 0.0,
-            "widgetText": "缓存料架监控",
-            "widgetType": "label",
-            "widgetFontSize": 57,
-            "widgetColor": "#000000",
-            "widgetBackground": "#e1f59b"
-        },
-        {
-            "id": 1662,
-            "name": "组_95_2_多边形_2",
-            "type": "polygon",
-            "parent_id": 1659,
-            "children_ids": [],
-            "group_id": 1658,
-            "center_pos": {
-                "x": -2335.38775,
-                "y": 1694.3185
-            },
-            "origin_pos": {
-                "x": -2335.388,
-                "y": 1694.3185
-            },
-            "width": 42.36165880094336,
-            "height": 160.14063505258218,
-            "rotate": 27.499999999999982,
+            "width": 792.7849960040919,
+            "height": 142.67134861935105,
+            "rotate": -5.0,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 2,
                 "fill": true,
-                "fill_color": "#005500",
+                "fill_color": "#000000",
                 "opacity": 255,
-                "cornerRadius": 0.0
+                "cornerRadius": 0.0,
+                "font_size": 10
             },
-            "zValue": 9.0,
-            "vertices": [
-                {
-                    "x": -2290.2505,
-                    "y": 1627.5455
-                },
-                {
-                    "x": -2347.9185,
-                    "y": 1672.519
-                },
-                {
-                    "x": -2380.9495,
-                    "y": 1760.87025
-                },
-                {
-                    "x": -2324.20325,
-                    "y": 1718.70425
-                }
-            ]
+            "zValue": 1705.0
+        },
+        {
+            "id": 1666,
+            "name": "文本_1663_2",
+            "type": "text",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -183.093,
+                "y": 2347.414
+            },
+            "origin_pos": {
+                "x": -183.093,
+                "y": 2347.414
+            },
+            "width": 795.6568280117768,
+            "height": 133.1347342099949,
+            "rotate": -5.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#ff5500",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 71,
+                "font_family": "汇文明朝体"
+            },
+            "zValue": 1706.0,
+            "context": "缓存料架状态监视"
         }
     ]
 }

@@ -1,0 +1,665 @@
+{
+    "sceneRect": {
+        "x": -581.5543462941207,
+        "y": -335.17774895387976,
+        "width": 1229.978136805918,
+        "height": 695.7130221138827
+    },
+    "backgroundColor": "#fff4f5e7",
+    "items": [
+        {
+            "id": 2,
+            "name": "矩形_1",
+            "type": "rect",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -0.74075,
+                "y": 98.99175
+            },
+            "origin_pos": {
+                "x": -0.74075,
+                "y": 98.99175
+            },
+            "width": 500.0,
+            "height": 150.0,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 3,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 2
+        },
+        {
+            "id": 3,
+            "name": "A库位空筒",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -100.70075,
+                "y": -100.003
+            },
+            "origin_pos": {
+                "x": -100.70075,
+                "y": -100.003
+            },
+            "rotate": -0.0,
+            "radius_w": 29.96479415729206,
+            "radius_h": 29.96479415729206,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#aaaa7f",
+                "opacity": 255
+            },
+            "zValue": 3
+        },
+        {
+            "id": 4,
+            "name": "A库位满料",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -101.03425,
+                "y": -100.003
+            },
+            "origin_pos": {
+                "x": -101.03425,
+                "y": -100.003
+            },
+            "rotate": -0.0,
+            "radius_w": 70.94677190996403,
+            "radius_h": 70.94677190996403,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#aaaaff",
+                "opacity": 255
+            },
+            "zValue": 1
+        },
+        {
+            "id": 6,
+            "name": "矩形_2",
+            "type": "rect",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "center_pos": {
+                "x": -2.321,
+                "y": 10.18525
+            },
+            "origin_pos": {
+                "x": -2.321,
+                "y": 10.18525
+            },
+            "width": 486.66666666666663,
+            "height": 17.77777777777777,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 6
+        },
+        {
+            "id": 7,
+            "name": "B库位空筒",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 99.459,
+                "y": -98.70825
+            },
+            "origin_pos": {
+                "x": 99.459,
+                "y": -98.70825
+            },
+            "rotate": -0.0,
+            "radius_w": 29.96479415729206,
+            "radius_h": 29.96479415729206,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#aaaa7f",
+                "opacity": 255
+            },
+            "zValue": 3
+        },
+        {
+            "id": 8,
+            "name": "B库位满料",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 100.77175,
+                "y": -99.5315
+            },
+            "origin_pos": {
+                "x": 100.77175,
+                "y": -99.5315
+            },
+            "rotate": -0.0,
+            "radius_w": 70.94677190996403,
+            "radius_h": 70.94677190996403,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#aaaaff",
+                "opacity": 255
+            },
+            "zValue": 1
+        },
+        {
+            "id": 10,
+            "name": "直线_3",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "head_pos": {
+                "x": -125.7415,
+                "y": -81.02425
+            },
+            "end_pos": {
+                "x": -174.291,
+                "y": -0.279
+            },
+            "origin_pos": {
+                "x": -150.01625,
+                "y": -40.6515
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 94.21704736424313,
+            "zValue": 10
+        },
+        {
+            "id": 11,
+            "name": "直线_4",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "head_pos": {
+                "x": -75.148,
+                "y": -79.491
+            },
+            "end_pos": {
+                "x": -23.53225,
+                "y": 0.232
+            },
+            "origin_pos": {
+                "x": -49.34,
+                "y": -39.6295
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 94.97353465786603,
+            "zValue": 11
+        },
+        {
+            "id": 12,
+            "name": "直线_5",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "head_pos": {
+                "x": -126.2525,
+                "y": -80.51325
+            },
+            "end_pos": {
+                "x": -100.18925,
+                "y": -60.07125
+            },
+            "origin_pos": {
+                "x": -113.22075,
+                "y": -70.29225
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 33.12353178228987,
+            "zValue": 12
+        },
+        {
+            "id": 13,
+            "name": "直线_6",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "head_pos": {
+                "x": -100.54175,
+                "y": -59.91275
+            },
+            "end_pos": {
+                "x": -75.4445,
+                "y": -79.529
+            },
+            "origin_pos": {
+                "x": -87.993,
+                "y": -69.72075
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 31.853669685621927,
+            "zValue": 13
+        },
+        {
+            "id": 14,
+            "name": "直线_10",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "head_pos": {
+                "x": 73.992,
+                "y": -79.79375
+            },
+            "end_pos": {
+                "x": 25.4425,
+                "y": 0.9515
+            },
+            "origin_pos": {
+                "x": 49.71725,
+                "y": -39.421
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 94.21704736424313,
+            "zValue": 10
+        },
+        {
+            "id": 15,
+            "name": "直线_11",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "head_pos": {
+                "x": 125.987,
+                "y": -81.53075
+            },
+            "end_pos": {
+                "x": 177.60275,
+                "y": -1.8075
+            },
+            "origin_pos": {
+                "x": 151.79475,
+                "y": -41.669
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 94.97353465786603,
+            "zValue": 11
+        },
+        {
+            "id": 16,
+            "name": "直线_12",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "head_pos": {
+                "x": 73.48075,
+                "y": -80.68425
+            },
+            "end_pos": {
+                "x": 99.54425,
+                "y": -60.24225
+            },
+            "origin_pos": {
+                "x": 86.5125,
+                "y": -70.46325
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 33.12353178228987,
+            "zValue": 12
+        },
+        {
+            "id": 17,
+            "name": "直线_13",
+            "type": "line",
+            "parent_id": 18,
+            "children_ids": [],
+            "group_id": 18,
+            "head_pos": {
+                "x": 101.34875,
+                "y": -61.20925
+            },
+            "end_pos": {
+                "x": 126.44575,
+                "y": -80.82525
+            },
+            "origin_pos": {
+                "x": 113.89725,
+                "y": -71.01725
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 31.853669685621927,
+            "zValue": 13
+        },
+        {
+            "id": 18,
+            "name": "双库托盘",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                17,
+                6,
+                13,
+                16,
+                11,
+                12,
+                10,
+                15,
+                14
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -2.321,
+                "y": -31.22825
+            },
+            "origin_pos": {
+                "x": -2.321,
+                "y": -31.22825
+            },
+            "width": 486.66666666666663,
+            "height": 100.60479894875144,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 18
+        },
+        {
+            "id": 20,
+            "name": "矩形_5",
+            "type": "rect",
+            "parent_id": 31,
+            "children_ids": [],
+            "group_id": 31,
+            "center_pos": {
+                "x": -3.20725,
+                "y": 9.10675
+            },
+            "origin_pos": {
+                "x": -3.20725,
+                "y": 9.10675
+            },
+            "width": 486.66666666666663,
+            "height": 17.77777777777777,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#000000",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 6
+        },
+        {
+            "id": 21,
+            "name": "直线_25",
+            "type": "line",
+            "parent_id": 31,
+            "children_ids": [],
+            "group_id": 31,
+            "head_pos": {
+                "x": 6.3465,
+                "y": -60.99125
+            },
+            "end_pos": {
+                "x": 31.4435,
+                "y": -80.6075
+            },
+            "origin_pos": {
+                "x": 18.895,
+                "y": -70.79925
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 31.853669685621927,
+            "zValue": 13
+        },
+        {
+            "id": 22,
+            "name": "直线_26",
+            "type": "line",
+            "parent_id": 31,
+            "children_ids": [],
+            "group_id": 31,
+            "head_pos": {
+                "x": 31.74025,
+                "y": -80.5695
+            },
+            "end_pos": {
+                "x": 83.356,
+                "y": -0.84625
+            },
+            "origin_pos": {
+                "x": 57.548,
+                "y": -40.708
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 94.97353465786603,
+            "zValue": 11
+        },
+        {
+            "id": 23,
+            "name": "直线_27",
+            "type": "line",
+            "parent_id": 31,
+            "children_ids": [],
+            "group_id": 31,
+            "head_pos": {
+                "x": -19.3645,
+                "y": -81.59175
+            },
+            "end_pos": {
+                "x": 6.699,
+                "y": -61.14975
+            },
+            "origin_pos": {
+                "x": -6.33275,
+                "y": -71.37075
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 33.12353178228987,
+            "zValue": 12
+        },
+        {
+            "id": 28,
+            "name": "直线_32",
+            "type": "line",
+            "parent_id": 31,
+            "children_ids": [],
+            "group_id": 31,
+            "head_pos": {
+                "x": -18.85325,
+                "y": -82.10275
+            },
+            "end_pos": {
+                "x": -67.40275,
+                "y": -1.3575
+            },
+            "origin_pos": {
+                "x": -43.128,
+                "y": -41.73
+            },
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "opacity": 255
+            },
+            "rotate": -0.0,
+            "length": 94.21704736424313,
+            "zValue": 10
+        },
+        {
+            "id": 29,
+            "name": "单库位空筒",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 6.4985,
+                "y": -101.003
+            },
+            "origin_pos": {
+                "x": 6.4985,
+                "y": -101.003
+            },
+            "rotate": -0.0,
+            "radius_w": 29.96479415729206,
+            "radius_h": 29.96479415729206,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#aaaa7f",
+                "opacity": 255
+            },
+            "zValue": 3
+        },
+        {
+            "id": 30,
+            "name": "单库位满料",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 6.11675,
+                "y": -102.21075
+            },
+            "origin_pos": {
+                "x": 6.11675,
+                "y": -102.21075
+            },
+            "rotate": -0.0,
+            "radius_w": 81.25,
+            "radius_h": 81.25,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#aaaaff",
+                "opacity": 255
+            },
+            "zValue": 1
+        },
+        {
+            "id": 31,
+            "name": "单库托盘",
+            "type": "group",
+            "parent_id": 0,
+            "children_ids": [
+                21,
+                22,
+                23,
+                28,
+                20
+            ],
+            "group_id": 0,
+            "center_pos": {
+                "x": -3.20725,
+                "y": -32.0535
+            },
+            "origin_pos": {
+                "x": -3.20725,
+                "y": -32.0535
+            },
+            "width": 486.66666666666663,
+            "height": 100.09832609832225,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 31
+        }
+    ]
+}

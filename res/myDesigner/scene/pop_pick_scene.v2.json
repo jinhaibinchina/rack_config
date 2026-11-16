@@ -1,0 +1,276 @@
+{
+    "sceneRect": {
+        "x": -413.1407577993177,
+        "y": -1584.4295573201077,
+        "width": 3736.5938050539467,
+        "height": 1452.0442247618964
+    },
+    "backgroundColor": "#ffeaebff",
+    "items": [
+        {
+            "id": 6,
+            "name": "Page5",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 934.341,
+                "y": -885.04275
+            },
+            "origin_pos": {
+                "x": 644.92825,
+                "y": -603.30725
+            },
+            "width": 750.0,
+            "height": 1000.0,
+            "rotate": -22.500000000000007,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 1,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 8,
+            "name": "Page4",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 964.774,
+                "y": -855.7495
+            },
+            "origin_pos": {
+                "x": 651.908,
+                "y": -600.31
+            },
+            "width": 750.0,
+            "height": 1000.0,
+            "rotate": -17.499999999999982,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 1,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 9,
+            "name": "Page3",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 989.569,
+                "y": -822.46725
+            },
+            "origin_pos": {
+                "x": 649.79725,
+                "y": -604.0875
+            },
+            "width": 750.0,
+            "height": 1000.0,
+            "rotate": -11.000000000000007,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 1,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 10,
+            "name": "Page2",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1008.4095,
+                "y": -788.1725
+            },
+            "origin_pos": {
+                "x": 649.27125,
+                "y": -603.36375
+            },
+            "width": 750.0,
+            "height": 1000.0,
+            "rotate": -5.5,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 1,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 11,
+            "name": "Page1",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1026.32225,
+                "y": -752.53125
+            },
+            "origin_pos": {
+                "x": 651.12425,
+                "y": -602.99525
+            },
+            "width": 750.0,
+            "height": 1000.0,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 1,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 12,
+            "name": "Page0",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1874.85825,
+                "y": -750.01825
+            },
+            "origin_pos": {
+                "x": 1499.6605,
+                "y": -600.48225
+            },
+            "width": 750.0,
+            "height": 1000.0,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 1,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 14,
+            "name": "Page6",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 908.514,
+                "y": -915.8605
+            },
+            "origin_pos": {
+                "x": 652.855,
+                "y": -603.17375
+            },
+            "width": 750.0,
+            "height": 1000.0,
+            "rotate": -28.999999999999964,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 0,
+                "fill": false,
+                "fill_color": "#00ff00",
+                "opacity": 255,
+                "cornerRadius": 0.0
+            },
+            "zValue": 0,
+            "widgetText": "00000000000000",
+            "widgetType": "textedit",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        },
+        {
+            "id": 15,
+            "name": "背景",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 1296.41825,
+                "y": -885.6995
+            },
+            "origin_pos": {
+                "x": 1296.41825,
+                "y": -885.6995
+            },
+            "width": 2045.2115643248521,
+            "height": 1424.9424833410862,
+            "rotate": -0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": -1.0,
+            "widgetType": "textedit",
+            "widgetText": "",
+            "widgetFontSize": 12,
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff"
+        }
+    ]
+}

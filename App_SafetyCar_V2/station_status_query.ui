@@ -1,0 +1,583 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>588</width>
+    <height>396</height>
+   </rect>
+  </property>
+  <property name="cursor">
+   <cursorShape>CrossCursor</cursorShape>
+  </property>
+  <property name="windowTitle">
+   <string>状态查询</string>
+  </property>
+  <widget class="QLabel" name="label_6">
+   <property name="geometry">
+    <rect>
+     <x>270</x>
+     <y>370</y>
+     <width>262</width>
+     <height>15</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>tips:故障信息详见《1756-rm003_-zh-p指令集》</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="layoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>60</x>
+     <y>40</y>
+     <width>471</width>
+     <height>321</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout_22">
+    <item>
+     <widget class="QGroupBox" name="groupBox">
+      <property name="title">
+       <string>PLC</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_4">
+         <item>
+          <widget class="QLabel" name="label_3">
+           <property name="text">
+            <string>设备状态：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_PLC_status">
+           <property name="text">
+            <string>TextLabel</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <item>
+          <widget class="QLabel" name="label_4">
+           <property name="text">
+            <string>故障状态：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_PLC_fault_status">
+           <property name="text">
+            <string>TextLabel</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QLabel" name="label_5">
+           <property name="text">
+            <string>控制器模式：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_controller_mode">
+           <property name="text">
+            <string>TextLabel</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_22">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_23">
+         <item>
+          <widget class="QLabel" name="label_7">
+           <property name="text">
+            <string>控制器状态：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_controller_status">
+           <property name="text">
+            <string>TextLabel</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_4">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>135</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupBox_3">
+      <property name="title">
+       <string>从站状态查询</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>站点选择：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboBox_station_select">
+           <item>
+            <property name="text">
+             <string>未选择</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1#维修区/安全门</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>2#维修区/安全门</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>3#维修区/安全门</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>4#维修区/安全门</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>2#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>3#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>4#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>5#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>6#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>7#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>8#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>9#上架X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>2#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>3#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>4#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>5#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>6#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>7#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>8#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>9#拣选X4</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>2#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>3#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>4#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>5#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>6#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>7#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>8#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>9#安全门X1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1#输送线X2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>2#输送线X2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>3#输送线X2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>4#输送线X2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>2#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>3#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>4#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>5#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>6#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>7#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>8#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>9#Q1P拣选/Q3P拣选</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1#Q3P托盘X2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>2#Q3P托盘X2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>3#Q3P托盘X2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>4#Q3P托盘X2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>主柜远程IO</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>从PLC</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_3">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_5">
+         <item>
+          <widget class="QLabel" name="label_2">
+           <property name="text">
+            <string>状态：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_status">
+           <property name="text">
+            <string>TextLabel</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_5">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_6">
+         <item>
+          <widget class="QLabel" name="label_9">
+           <property name="text">
+            <string>故障码：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_errcode">
+           <property name="text">
+            <string>TextLabel</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_6">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_7">
+         <item>
+          <widget class="QLabel" name="label_10">
+           <property name="text">
+            <string>故障信息：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_errinfo">
+           <property name="text">
+            <string>TextLabel</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_7">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>126</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
