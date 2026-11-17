@@ -261,7 +261,14 @@
             "widgetText": "",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
+            "widgetBackground": "#ffffff",
+            "bindings": {
+                "widgetValue": {
+                    "tag": "axis.reduction",
+                    "apply": "number",
+                    "mode": "rw"
+                }
+            }
         },
         {
             "id": 102,
@@ -295,7 +302,14 @@
             "widgetText": "",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
+            "widgetBackground": "#ffffff",
+            "bindings": {
+                "widgetValue": {
+                    "tag": "axis.speed",
+                    "apply": "number",
+                    "mode": "rw"
+                }
+            }
         },
         {
             "id": 103,
@@ -329,7 +343,14 @@
             "widgetText": "",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
+            "widgetBackground": "#ffffff",
+            "bindings": {
+                "widgetValue": {
+                    "tag": "axis.neg_pos",
+                    "apply": "number",
+                    "mode": "rw"
+                }
+            }
         },
         {
             "id": 104,
@@ -339,16 +360,16 @@
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": -1953.6435,
+                "x": -1954.862,
                 "y": -4357.02
             },
             "origin_pos": {
-                "x": -1953.6435,
+                "x": -1954.862,
                 "y": -4357.02
             },
             "width": 110.09916473526343,
             "height": 28.258599366004095,
-            "rotate": -0.0,
+            "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 2,
@@ -363,7 +384,14 @@
             "widgetText": "",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
+            "widgetBackground": "#ffffff",
+            "bindings": {
+                "widgetValue": {
+                    "tag": "axis.pos_pos",
+                    "apply": "number",
+                    "mode": "rw"
+                }
+            }
         },
         {
             "id": 105,
@@ -397,7 +425,14 @@
             "widgetText": "",
             "widgetFontSize": 12,
             "widgetColor": "#000000",
-            "widgetBackground": "#ffffff"
+            "widgetBackground": "#ffffff",
+            "bindings": {
+                "widgetValue": {
+                    "tag": "axis.home_count",
+                    "apply": "number",
+                    "mode": "rw"
+                }
+            }
         },
         {
             "id": 107,
@@ -710,16 +745,16 @@
             "children_ids": [],
             "group_id": 0,
             "center_pos": {
-                "x": -1871.0895,
-                "y": -4323.84225
+                "x": -1871.09,
+                "y": -4325.061
             },
             "origin_pos": {
-                "x": -1860.0255,
-                "y": -4319.25625
+                "x": -1860.025,
+                "y": -4320.475
             },
             "width": 37.65625,
             "height": 22.515625,
-            "rotate": -0.0,
+            "rotate": 0.0,
             "style": {
                 "stroke": "#000000",
                 "strokeWidth": 1,
@@ -730,7 +765,14 @@
                 "font_size": 10
             },
             "zValue": 107.0,
-            "context": "###"
+            "context": "###",
+            "bindings": {
+                "context": {
+                    "tag": "axis.home_count_now",
+                    "apply": "text",
+                    "mode": "r"
+                }
+            }
         },
         {
             "id": 124,

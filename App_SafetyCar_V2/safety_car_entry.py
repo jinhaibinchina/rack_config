@@ -79,7 +79,7 @@ from App_SafetyCar_V2.station_status_query_ui import Ui_Dialog as Ui_station_sta
 from res.app_safety_car_resource_manager import resource_manager as res_manager
 
 DEFAULT_PLC_IP = "192.168.3.231"
-APP_TITLE = "大小车安全PLC客户端V3.1.0"
+APP_TITLE = "大小车安全PLC客户端V6.1.0"
 
 __all__ = [
     "APP_TITLE",

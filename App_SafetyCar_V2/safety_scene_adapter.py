@@ -42,7 +42,7 @@ import os
 import sys
 from typing import Dict, List, Optional
 
-from PySide6.QtCore import QObject, QPointF, QRectF, QSizeF, Qt, Signal
+from PySide6.QtCore import QObject, QPointF, QRectF, QSizeF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QFrame
 
@@ -774,6 +774,15 @@ class SafetySceneView(GraphicsView):
         for name in self._DEAD_TIMER_NAMES:
             setattr(self, name, None)
 
+        # 旧 ``QuadTreeScene`` 的 ``render_timer``（myGraphicsScene，16ms ≈60FPS）
+        # 每帧触发 ``on_render_frame``，Run 模式下调用 ``update_callback()``——
+        # 业务代码靠它在运行态把 PLC 数据刷到图元（``update_items_data``）。
+        # V2 场景没有渲染循环，这里补回等价定时器；名字保持 ``render_timer``，
+        # ``shutdown()`` 按旧名字表通用 stop 即可。
+        self.render_timer = QTimer(self)
+        self.render_timer.timeout.connect(self._on_render_frame)
+        self.render_timer.start(16)
+
         # 场景信号转出来：业务代码连的是 ``scene.selectionChanged`` /
         # ``scene.double_clicked_without_group``，这里保持同名。
         self._scene.double_clicked_without_group.connect(
@@ -806,6 +815,12 @@ class SafetySceneView(GraphicsView):
 
     def selected_top_level_items(self):
         return self._scene.selected_top_level_items()
+
+    def _on_render_frame(self) -> None:
+        """复刻旧 ``on_render_frame`` 的回调门控：仅运行态驱动 ``update_callback``。"""
+        cb = self.update_callback
+        if cb is not None and callable(cb) and self._scene.is_run_mode:
+            cb()
 
     # -- 页面背景 / 画布信息（NavigationContentWidget 的「页面背景」「画布设置」页）--
     def get_bg_color(self) -> QColor:
