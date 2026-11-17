@@ -304,7 +304,7 @@ def create_control(record: dict, host: QWidget | None = None) -> QWidget:
     else:  # textedit（含未知变体退化）
         w = QTextEdit(host) if host is not None else QTextEdit()
         w.setReadOnly(True)
-        w.setPlaceholderText("只读多行文本…")
+        w.setPlaceholderText("可重载Widget控件")
         w.setPlainText(text)
     # QGraphicsProxyWidget.resize(w,h) 会被控件自身的 minimumSizeHint 撑大
     # （QComboBox 默认 114×22、QLineEdit 20 高），小尺寸图元会连位置一起偏。

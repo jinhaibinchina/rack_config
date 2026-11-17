@@ -27,9 +27,9 @@ from .template_store import ToolboxTemplate
 
 CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("基本图元", ("rect", "circle", "line", "triangle", "polygon", "polyline",
-                "path", "bezier")),
+                 "bezier")),
     ("文本与素材", ("text", "image")),
-    ("功能控件", ("checkbox", "widget", "group")),
+    ("功能控件", ( "widget", "group")),
     ("控件变体", WIDGET_TOOL_KEYS),
 )
 ICON_SIZE = 28

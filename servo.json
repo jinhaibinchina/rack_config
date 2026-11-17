@@ -1,0 +1,249 @@
+{
+    "sceneRect": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 0.0,
+        "height": 0.0
+    },
+    "items": [
+        {
+            "id": 1,
+            "name": "矩形_1",
+            "type": "rect",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -125.0,
+                "y": -125.0
+            },
+            "origin_pos": {
+                "x": -125.0,
+                "y": -125.0
+            },
+            "width": 250.0,
+            "height": 250.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 1.0
+        },
+        {
+            "id": 2,
+            "name": "圆_2",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -125.0,
+                "y": -125.0
+            },
+            "origin_pos": {
+                "x": -125.0,
+                "y": -125.0
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#ffffff",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 2.0,
+            "radius_w": 97.15493316888293,
+            "radius_h": 97.15493316888293
+        },
+        {
+            "id": 3,
+            "name": "圆_3",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -125.0,
+                "y": -125.0
+            },
+            "origin_pos": {
+                "x": -125.0,
+                "y": -125.0
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 3.0,
+            "radius_w": 13.994726201506186,
+            "radius_h": 13.994726201506186
+        },
+        {
+            "id": 4,
+            "name": "圆_4",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -16.634,
+                "y": -231.551
+            },
+            "origin_pos": {
+                "x": -16.634,
+                "y": -231.551
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 4.0,
+            "radius_w": 8.039760241712901,
+            "radius_h": 8.039760241712901
+        },
+        {
+            "id": 5,
+            "name": "圆_5",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -232.216,
+                "y": -233.547
+            },
+            "origin_pos": {
+                "x": -232.216,
+                "y": -233.547
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 5.0,
+            "radius_w": 7.197134197109016,
+            "radius_h": 7.197134197109016
+        },
+        {
+            "id": 6,
+            "name": "圆_6",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -224.897,
+                "y": -24.619
+            },
+            "origin_pos": {
+                "x": -224.897,
+                "y": -24.619
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 6.0,
+            "radius_w": 8.951709027424823,
+            "radius_h": 8.951709027424823
+        },
+        {
+            "id": 7,
+            "name": "圆_7",
+            "type": "circle",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": -24.619,
+                "y": -25.95
+            },
+            "origin_pos": {
+                "x": -24.619,
+                "y": -25.95
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 7.0,
+            "radius_w": 8.951709027424831,
+            "radius_h": 8.951709027424831
+        },
+        {
+            "id": 8,
+            "name": "电机轴",
+            "type": "line",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "origin_pos": {
+                "x": -125.0,
+                "y": -173.577
+            },
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 7,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 8.0,
+            "head_pos": {
+                "x": -125.0,
+                "y": -125.0
+            },
+            "end_pos": {
+                "x": -125.0,
+                "y": -222.155
+            },
+            "length": 97.15493316888293,
+            "center_pos": {
+                "x": -125.0,
+                "y": -173.577
+            }
+        }
+    ]
+}
