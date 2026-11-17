@@ -28,7 +28,7 @@ from .g_path import (
 )
 from .g_style import (
     HOVER_COLOR, TEXT_PAD_X, TEXT_PAD_Y, dashed_pen_for, font_for, parse_color,
-    text_metrics,
+    text_align_flags, text_metrics,
 )
 from .g_widgets import paint_variant
 
@@ -249,7 +249,9 @@ class TextItem(BaseItem):
             ry = min(radius, r.height() / 2.0)
         rounded = rx > 0 and ry > 0
         if s.stroke_width > 0:
-            painter.setPen(s.pen(self.stroke_color()))
+            stroke = self.stroke_color()
+            stroke.setAlpha(255)
+            painter.setPen(s.pen(stroke))
             if s.fill:
                 painter.setBrush(s.brush())
             if rounded:
@@ -269,13 +271,16 @@ class TextItem(BaseItem):
                     painter.drawRoundedRect(r, rx, ry)
                     painter.restore()
                 else:
-                    painter.fillRect(r, s.fill_color)
+                    # fillRect 接受 QBrush：默认 solid 与旧的 QColor 写法逐像素
+                    # 一致，选了填充样式后文本背景也跟着变（旧写法会绕过 brush）。
+                    painter.fillRect(r, s.brush())
         # 一次排版搞定：先 boundingRect 量出紧凑矩形再往里面 drawText，等于
         # 每帧对同一个字符串排两次版（实测占 text paint 的 40%+，103 个文本就是
         # 每帧 17 ms，框选时肉眼看得到卡顿）。直接画进 r，靠 TextDontClip 保留
-        # 「文字超出边框也不裁」的旧观感——六种情形（短文本 / 溢出 / 多行 /
-        # 0.4~3.0 倍缩放 / 中文混排）逐像素比对与旧写法完全一致。
-        painter.drawText(r, Qt.AlignCenter | Qt.TextDontClip,
+        # 「文字超出边框也不裁」的旧观感。水平对齐走 style.text_align：存量缺
+        # 字段兜底 center（与旧 AlignCenter 逐像素一致），新建文本默认 left；
+        # 垂直方向恒居中，所以切对齐只动水平位置，不改变文字的上下位置。
+        painter.drawText(r, text_align_flags(s.text_align) | Qt.TextDontClip,
                          self.context or "")
         painter.restore()
         _selection_overlay(painter, self)

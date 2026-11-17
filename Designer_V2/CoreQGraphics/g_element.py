@@ -22,6 +22,7 @@ from PySide6.QtGui import QPainter, QPixmap, QTransform
 from PySide6.QtWidgets import QGraphicsItem
 
 from .g_style import HOVER_COLOR, Style, parse_color
+from .g_binding import BY_KEY, normalize_binding
 
 
 def _page_xy(data: dict, key: str, default: float = 0.0) -> tuple[float, float]:
@@ -630,6 +631,61 @@ class BaseItem(QGraphicsItem):
         style = dict(self._page.get("style") or {})
         style[key] = value
         self.set_page_field("style", style)
+
+    # ------------------------------------------------------------------
+    # 变量绑定（设计态编辑 / 运行态读取，存图元内 bindings 字段）
+    # ------------------------------------------------------------------
+    # ``bindings`` 是可选顶层字段：未绑定时不写键，保持 round-trip 零改动。
+    # 白名单与 coercion 统一在 g_binding，设计态面板与运行态桥共用。
+    def bindings(self) -> dict[str, dict[str, str]]:
+        """本图元的 ``{属性: {tag, apply}}`` 绑定表（规范化副本）。"""
+        raw = self._page.get("bindings")
+        if not isinstance(raw, dict):
+            return {}
+        out: dict[str, dict[str, str]] = {}
+        for field, entry in raw.items():
+            spec = BY_KEY.get(str(field))
+            if spec is None:
+                continue
+            norm = normalize_binding(entry, spec.apply)
+            if norm["tag"]:
+                out[str(field)] = norm
+        return out
+
+    def binding_tag(self, field: str) -> str:
+        """某属性当前绑定的 tag；未绑定返回空串。"""
+        return self.bindings().get(str(field), {}).get("tag", "")
+
+    def set_binding(self, field: str, tag: str,
+                    apply: str | None = None) -> None:
+        """设置一个属性的绑定；``tag`` 为空表示清除该属性。
+
+        写进 ``_page['bindings']`` 走 :meth:`set_page_field`，因此自动被
+        ``page_data()`` 序列化、被         ``PageHistory`` 快照撤销。清空最后一条时
+        整个键被删掉，回到存量记录的原始形态（零改动契约）。
+        """
+        field = str(field)
+        spec = BY_KEY.get(field)
+        if spec is None:
+            return
+        tag = str(tag or "").strip()
+        table = dict(self._page.get("bindings") or {})
+        if not tag:
+            if field not in table:
+                return
+            table.pop(field, None)
+        else:
+            entry = normalize_binding(
+                {"tag": tag, "apply": apply or spec.apply}, spec.apply)
+            if table.get(field) == entry:
+                return
+            table[field] = entry
+        if table:
+            self.set_page_field("bindings", table)
+        else:
+            self._page.pop("bindings", None)
+            self._dirty = True
+            self.update()
 
     # ------------------------------------------------------------------
     # 绘制交互：CAD 式分点落点

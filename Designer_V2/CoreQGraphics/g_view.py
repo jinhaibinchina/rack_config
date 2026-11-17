@@ -91,13 +91,13 @@ def nice_ruler_step(scene_per_px: float) -> float:
 _VIEW_RULER_STEP = nice_ruler_step(1.0)
 
 
-def ruler_label(value: float, step: float = 0.0) -> str:
+def ruler_label(value: float, step: float = 0.0,right_down:bool= False) -> str:
     """刻度数值统一保留 1 位小数（``step`` 保留给旧调用点，不再影响格式）。
 
     固定小数位还顺带抹掉了 ``value += step`` 累积出来的浮点尾巴，
     例如 0.30000000000000004 显示为 ``0.3``；``-0.0`` 归一成 ``0.0``。
     """
-    text = f"{value:.1f}"
+    text = f"{value:.1f}" if right_down else  f"{value:.0f}"
     return "0.0" if text == "-0.0" else text
 
 # 鼠标附近吸附标记：小于这个屏幕像素的偏移不吸附，避免抖动
@@ -2257,7 +2257,7 @@ class GraphicsView(QGraphicsView):
                     painter.setPen(_RULER_TEXT)
                     base_y = band_top + 14 if down else band_top + t - 10
                     painter.drawText(QPoint(x + 2, base_y),
-                                     ruler_label(value, step))
+                                     ruler_label(value, step,down))
                 value += step
                 guard += 1
 
@@ -2294,7 +2294,7 @@ class GraphicsView(QGraphicsView):
                                       else band_left + t - 11, y - 2)
                     painter.rotate(-90)
                     painter.setPen(_RULER_TEXT)
-                    painter.drawText(QPoint(0, 0), ruler_label(value, step))
+                    painter.drawText(QPoint(0, 0), ruler_label(value, step,right))
                     painter.restore()
                 value += step
                 guard += 1

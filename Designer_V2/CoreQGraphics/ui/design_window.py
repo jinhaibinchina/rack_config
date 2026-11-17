@@ -260,7 +260,7 @@ class DesignerWindow(QMainWindow):
             bar.addAction(self.actions[key])
         bar.addSeparator()
         bar.addWidget(QLabel("  绘制："))
-        for key in ("rect", "circle", "line", "text", "image", "checkbox"):
+        for key in ("rect", "circle", "line", "text", "image"):
             action = QAction(TYPE_LABELS[key], self)
             action.triggered.connect(
                 lambda checked=False, k=key: self._activate_draw_tool(k)

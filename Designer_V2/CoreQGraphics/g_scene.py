@@ -38,6 +38,7 @@ from .g_path import (
     PATH_FILL_RULE_KEY, PATH_SEGMENTS_KEY, path_to_segments, path_to_vertices,
     shift_segments,
 )
+from .g_style import TEXT_ALIGN_NEW
 from .g_widgets import (
     WIDGET_DEFAULTS, WIDGET_VARIANT_LABELS, create_control, normalize_variant,
     widget_style_sheet, widget_text, widget_variant,
@@ -84,7 +85,7 @@ DEFAULT_SIZES: dict[str, tuple[float, float]] = {
 }
 TYPE_LABELS: dict[str, str] = {
     "rect": "矩形", "circle": "圆", "text": "文本", "image": "图片",
-    "checkbox": "复选框", "widget": "控件", "group": "组", "line": "直线",
+    "widget": "控件", "group": "组", "line": "直线",
     "triangle": "三角形", "polygon": "多边形", "polyline": "折线",
     "path": "路径", "bezier": "贝塞尔曲线",
 }
@@ -816,6 +817,9 @@ class GraphicsScene(QGraphicsScene):
             record["style"]["fill"] = False
         elif type_key == "text":
             record["context"] = fields.pop("context", "文本")
+            # 新建文本默认左对齐；存量页面缺 text_align 键时由 Style 兜底
+            # center，逐像素对拍与 round-trip 完全不受影响。
+            record["style"]["text_align"] = TEXT_ALIGN_NEW
         elif type_key == "image":
             record["image_path"] = fields.pop("image_path", "")
         elif type_key == "checkbox":

@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QFileInfo, QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QBrush, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QListWidget, QPushButton, QSplitter, QStackedWidget,
     QToolTip, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
@@ -28,14 +28,36 @@ from Designer.Core.property_widgets import (
 
 from ..g_scene import TYPE_LABELS
 from ..g_style import (
-    FONT_FAMILY_DEFAULT, available_font_families, color_str,
-    is_scalable_font_family, normalize_font_family, parse_color,
+    BRUSH_STYLE_KEYS, BRUSH_STYLE_LABELS, FONT_FAMILY_DEFAULT,
+    TEXT_ALIGN_KEYS, TEXT_ALIGN_LABELS, available_font_families,
+    brush_style_value, color_str, is_scalable_font_family,
+    normalize_brush_style, normalize_font_family, normalize_text_align,
+    parse_color,
 )
 from ..g_widgets import (
     WIDGET_DEFAULTS, WIDGET_VARIANTS, WIDGET_VARIANT_LABELS, normalize_variant,
 )
+from ..g_binding import APPLY_KINDS, bindables_for
 
 PAGE_ROLE = Qt.UserRole
+
+
+def _brush_style_icon(key: str, size: int = 16) -> QIcon:
+    """给「填充样式」下拉画一个 pattern 预览，贴近 Qt 属性编辑器的观感。
+
+    每项一个白底小方块，用对应 ``Qt.BrushStyle`` 的绿色画刷填充；「无填充」
+    自然显示为空心方块，实心 / 密集点 / 网格一眼可分。
+    """
+    pix = QPixmap(size, size)
+    pix.fill(QColor("#ffffff"))
+    painter = QPainter(pix)
+    try:
+        painter.setPen(QColor("#5a5a5a"))
+        painter.setBrush(QBrush(QColor("#1f8a3c"), brush_style_value(key)))
+        painter.drawRect(0, 0, size - 1, size - 1)
+    finally:
+        painter.end()
+    return QIcon(pix)
 
 
 class PropertyPanel(QWidget):
@@ -422,6 +444,7 @@ class PropertyPanel(QWidget):
         self._add_page("general", "常规", self._page_general(it))
         self._add_page("appearance", "外观", self._page_appearance(it))
         self._add_page("layout", "布局", self._page_layout(it))
+        self._add_page("bindings", "变量绑定", self._page_bindings(it))
         extra = self._page_specific(it)
         if extra is not None:
             key, title, widget = extra
@@ -503,6 +526,23 @@ class PropertyPanel(QWidget):
         )
         card.add_row(("填充色", fill_color), ("填充", fill))
 
+        # 填充样式：枚举键 + 中文标签 + pattern 预览，与 widgetType 下拉同范式。
+        # 缺字段时归一到 solid（不补写 JSON），显式切换才写 style.fill_style。
+        fill_style_combo = QComboBox()
+        fill_style_combo.setObjectName("propFillStyle")
+        for key in BRUSH_STYLE_KEYS:
+            fill_style_combo.addItem(_brush_style_icon(key),
+                                     BRUSH_STYLE_LABELS[key], key)
+        fill_style_combo.setCurrentIndex(fill_style_combo.findData(
+            normalize_brush_style(it.style_value("fill_style"))))
+        fill_style_combo.currentIndexChanged.connect(
+            lambda _i: self._commit(
+                lambda: it.set_style_value("fill_style",
+                                           str(fill_style_combo.currentData()))
+            )
+        )
+        card.add_row(("填充样式", fill_style_combo))
+
         opacity = OpacityField(int(it.style_value("opacity", 255)))
         opacity.valueChanged.connect(
             lambda v: self._commit(lambda: it.set_style_value("opacity", int(v)))
@@ -522,7 +562,8 @@ class PropertyPanel(QWidget):
         if it.TYPE == "text":
             card.add_row(("字体", self._font_family_combo(it)),
                          ("字号", self._font_size_box(it)))
-        card.add_hint("颜色控件里的不透明度会写进 style.opacity，与旧 Core 一致。")
+        card.add_hint("填充样式仅在「填充」开启时生效；颜色控件里的不透明度会"
+                      "写进 style.opacity，与旧 Core 一致。")
         return page
 
     def _page_layout(self, it) -> PropertyPage:
@@ -655,6 +696,57 @@ class PropertyPanel(QWidget):
         return page
 
     # ------------------------------------------------------------------
+    # 变量绑定页（设计态把图元属性绑到变量 tag；运行态单向读）
+    # ------------------------------------------------------------------
+    def _page_bindings(self, it) -> PropertyPage:
+        page = PropertyPage()
+        card = self._card(page, "属性 → 变量 tag")
+        specs = bindables_for(it.TYPE)
+        current = it.bindings()
+        for spec in specs:
+            row = current.get(spec.key, {})
+            tag_edit = make_line(
+                str(row.get("tag", "")),
+                tooltip=f"变量名，运行态由外部按这个名字推值；留空表示不绑定")
+            tag_edit.setObjectName(f"bindTag_{spec.key}")
+            tag_edit.editingFinished.connect(
+                lambda e=tag_edit, f=spec.key: self._commit_tag(it, e, f))
+
+            combo = QComboBox()
+            combo.setObjectName(f"bindApply_{spec.key}")
+            for value, label in APPLY_KINDS:
+                combo.addItem(label, value)
+            cur_apply = str(row.get("apply", spec.apply))
+            idx = combo.findData(cur_apply)
+            combo.setCurrentIndex(idx if idx >= 0 else 0)
+            if row.get("tag"):
+                combo.currentIndexChanged.connect(
+                    lambda _i, c=combo, f=spec.key: self._commit_apply(it, c, f))
+            else:
+                # 未绑定时改 apply 无意义，置灰；填上 tag 后重建面板再启用
+                combo.setEnabled(False)
+
+            card.add_row((spec.label, tag_edit), ("值类型", combo))
+
+        card.add_hint(
+            "在这里把图元属性绑到变量 tag（自由字符串，运行态由外部按同名 key 推值）。"
+            "运行态只把值刷到显示上，不会改写设计数据；几何属性不可绑定。")
+        card.add_hint(
+            "填好 tag 后该行的「值类型」才可用：文本=原样转字符串，布尔="
+            "1/true/on/yes 为真，数值=转数字，颜色=#rrggbb/颜色名/数值，原值=不转换。")
+        return page
+
+    def _commit_tag(self, it, edit, field: str) -> None:
+        tag = edit.text().strip()
+        self._commit(lambda: it.set_binding(field, tag))
+        # 绑定状态变了（新增 / 清空 tag），重建面板以刷新 apply 可用性
+        QTimer.singleShot(0, lambda: self.update_for_selected(it))
+
+    def _commit_apply(self, it, combo, field: str) -> None:
+        apply = str(combo.currentData() or "text")
+        self._commit(lambda: it.set_binding(field, it.binding_tag(field), apply))
+
+    # ------------------------------------------------------------------
     # 类型特有页
     # ------------------------------------------------------------------
     def _page_specific(self, it):
@@ -668,6 +760,20 @@ class PropertyPanel(QWidget):
             card.add_widget(edit)
             card.add_row(("字体", self._font_family_combo(it)),
                          ("字体大小", self._font_size_box(it)))
+            # 文本水平对齐：缺字段时归一到 center（存量口径），显式切换才写键。
+            align_combo = QComboBox()
+            align_combo.setObjectName("propTextAlign")
+            for key in TEXT_ALIGN_KEYS:
+                align_combo.addItem(TEXT_ALIGN_LABELS[key], key)
+            align_combo.setCurrentIndex(align_combo.findData(
+                normalize_text_align(it.style_value("text_align"))))
+            align_combo.currentIndexChanged.connect(
+                lambda _i: self._commit(
+                    lambda: it.set_style_value("text_align",
+                                               str(align_combo.currentData()))
+                )
+            )
+            card.add_row(("对齐", align_combo))
             card.add_hint("改字体 / 字体大小或文字后，边框 / 背景会按文字实际尺寸自动重算"
                           "（不同字体下同一个字的宽高不同），中心与旋转支点保持不动。"
                           "想手动指定边框请在「布局」页改宽高"

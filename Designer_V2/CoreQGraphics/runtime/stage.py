@@ -54,6 +54,41 @@ from .view import RuntimeScene, RuntimeView  # noqa: E402
 from .widgets import (  # noqa: E402
     ControlProvider, DefaultControlProvider, WidgetHost,
 )
+from ..g_binding import BY_KEY  # noqa: E402
+
+
+def _control_apply(field: str, apply: str) -> Callable[[Any, Any], None]:
+    """widget 图元绑定的写值函数：按字段与控件能力探测 setter。"""
+    def _apply(widget, value):
+        if widget is None:
+            return
+        if field == "widgetText":
+            text = "" if value is None else str(value)
+            setter = (getattr(widget, "setText", None)
+                      or getattr(widget, "setPlainText", None))
+            if callable(setter):
+                setter(text)
+            return
+        # widgetValue：数值控件 setValue，其余退回 setText
+        num = value
+        if isinstance(value, str):
+            try:
+                num = float(value)
+            except ValueError:
+                num = 0.0
+        setter = getattr(widget, "setValue", None)
+        if callable(setter):
+            try:
+                setter(num)
+                return
+            except (TypeError, ValueError):
+                pass
+        text_setter = (getattr(widget, "setText", None)
+                       or getattr(widget, "setPlainText", None))
+        if callable(text_setter):
+            text_setter("" if value is None else str(value))
+
+    return _apply
 
 
 def _default_apply(target: Any, value: Any) -> None:
@@ -226,6 +261,9 @@ class RuntimeStage(QObject):
         self.tags = TagBus(flush_ms, self)
         self.tags.valuesChanged.connect(self._dispatch)
         self._bindings: list[StageBinding] = []
+        # 由页面 bindings 字段派生的绑定，与业务手动 bind_* 分开记账：
+        # reload() 只清这一批，不碰业务在构造时注册的绑定。
+        self._page_bindings: list[StageBinding] = []
 
         # 旧 API 门面：rack 的 model 拿 scene_manager，PopPick 的 PageDeck
         # 拿 pages_manager（只暴露 widget 卡片）。
@@ -255,6 +293,8 @@ class RuntimeStage(QObject):
             self.enter_run_mode(True)
             self.registry.rebuild()       # 显式再做一次，保证时序不依赖信号
             self.widgets.rebuild()
+            self._clear_page_bindings()
+            self._load_page_bindings()    # 设计态存的 bindings → TagBus 注册
             self.fit()
         except (OSError, ValueError, KeyError) as exc:
             self.load_error = f"场景载入失败：{exc}"
@@ -311,6 +351,7 @@ class RuntimeStage(QObject):
         for binding in self._bindings:
             binding.close()
         self._bindings.clear()
+        self._page_bindings.clear()
         self.scene.clear_page()
 
     def __del__(self):  # pragma: no cover - 解释器退出兜底
@@ -367,6 +408,60 @@ class RuntimeStage(QObject):
         return DefaultControlProvider()
 
     # -- 数据绑定 -------------------------------------------------------
+    def _clear_page_bindings(self) -> None:
+        """丢弃上一页由 bindings 字段派生的绑定（业务手动绑定不动）。"""
+        for binding in self._page_bindings:
+            binding.close()
+            if binding in self._bindings:
+                self._bindings.remove(binding)
+        self._page_bindings.clear()
+
+    def _load_page_bindings(self) -> int:
+        """扫描当前页每个图元的 ``bindings`` 字段并注册到 :attr:`tags`。
+
+        设计态存的是自由字符串 tag；运行态按 ``target`` 分两路：
+
+        * ``element``：绑到 :class:`RuntimeElement`，apply 走
+          :meth:`RuntimeElement.apply_binding`（只写显示字段，不污染 ``_page``）；
+        * ``control``：绑到 widget 图元的真实控件，apply 走 :func:`_control_apply`。
+
+        两条路都用 :meth:`bind_element` / :meth:`bind_control`，目标每次现查，
+        换页 / 控件重建不断线。返回成功注册的绑定条数。
+        """
+        scene = self.scene
+        count = 0
+        for it in scene.all_items():
+            rec = it.page_record()
+            raw = rec.get("bindings")
+            if not isinstance(raw, dict) or not raw:
+                continue
+            iid = int(it.item_id)
+            for field, entry in raw.items():
+                spec = BY_KEY.get(str(field))
+                if spec is None:
+                    continue
+                tag = str((entry or {}).get("tag") or "").strip() \
+                    if isinstance(entry, dict) else str(entry or "").strip()
+                if not tag:
+                    continue
+                apply = str((entry or {}).get("apply") or spec.apply) \
+                    if isinstance(entry, dict) else spec.apply
+                if spec.target == "control" and it.TYPE == "widget":
+                    binding = self.bind_control(
+                        tag, iid, apply=_control_apply(str(field), apply))
+                else:
+                    binding = self.bind_element(
+                        tag, iid,
+                        apply=lambda el, v, f=str(field), a=apply:
+                        el.apply_binding(f, v, a))
+                self._page_bindings.append(binding)
+                count += 1
+        return count
+
+    def page_binding_count(self) -> int:
+        """当前页由 bindings 字段派生的绑定条数（诊断用）。"""
+        return len(self._page_bindings)
+
     def _dispatch(self, values: dict) -> None:
         for binding in list(self._bindings):
             if binding.key in values:

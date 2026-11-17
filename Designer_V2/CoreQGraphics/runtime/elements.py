@@ -51,6 +51,19 @@ if __package__ in (None, ""):
     if _ROOT not in sys.path:
         sys.path.insert(0, _ROOT)
 
+try:
+    from ..g_binding import BY_KEY, coerce as _coerce
+    from ..g_style import (
+        FILL_STYLE_DEFAULT, TEXT_ALIGN_DEFAULT, normalize_brush_style,
+        normalize_text_align, parse_color as _parse_color,
+    )
+except ImportError:  # 脚本直跑兜底
+    from g_binding import BY_KEY, coerce as _coerce  # type: ignore
+    from g_style import (  # type: ignore
+        FILL_STYLE_DEFAULT, TEXT_ALIGN_DEFAULT, normalize_brush_style,
+        normalize_text_align, parse_color as _parse_color,
+    )
+
 
 def _color_text(color: Any) -> str:
     """把 QColor / 字符串 / RGB 三元组统一成 ``#RRGGBB``。"""
@@ -565,6 +578,30 @@ class RuntimeElement(QObject):
         if it is not None:
             it.set_style_value("fill", bool(state))
 
+    def get_fill_style(self) -> str:
+        """填充样式字符串（``solid`` / ``bdiag`` / ``none`` …），缺字段兜底 solid。"""
+        it = self.item()
+        return (normalize_brush_style(it._style.fill_style)
+                if it is not None else FILL_STYLE_DEFAULT)
+
+    def set_fill_style(self, style: Any) -> None:
+        """运行态切换填充样式；未知值归一到 solid，不往 JSON 写垃圾键。"""
+        it = self.item()
+        if it is not None:
+            it.set_style_value("fill_style", normalize_brush_style(style))
+
+    def get_text_align(self) -> str:
+        """文本水平对齐（left / center / right），缺字段兜底 center。"""
+        it = self.item()
+        return (normalize_text_align(it._style.text_align)
+                if it is not None else TEXT_ALIGN_DEFAULT)
+
+    def set_text_align(self, align: Any) -> None:
+        """运行态切换文本对齐；未知值归一到 center。"""
+        it = self.item()
+        if it is not None:
+            it.set_style_value("text_align", normalize_text_align(align))
+
     @property
     def context(self) -> str:
         it = self.item()
@@ -575,6 +612,59 @@ class RuntimeElement(QObject):
         it = self.item()
         if it is not None:
             it.set_page_field("context", "" if value is None else str(value))
+
+    # -- 变量绑定：运行态显示写入（不污染设计数据） --------------------
+    def apply_binding(self, field: str, value: Any, apply: str) -> bool:
+        """把 tag 值写进**实时显示字段**，不写 ``_page``、不置脏、不进 undo。
+
+        这是「设计态绑定 / 运行态单向读」的落点：设计数据（``_page``）只在
+        设计器里由属性面板修改，运行态刷新一律走这里直接刷 Qt 可见状态，
+        因此运行一段时间后 ``page_data()`` / JSON 仍与保存时逐字段一致。
+
+        支持的属性见 :data:`g_binding.BINDABLE_PROPERTIES` 中 ``target ==
+        'element'`` 的项；widget 图元的 ``widgetText`` / ``widgetValue`` 是
+        ``target == 'control'``，由 :class:`~.stage.RuntimeStage` 走
+        ``bind_control`` 写到真实 QWidget，不经过这里。
+
+        返回是否命中并写入了某个显示字段。
+        """
+        spec = BY_KEY.get(str(field))
+        if spec is None or spec.target != "element":
+            return False
+        it = self.item()
+        if it is None:
+            return False
+        v = _coerce(value, apply)
+        key = str(field)
+        if key == "visible":
+            # 走门面的可见性（含组级联 / 有效可见性），只 setVisible，不写 page
+            self.set_visibility(bool(v))
+            return True
+        if key == "context":
+            it.context = "" if v is None else str(v)
+        elif key == "checked":
+            it.checked = bool(v)
+        elif key == "stroke":
+            it._style.stroke = _parse_color(v)
+        elif key == "fill_color":
+            it._style.fill_color = _parse_color(v)
+        elif key == "fill":
+            it._style.fill = bool(v)
+        elif key == "opacity":
+            op = max(0, min(255, int(v)))
+            it._style.opacity = op
+            it._style.stroke.setAlpha(op)
+            it._style.fill_color.setAlpha(op)
+        elif key == "strokeWidth":
+            it._style.stroke_width = max(0.0, float(v))
+        elif key == "cornerRadius":
+            it._style.corner_radius = max(0.0, float(v))
+        elif key == "font_size":
+            it._style.font_size = max(0.0, float(v))
+        else:
+            return False
+        it.update()
+        return True
 
     # -- widget 门面（委托给 WidgetHost，普通图元调用是安全的 no-op） ----
     def set_widget_factory(self, factory: Callable) -> None:

@@ -12,7 +12,7 @@ if __package__ in (None, ""):
     _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if _ROOT not in sys.path:
         sys.path.insert(0, _ROOT)
-    from DesignerV2.CoreQGraphics.ui import DesignerWindow
+    from Designer_V2.CoreQGraphics.ui import DesignerWindow
 else:
     from .ui.design_window import DesignerWindow
 

@@ -21,9 +21,102 @@ TEXT_PAD_Y = 4.0
 # 1618 图元逐像素对拍与 JSON round-trip 完全不变。
 FONT_FAMILY_DEFAULT = "Arial"
 
+# 图元填充样式（对应 Qt Designer 属性面板的「填充样式」下拉 / Qt.BrushStyle）。
+# 持久化**字符串键**，与 widgetType / path_fill_rule 同一口径：不写死枚举整数，
+# 避免 Qt 版本变动导致数值漂移，存量 page 在缺 fill_style 键时一律兜底为 solid
+# ——这正是旧引擎唯一的填充方式，保证存量渲染与 JSON round-trip 零改动。
+FILL_STYLE_DEFAULT = "solid"
+
+# 下拉项顺序：实心 → 密集点 → 线 / 网格 → 无填充（对齐截图里 Qt 属性编辑器的排列）
+BRUSH_STYLE_KEYS: tuple[str, ...] = (
+    "solid", "dense1", "dense2", "dense3", "dense4", "dense5", "dense6", "dense7",
+    "hor", "ver", "cross", "bdiag", "fdiag", "diagcross", "none",
+)
+
+BRUSH_STYLE_LABELS: dict[str, str] = {
+    "solid": "实心",
+    "dense1": "密集点 1（最密）",
+    "dense2": "密集点 2",
+    "dense3": "密集点 3",
+    "dense4": "密集点 4（50%）",
+    "dense5": "密集点 5",
+    "dense6": "密集点 6",
+    "dense7": "密集点 7（最疏）",
+    "hor": "横线",
+    "ver": "竖线",
+    "cross": "十字网格",
+    "bdiag": "斜线 /",
+    "fdiag": "斜线 \\",
+    "diagcross": "斜向网格",
+    "none": "无填充",
+}
+
+_BRUSH_STYLE_VALUES: dict[str, Qt.BrushStyle] = {
+    "none": Qt.NoBrush,
+    "solid": Qt.SolidPattern,
+    "dense1": Qt.Dense1Pattern,
+    "dense2": Qt.Dense2Pattern,
+    "dense3": Qt.Dense3Pattern,
+    "dense4": Qt.Dense4Pattern,
+    "dense5": Qt.Dense5Pattern,
+    "dense6": Qt.Dense6Pattern,
+    "dense7": Qt.Dense7Pattern,
+    "hor": Qt.HorPattern,
+    "ver": Qt.VerPattern,
+    "cross": Qt.CrossPattern,
+    "bdiag": Qt.BDiagPattern,
+    "fdiag": Qt.FDiagPattern,
+    "diagcross": Qt.DiagCrossPattern,
+}
+
+
+def normalize_brush_style(value) -> str:
+    """填充样式键兜底：缺失 / 未知值一律退回 ``solid``。
+
+    存量 page 没有 ``fill_style`` 键，读出来即默认值，不需要把键补写回 JSON
+    ——这是 round-trip 零改动的前提（同 :func:`normalize_font_family`）。
+    """
+    key = str(value or "").strip().lower()
+    return key if key in _BRUSH_STYLE_VALUES else FILL_STYLE_DEFAULT
+
+
+def brush_style_value(name) -> Qt.BrushStyle:
+    return _BRUSH_STYLE_VALUES[normalize_brush_style(name)]
+
+
+# 文本水平对齐（属性面板「对齐」下拉，对应 QPainter.drawText 的 alignment flag）。
+# 存量页面和旧引擎的文本都是居中，JSON 里也没有 text_align 键，所以**读取侧**
+# 兜底 center——这是存量渲染逐字节对拍与 round-trip 零改动的前提；而**新建**
+# 文本由 g_scene.create_item 显式写 left，这才是用户要的「默认左对齐」。
+TEXT_ALIGN_DEFAULT = "center"   # 缺字段兜底（存量）
+TEXT_ALIGN_NEW = "left"         # 新建文本默认值
+
+TEXT_ALIGN_KEYS: tuple[str, ...] = ("left", "center", "right")
+TEXT_ALIGN_LABELS: dict[str, str] = {
+    "left": "左对齐", "center": "居中", "right": "右对齐",
+}
+# 垂直方向恒居中（与旧 Qt.AlignCenter 等价），只切换水平对齐；
+# 于是存量 center 分支的绘制与改动前逐像素一致。
+_TEXT_ALIGN_FLAGS = {
+    "left": Qt.AlignLeft | Qt.AlignVCenter,
+    "center": Qt.AlignHCenter | Qt.AlignVCenter,
+    "right": Qt.AlignRight | Qt.AlignVCenter,
+}
+
+
+def normalize_text_align(value) -> str:
+    """对齐键兜底：缺失 / 未知值一律退回 ``center``（存量口径）。"""
+    key = str(value or "").strip().lower()
+    return key if key in _TEXT_ALIGN_FLAGS else TEXT_ALIGN_DEFAULT
+
+
+def text_align_flags(name):
+    return _TEXT_ALIGN_FLAGS[normalize_text_align(name)]
+
+
 _CACHE_LIMIT = 512
 _pen_cache: dict[tuple, QPen] = {}
-_brush_cache: dict[int, QBrush] = {}
+_brush_cache: dict[tuple, QBrush] = {}
 _dash_cache: dict[int, QPen] = {}
 _font_cache: dict[tuple, QFont] = {}
 # 字体族「可平滑缩放」判定与过滤后的候选族（字体库一次进程内基本不变）
@@ -76,11 +169,18 @@ def pen_for(color: QColor, width: float = 1.0, style=Qt.SolidLine) -> QPen:
     return pen
 
 
-def brush_for(color: QColor) -> QBrush:
-    key = color.rgba()
+def brush_for(color: QColor, style=Qt.SolidPattern) -> QBrush:
+    """按 (颜色, 填充样式) 复用只读画刷。
+
+    与 :func:`pen_for` 同理：PySide6 6.10 的 ``Qt.BrushStyle`` 是枚举，
+    ``int(enum)`` 会抛 TypeError，而绘制回调里的异常不会被传播；枚举本身
+    可哈希，直接进 key。默认 SolidPattern 与旧实现 ``QBrush(QColor(color))``
+    完全等价，存量图元走这条路径渲染逐字节不变。
+    """
+    key = (color.rgba(), style)
     brush = _brush_cache.get(key)
     if brush is None:
-        brush = QBrush(QColor(color))
+        brush = QBrush(QColor(color), style)
         _guard(_brush_cache)
         _brush_cache[key] = brush
     return brush
@@ -220,6 +320,12 @@ class Style:
     # 字体族：``style.font_family``，缺字段时取 ``FONT_FAMILY_DEFAULT``。
     # 放在带默认值的末尾，任何按位置构造的地方都不会被破坏。
     font_family: str = FONT_FAMILY_DEFAULT
+    # 填充样式：``style.fill_style``，缺字段时取 ``solid``（旧引擎唯一填充方式）。
+    # 同样放在带默认值的末尾；只在属性面板显式编辑时才写进 JSON。
+    fill_style: str = FILL_STYLE_DEFAULT
+    # 文本对齐：``style.text_align``，缺字段兜底 center（存量/旧引擎口径）；
+    # 新建文本由 create_item 显式写 left。只对 TextItem 的绘制有意义。
+    text_align: str = TEXT_ALIGN_DEFAULT
 
     @classmethod
     def from_dict(cls, data: dict | None) -> "Style":
@@ -240,6 +346,8 @@ class Style:
             corner_radius=max(0.0, float(d.get("cornerRadius", 0.0) or 0.0)),
             font_size=float(d.get("font_size", 10)),
             font_family=normalize_font_family(d.get("font_family")),
+            fill_style=normalize_brush_style(d.get("fill_style")),
+            text_align=normalize_text_align(d.get("text_align")),
         )
 
     def pen(self, color: QColor | None = None, width: float | None = None) -> QPen:
@@ -252,4 +360,14 @@ class Style:
         return pen_for(c, w)
 
     def brush(self):
-        return brush_for(self.fill_color) if self.fill else QBrush(Qt.NoBrush)
+        """按 fill / fill_style 返回只读画刷。
+
+        ``fill=False`` 优先于任何样式（等价于Qt Designer 里关掉填充开关）；
+        选了「无填充」同样返回 NoBrush。其余样式按 ``(颜色, 样式)`` 走缓存。
+        """
+        if not self.fill:
+            return QBrush(Qt.NoBrush)
+        style = brush_style_value(self.fill_style)
+        if style == Qt.NoBrush:
+            return QBrush(Qt.NoBrush)
+        return brush_for(self.fill_color, style)
