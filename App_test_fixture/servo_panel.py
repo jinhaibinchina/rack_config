@@ -68,7 +68,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from DesignerV2.CoreQGraphics.runtime import ControlProvider
+from Designer_V2.CoreQGraphics.runtime import ControlProvider
 
 from . import fixture_config as cfg
 

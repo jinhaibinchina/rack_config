@@ -657,12 +657,16 @@ class BaseItem(QGraphicsItem):
         return self.bindings().get(str(field), {}).get("tag", "")
 
     def set_binding(self, field: str, tag: str,
-                    apply: str | None = None) -> None:
+                    apply: str | None = None,
+                    mode: str | None = None) -> None:
         """设置一个属性的绑定；``tag`` 为空表示清除该属性。
 
         写进 ``_page['bindings']`` 走 :meth:`set_page_field`，因此自动被
-        ``page_data()`` 序列化、被         ``PageHistory`` 快照撤销。清空最后一条时
+        ``page_data()`` 序列化、被 ``PageHistory`` 快照撤销。清空最后一条时
         整个键被删掉，回到存量记录的原始形态（零改动契约）。
+
+        ``apply`` / ``mode`` 传 ``None`` 时沿用该属性当前的旧值（缺省 mode='r'），
+        这样属性面板单独改方向或值类型不会把另一项重置掉。
         """
         field = str(field)
         spec = BY_KEY.get(field)
@@ -675,8 +679,11 @@ class BaseItem(QGraphicsItem):
                 return
             table.pop(field, None)
         else:
+            old = normalize_binding(table.get(field) or {}, spec.apply)
             entry = normalize_binding(
-                {"tag": tag, "apply": apply or spec.apply}, spec.apply)
+                {"tag": tag,
+                 "apply": apply or old["apply"],
+                 "mode": mode or old["mode"]}, spec.apply)
             if table.get(field) == entry:
                 return
             table[field] = entry

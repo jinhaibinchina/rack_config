@@ -37,7 +37,9 @@ from ..g_style import (
 from ..g_widgets import (
     WIDGET_DEFAULTS, WIDGET_VARIANTS, WIDGET_VARIANT_LABELS, normalize_variant,
 )
-from ..g_binding import APPLY_KINDS, bindables_for
+from ..g_binding import (
+    APPLY_KINDS, MODE_KINDS, WRITABLE_FIELDS, bindables_for,
+)
 
 PAGE_ROLE = Qt.UserRole
 
@@ -696,7 +698,7 @@ class PropertyPanel(QWidget):
         return page
 
     # ------------------------------------------------------------------
-    # 变量绑定页（设计态把图元属性绑到变量 tag；运行态单向读）
+    # 变量绑定页（设计态把图元属性绑到变量 tag；运行态读 / 写双向）
     # ------------------------------------------------------------------
     def _page_bindings(self, it) -> PropertyPage:
         page = PropertyPage()
@@ -707,7 +709,8 @@ class PropertyPanel(QWidget):
             row = current.get(spec.key, {})
             tag_edit = make_line(
                 str(row.get("tag", "")),
-                tooltip=f"变量名，运行态由外部按这个名字推值；留空表示不绑定")
+                tooltip="变量名；外部按同名 key 推值（读），用户操作按同名 key 写出（写）。"
+                        "留空表示不绑定")
             tag_edit.setObjectName(f"bindTag_{spec.key}")
             tag_edit.editingFinished.connect(
                 lambda e=tag_edit, f=spec.key: self._commit_tag(it, e, f))
@@ -723,28 +726,47 @@ class PropertyPanel(QWidget):
                 combo.currentIndexChanged.connect(
                     lambda _i, c=combo, f=spec.key: self._commit_apply(it, c, f))
             else:
-                # 未绑定时改 apply 无意义，置灰；填上 tag 后重建面板再启用
-                combo.setEnabled(False)
+                combo.setEnabled(False)   # 未绑定时改值类型无意义
 
+            # add_row 每行最多 2 组控件（内部 [:2]），方向另起一行
             card.add_row((spec.label, tag_edit), ("值类型", combo))
+            if spec.key in WRITABLE_FIELDS:
+                mode_combo = QComboBox()
+                mode_combo.setObjectName(f"bindMode_{spec.key}")
+                for value, label in MODE_KINDS:
+                    mode_combo.addItem(label, value)
+                cur_mode = str(row.get("mode", "r"))
+                midx = mode_combo.findData(cur_mode)
+                mode_combo.setCurrentIndex(midx if midx >= 0 else 0)
+                if row.get("tag"):
+                    mode_combo.currentIndexChanged.connect(
+                        lambda _i, c=mode_combo, f=spec.key:
+                        self._commit_mode(it, c, f))
+                else:
+                    mode_combo.setEnabled(False)
+                card.add_row(("读写方向", mode_combo))
 
         card.add_hint(
-            "在这里把图元属性绑到变量 tag（自由字符串，运行态由外部按同名 key 推值）。"
-            "运行态只把值刷到显示上，不会改写设计数据；几何属性不可绑定。")
+            "读：外部按 tag 推值刷新画面显示，不改写设计数据。写：用户操作 widget 控件或"
+            "勾选 checkbox 图元时，把新值作为写请求发给外部（PLC / 数据源），由业务层写设备。")
         card.add_hint(
-            "填好 tag 后该行的「值类型」才可用：文本=原样转字符串，布尔="
-            "1/true/on/yes 为真，数值=转数字，颜色=#rrggbb/颜色名/数值，原值=不转换。")
+            "只有控件文本 / 控件数值 / 勾选状态三种属性能打开「读写 / 只写」——它们是运行态"
+            "用户能产生新值的入口；其余属性恒为只读。未填 tag 前值类型与方向置灰。")
         return page
 
     def _commit_tag(self, it, edit, field: str) -> None:
         tag = edit.text().strip()
         self._commit(lambda: it.set_binding(field, tag))
-        # 绑定状态变了（新增 / 清空 tag），重建面板以刷新 apply 可用性
+        # 绑定状态变了（新增 / 清空 tag），重建面板以刷新各下拉可用性
         QTimer.singleShot(0, lambda: self.update_for_selected(it))
 
     def _commit_apply(self, it, combo, field: str) -> None:
         apply = str(combo.currentData() or "text")
         self._commit(lambda: it.set_binding(field, it.binding_tag(field), apply))
+
+    def _commit_mode(self, it, combo, field: str) -> None:
+        mode = str(combo.currentData() or "r")
+        self._commit(lambda: it.set_binding(field, it.binding_tag(field), mode=mode))
 
     # ------------------------------------------------------------------
     # 类型特有页

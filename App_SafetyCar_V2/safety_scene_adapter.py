@@ -52,7 +52,7 @@ if __package__ in (None, ""):
     if _ROOT not in sys.path:
         sys.path.insert(0, _ROOT)
 
-from DesignerV2.CoreQGraphics import GraphicsScene, GraphicsView   # noqa: E402
+from Designer_V2.CoreQGraphics import GraphicsScene, GraphicsView   # noqa: E402
 from .scene_mode import SceneMode                                  # noqa: E402
 from res.designer_resource_manager import resource_manager as res_mng  # noqa: E402
 

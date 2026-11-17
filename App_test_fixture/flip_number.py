@@ -64,7 +64,7 @@ from PySide6.QtWidgets import (
     QWidget, QApplication,
 )
 
-from DesignerV2.CoreQGraphics.runtime import ControlProvider
+from Designer_V2.CoreQGraphics.runtime import ControlProvider
 
 # 一位的默认尺寸（宽 × 高）。6 位 ≈ 6*64 + 5*4 = 404px，可塞进 468 宽的图元。
 BASE_DIGIT_W = 64

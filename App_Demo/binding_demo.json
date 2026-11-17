@@ -1,0 +1,313 @@
+{
+    "sceneRect": {
+        "x": -700.0,
+        "y": -300.0,
+        "width": 1400.0,
+        "height": 1250.0
+    },
+    "backgroundColor": "#1e1e2e",
+    "items": [
+        {
+            "id": 1,
+            "name": "标题",
+            "type": "text",
+            "center_pos": {
+                "x": 0.0,
+                "y": -220.0
+            },
+            "origin_pos": {
+                "x": 0.0,
+                "y": -220.0
+            },
+            "width": 900.0,
+            "height": 90.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#a6accd",
+                "strokeWidth": 1,
+                "fill": false,
+                "fill_color": "#000000",
+                "font_size": 42,
+                "opacity": 255
+            },
+            "context": "变量绑定 Demo"
+        },
+        {
+            "id": 2,
+            "name": "状态文本",
+            "type": "text",
+            "center_pos": {
+                "x": 0.0,
+                "y": -110.0
+            },
+            "origin_pos": {
+                "x": 0.0,
+                "y": -110.0
+            },
+            "width": 700.0,
+            "height": 70.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#89ddff",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#2a2a3e",
+                "font_size": 30,
+                "opacity": 255,
+                "text_align": "left"
+            },
+            "context": "等待数据…",
+            "bindings": {
+                "context": {
+                    "tag": "demo.status",
+                    "apply": "text"
+                },
+                "stroke": {
+                    "tag": "demo.statusColor",
+                    "apply": "color"
+                }
+            }
+        },
+        {
+            "id": 3,
+            "name": "数值文本",
+            "type": "text",
+            "center_pos": {
+                "x": 0.0,
+                "y": -10.0
+            },
+            "origin_pos": {
+                "x": 0.0,
+                "y": -10.0
+            },
+            "width": 700.0,
+            "height": 70.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#c3e88d",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#2a2a3e",
+                "font_size": 30,
+                "opacity": 255,
+                "text_align": "left"
+            },
+            "context": "温度: --",
+            "bindings": {
+                "context": {
+                    "tag": "demo.temp",
+                    "apply": "text"
+                }
+            }
+        },
+        {
+            "id": 4,
+            "name": "指示灯",
+            "type": "rect",
+            "center_pos": {
+                "x": -450.0,
+                "y": 120.0
+            },
+            "origin_pos": {
+                "x": -450.0,
+                "y": 120.0
+            },
+            "width": 120.0,
+            "height": 120.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#ffffff",
+                "strokeWidth": 3,
+                "fill": true,
+                "fill_color": "#555555",
+                "opacity": 255,
+                "cornerRadius": 34.0
+            },
+            "bindings": {
+                "fill_color": {
+                    "tag": "demo.lamp",
+                    "apply": "color"
+                },
+                "visible": {
+                    "tag": "demo.lampVisible",
+                    "apply": "bool"
+                }
+            }
+        },
+        {
+            "id": 5,
+            "name": "指示灯标签",
+            "type": "text",
+            "center_pos": {
+                "x": -450.0,
+                "y": 215.0
+            },
+            "origin_pos": {
+                "x": -450.0,
+                "y": 215.0
+            },
+            "width": 200.0,
+            "height": 40.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#a6accd",
+                "strokeWidth": 1,
+                "fill": false,
+                "fill_color": "#000000",
+                "font_size": 20,
+                "opacity": 255
+            },
+            "context": "运行指示灯"
+        },
+        {
+            "id": 7,
+            "name": "控件文本",
+            "type": "widget",
+            "center_pos": {
+                "x": 0.0,
+                "y": 300.0
+            },
+            "origin_pos": {
+                "x": 0.0,
+                "y": 300.0
+            },
+            "width": 600.0,
+            "height": 60.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#82aaff",
+                "strokeWidth": 1,
+                "fill": false,
+                "fill_color": "#000000",
+                "font_size": 10,
+                "opacity": 255
+            },
+            "widgetType": "lineedit",
+            "widgetText": "控件初始值",
+            "widgetFontSize": 20,
+            "widgetColor": "#c3e88d",
+            "widgetBackground": "#2a2a3e",
+            "bindings": {
+                "widgetText": {
+                    "tag": "demo.widget",
+                    "apply": "text",
+                    "mode": "rw"
+                }
+            }
+        },
+        {
+            "id": 8,
+            "name": "速度设定",
+            "type": "widget",
+            "center_pos": {
+                "x": -300.0,
+                "y": 420.0
+            },
+            "origin_pos": {
+                "x": -300.0,
+                "y": 420.0
+            },
+            "width": 500.0,
+            "height": 56.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#82aaff",
+                "strokeWidth": 1,
+                "fill": false,
+                "fill_color": "#000000",
+                "font_size": 10,
+                "opacity": 255
+            },
+            "widgetType": "spinbox",
+            "widgetText": "min=0\nmax=200\nvalue=50",
+            "widgetFontSize": 18,
+            "widgetColor": "#c3e88d",
+            "widgetBackground": "#2a2a3e",
+            "bindings": {
+                "widgetValue": {
+                    "tag": "demo.speed",
+                    "apply": "number",
+                    "mode": "rw"
+                }
+            }
+        },
+        {
+            "id": 9,
+            "name": "亮度滑块",
+            "type": "widget",
+            "center_pos": {
+                "x": 300.0,
+                "y": 420.0
+            },
+            "origin_pos": {
+                "x": 300.0,
+                "y": 420.0
+            },
+            "width": 500.0,
+            "height": 56.0,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#82aaff",
+                "strokeWidth": 1,
+                "fill": false,
+                "fill_color": "#000000",
+                "font_size": 10,
+                "opacity": 255
+            },
+            "widgetType": "slider",
+            "widgetText": "min=0\nmax=1000\nvalue=30",
+            "widgetFontSize": 24,
+            "widgetColor": "#c3e88d",
+            "widgetBackground": "#2a2a3e",
+            "bindings": {
+                "widgetValue": {
+                    "tag": "demo.brightness",
+                    "apply": "number",
+                    "mode": "rw"
+                }
+            }
+        },
+        {
+            "id": 10,
+            "name": "报警勾选",
+            "type": "widget",
+            "parent_id": 0,
+            "children_ids": [],
+            "group_id": 0,
+            "center_pos": {
+                "x": 222.58,
+                "y": 115.949
+            },
+            "origin_pos": {
+                "x": 222.58,
+                "y": 115.949
+            },
+            "width": 254.70017035398217,
+            "height": 84.46074336283182,
+            "rotate": 0.0,
+            "style": {
+                "stroke": "#000000",
+                "strokeWidth": 2,
+                "fill": true,
+                "fill_color": "#919191",
+                "opacity": 255,
+                "cornerRadius": 0.0,
+                "font_size": 10
+            },
+            "zValue": 1.0,
+            "widgetType": "checkbox",
+            "widgetText": "",
+            "widgetFontSize": 25,
+            "widgetFontFamily": "",
+            "widgetColor": "#000000",
+            "widgetBackground": "#ffffff",
+            "bindings": {
+                "widgetValue": {
+                    "tag": "demo.alarm",
+                    "apply": "bool",
+                    "mode": "rw"
+                }
+            }
+        }
+    ]
+}

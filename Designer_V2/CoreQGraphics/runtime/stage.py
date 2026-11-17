@@ -54,7 +54,40 @@ from .view import RuntimeScene, RuntimeView  # noqa: E402
 from .widgets import (  # noqa: E402
     ControlProvider, DefaultControlProvider, WidgetHost,
 )
-from ..g_binding import BY_KEY  # noqa: E402
+from ..g_binding import (  # noqa: E402
+    BY_KEY, WRITABLE_FIELDS, coerce, is_readable, is_writable,
+)
+
+
+def _first_signal(widget: Any, names: tuple[str, ...]):
+    """按优先级取控件上第一个真实存在的 Qt 信号（鸭子类型，兼容自定义控件）。"""
+    for name in names:
+        sig = getattr(widget, name, None)
+        if sig is not None and hasattr(sig, "connect"):
+            return sig, name
+    return None, None
+
+
+def _control_value(widget: Any, field: str) -> Any:
+    """从真实控件读出当前值，供反向写使用。"""
+    if field == "widgetText":
+        for name in ("text", "toPlainText"):
+            fn = getattr(widget, name, None)
+            if callable(fn):
+                try:
+                    return fn()
+                except (TypeError, ValueError):
+                    pass
+        return ""
+    # widgetValue：数值 / 勾选 / 下拉，按能力探测
+    for name in ("value", "isChecked", "currentText"):
+        fn = getattr(widget, name, None)
+        if callable(fn):
+            try:
+                return fn()
+            except (TypeError, ValueError):
+                pass
+    return None
 
 
 def _control_apply(field: str, apply: str) -> Callable[[Any, Any], None]:
@@ -122,7 +155,11 @@ class TagBus(QObject):
     重画整张页面；这是 PopPick 实测过的卡顿来源。
     """
 
-    valuesChanged = Signal(object)   # dict[str, Any]
+    valuesChanged = Signal(object)   # dict[str, Any]  外部 → 画面
+
+    # 反向写：用户操作画面产生的值 → 外部业务 / PLC。Designer_V2 只发请求，
+    # 真正的设备写入由订阅方（业务层）完成，因此这里不依赖任何 PLC 客户端。
+    writeRequested = Signal(str, object)   # (tag, value)
 
     def __init__(self, flush_ms: int = 80, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -160,6 +197,28 @@ class TagBus(QObject):
         if self._timer.isActive():
             self._timer.stop()
         self.flush()
+
+    # -- 反向写 ---------------------------------------------------------
+    def request_write(self, key: str, value: Any) -> None:
+        """请求把 ``key=value`` 写到外部（PLC / 数据源）。
+
+        只发 :attr:`writeRequested`，不碰 :attr:`_values`（写下去的值是否已生效
+        由外部回推 ``update()`` 决定，避免本地臆断）。回环抑制由绑定桥负责：读
+        方向刷新控件时短暂屏蔽它的值变更信号，不会再次触发 writeRequested。
+        """
+        self.writeRequested.emit(str(key), value)
+
+    # 正在被读方向刷值的控件签名集合；绑定桥用它抑制"读触发写"的回环。
+    _suppress: set[int] = set()
+
+    def is_suppressed(self, widget: Any) -> bool:
+        return id(widget) in self._suppress
+
+    def suppress(self, widget: Any) -> None:
+        self._suppress.add(id(widget))
+
+    def unsuppress(self, widget: Any) -> None:
+        self._suppress.discard(id(widget))
 
     def value(self, key: str, default: Any = None) -> Any:
         return self._values.get(str(key), default)
@@ -264,6 +323,8 @@ class RuntimeStage(QObject):
         # 由页面 bindings 字段派生的绑定，与业务手动 bind_* 分开记账：
         # reload() 只清这一批，不碰业务在构造时注册的绑定。
         self._page_bindings: list[StageBinding] = []
+        # 反向写记账：每条含 tag/apply/图元/控件与已连接的信号槽，换页/关窗时断开。
+        self._write_links: list[dict] = []
 
         # 旧 API 门面：rack 的 model 拿 scene_manager，PopPick 的 PageDeck
         # 拿 pages_manager（只暴露 widget 卡片）。
@@ -348,6 +409,7 @@ class RuntimeStage(QObject):
         self.widgets.release()
         self.registry.disconnect_scene()
         self.tags.stop()
+        self._clear_write_links()
         for binding in self._bindings:
             binding.close()
         self._bindings.clear()
@@ -410,23 +472,35 @@ class RuntimeStage(QObject):
     # -- 数据绑定 -------------------------------------------------------
     def _clear_page_bindings(self) -> None:
         """丢弃上一页由 bindings 字段派生的绑定（业务手动绑定不动）。"""
+        self._clear_write_links()
         for binding in self._page_bindings:
             binding.close()
             if binding in self._bindings:
                 self._bindings.remove(binding)
         self._page_bindings.clear()
 
+    def _clear_write_links(self) -> None:
+        """断开所有反向写的信号槽（换页 / 关窗）。"""
+        for link in self._write_links:
+            sig, slot = link.get("signal"), link.get("slot")
+            if sig is not None and slot is not None:
+                try:
+                    sig.disconnect(slot)
+                except (RuntimeError, TypeError):
+                    pass
+        self._write_links.clear()
+
     def _load_page_bindings(self) -> int:
-        """扫描当前页每个图元的 ``bindings`` 字段并注册到 :attr:`tags`。
+        """扫描当前页每个图元的 ``bindings`` 字段并注册读 / 写两路。
 
-        设计态存的是自由字符串 tag；运行态按 ``target`` 分两路：
+        设计态存的是自由字符串 tag；运行态按 ``mode`` 分：
 
-        * ``element``：绑到 :class:`RuntimeElement`，apply 走
-          :meth:`RuntimeElement.apply_binding`（只写显示字段，不污染 ``_page``）；
-        * ``control``：绑到 widget 图元的真实控件，apply 走 :func:`_control_apply`。
+        * ``mode='r'/'rw'``（读方向）：按 ``target`` 绑到 RuntimeElement 或真实控件；
+          外部推值 → apply 写实时显示字段，不污染 ``_page``；
+        * ``mode='w'/'rw'``（写方向，且字段在 WRITABLE_FIELDS）：把用户交互信号
+          接到 :meth:`TagBus.request_write`，控件刷值时抑制回环。
 
-        两条路都用 :meth:`bind_element` / :meth:`bind_control`，目标每次现查，
-        换页 / 控件重建不断线。返回成功注册的绑定条数。
+        返回成功注册的"读绑定"条数。
         """
         scene = self.scene
         count = 0
@@ -437,7 +511,8 @@ class RuntimeStage(QObject):
                 continue
             iid = int(it.item_id)
             for field, entry in raw.items():
-                spec = BY_KEY.get(str(field))
+                field = str(field)
+                spec = BY_KEY.get(field)
                 if spec is None:
                     continue
                 tag = str((entry or {}).get("tag") or "").strip() \
@@ -446,32 +521,145 @@ class RuntimeStage(QObject):
                     continue
                 apply = str((entry or {}).get("apply") or spec.apply) \
                     if isinstance(entry, dict) else spec.apply
-                if spec.target == "control" and it.TYPE == "widget":
-                    binding = self.bind_control(
-                        tag, iid, apply=_control_apply(str(field), apply))
-                else:
-                    binding = self.bind_element(
-                        tag, iid,
-                        apply=lambda el, v, f=str(field), a=apply:
-                        el.apply_binding(f, v, a))
-                self._page_bindings.append(binding)
-                count += 1
+                mode = str((entry or {}).get("mode") or "r") \
+                    if isinstance(entry, dict) else "r"
+                norm = {"mode": mode}
+
+                # ---- 读方向 ------------------------------------------
+                if is_readable(norm):
+                    if spec.target == "control" and it.TYPE == "widget":
+                        base_apply = _control_apply(field, apply)
+                        # 包裹 apply：刷值时先把控件标为 suppress，避免值变更
+                        # 信号再次触发 writeRequested（读→写回环）。
+                        def read_apply(w, v, _base=base_apply):
+                            if w is None:
+                                return
+                            self.tags.suppress(w)
+                            try:
+                                _base(w, v)
+                            finally:
+                                self.tags.unsuppress(w)
+                        binding = self.bind_control(tag, iid, apply=read_apply)
+                    else:
+                        binding = self.bind_element(
+                            tag, iid,
+                            apply=lambda el, v, f=field, a=apply:
+                            el.apply_binding(f, v, a))
+                    self._page_bindings.append(binding)
+                    count += 1
+
+                # ---- 写方向 ------------------------------------------
+                if is_writable(norm) and field in WRITABLE_FIELDS:
+                    if spec.target == "control" and it.TYPE == "widget":
+                        self._wire_control_write(iid, field, tag, apply)
+                    elif field == "checked" and it.TYPE == "checkbox":
+                        self._wire_checkbox_write(iid, tag, apply)
         return count
 
+    def _wire_control_write(self, iid: int, field: str, tag: str,
+                            apply: str, widget: Any = None) -> None:
+        """把 widget 控件的值变更信号接到反向写。
+
+        ``widget`` 由 controlCreated 回调显式传入（此刻可能还没进 WidgetHost
+        索引）；_load_page_bindings 时留空，从 WidgetHost 现查。
+        """
+        if widget is None:
+            widget = self.widgets.control_of(iid)
+        if widget is None:
+            return
+        # 不同属性挑不同信号：文本用 editingFinished 避免每敲一个字就写一次，
+        # 数值用 valueChanged，勾选用 toggled。
+        if field == "widgetText":
+            names = ("editingFinished", "textChanged",
+                     "currentTextChanged", "toggled")
+        else:
+            names = ("valueChanged", "toggled", "currentIndexChanged",
+                     "currentTextChanged")
+        sig, sig_name = _first_signal(widget, names)
+        if sig is None:
+            return
+
+        def on_change(*_args, _w=widget, _f=field, _t=tag, _a=apply):
+            if self.tags.is_suppressed(_w):
+                return
+            value = _control_value(_w, _f)
+            self.tags.request_write(_t, coerce(value, _a))
+
+        sig.connect(on_change)
+        self._write_links.append({"iid": iid, "kind": "control",
+                                  "signal": sig, "slot": on_change})
+
+    def _wire_checkbox_write(self, iid: int, tag: str, apply: str) -> None:
+        """checkbox 图元：点击切换显示态并写出；需打开图元点击路由。"""
+        element = self.registry.find(iid)
+        if element is None:
+            return
+
+        def on_click(_e=element, _t=tag, _a=apply, _iid=iid):
+            it = _e.item()
+            if it is None:
+                return
+            new_state = not bool(it.checked)
+            # 只刷显示字段 + 写出，不写 _page（与读方向同一出口）
+            _e.apply_binding("checked", new_state, "bool")
+            self.tags.request_write(_t, coerce(new_state, _a))
+
+        element.clicked.connect(on_click)
+        element.set_interactive(True)   # 没有这条，点击路由不会命中该图元
+        self._write_links.append({"iid": iid, "kind": "checkbox",
+                                  "signal": element.clicked, "slot": on_click})
+
     def page_binding_count(self) -> int:
-        """当前页由 bindings 字段派生的绑定条数（诊断用）。"""
+        """当前页由 bindings 字段派生的"读绑定"条数（诊断用）。"""
         return len(self._page_bindings)
+
+    def page_write_count(self) -> int:
+        """当前页由 bindings 字段派生的"反向写"条数（诊断用）。"""
+        return sum(1 for link in self._write_links
+                   if link.get("kind") in ("control", "checkbox"))
 
     def _dispatch(self, values: dict) -> None:
         for binding in list(self._bindings):
             if binding.key in values:
                 binding.push(values[binding.key])
 
-    def _on_control_created(self, _iid: int, _widget) -> None:
-        # 控件被重建后，用总线缓存把旧值补灌回新控件
+    def _on_control_created(self, iid: int, widget) -> None:
+        # 控件被重建后：补灌缓存值 + 重接该图元的反向写信号。
         for binding in list(self._bindings):
             if binding.is_control:
                 binding.replay()
+        # 旧控件若曾接过写信号，先断开它（随 proxy 回收），再对新控件重接。
+        for link in list(self._write_links):
+            if link.get("kind") == "control" and link.get("iid") == int(iid):
+                sig, slot = link.get("signal"), link.get("slot")
+                if sig is not None and slot is not None:
+                    try:
+                        sig.disconnect(slot)
+                    except (RuntimeError, TypeError):
+                        pass
+                self._write_links.remove(link)
+                # 仅重接那些确实声明了 widget 可写的字段
+                self._rewire_control_write(iid, widget)
+
+    def _rewire_control_write(self, iid: int, widget) -> None:
+        """控件重建后，按页面上该 widget 图元的 bindings 重接可写字段。"""
+        element = self.registry.find(iid)
+        if element is None or element.item() is None:
+            return
+        raw = element.item().page_record().get("bindings") or {}
+        for field, entry in raw.items():
+            field = str(field)
+            spec = BY_KEY.get(field)
+            if spec is None or field not in WRITABLE_FIELDS:
+                continue
+            norm = {"mode": str((entry or {}).get("mode") or "r")}
+            if not is_writable(norm):
+                continue
+            tag = str((entry or {}).get("tag") or "").strip()
+            if not tag:
+                continue
+            apply = str((entry or {}).get("apply") or spec.apply)
+            self._wire_control_write(iid, field, tag, apply, widget=widget)
 
     def bind(self, key: str, target: Any,
              apply: Callable[[Any, Any], None] | None = None) -> StageBinding:
@@ -515,4 +703,5 @@ class RuntimeStage(QObject):
                 f"widgets={len(self.registry.widgets())}, "
                 f"proxies={len(self.widgets.proxies())}, "
                 f"mode={self.widgets.mode}, profile={self.registry.profile.name}, "
-                f"bindings={len(self._bindings)}, error={self.load_error!r})")
+                f"bindings={len(self._bindings)}, writes={self.page_write_count()}, "
+                f"error={self.load_error!r})")

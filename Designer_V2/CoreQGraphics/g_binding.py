@@ -8,11 +8,14 @@
   序列化与整页 undo/redo（``PageHistory`` 快照）。
 * **属性白名单**：只放开显示类属性（文本 / 勾选 / 可见 / 样式），几何属性
   （id、name、center_pos、width…）一律不绑，避免运行态数据推着画面乱跳。
-* **单向读**：本模块只负责「值怎么 coercion」与「哪些属性能绑」，不碰数据
-  采集与回写。运行态把值写进实时显示字段，不写设计数据（见
+* **双向**：缺省 ``mode="r"``（只读，外部推值 → 画面刷新，向后兼容存量页面）；
+  ``mode="rw"`` / ``"w"`` 额外打开反向写——用户在运行态操作 widget 控件或点击
+  checkbox 图元时，把新值作为写请求发到 ``TagBus.writeRequested``，由外部业务
+  / PLC 订阅后真正写设备。Designer_V2 自身不碰 PLC。
+* **显示写不污染**：读方向把值写进实时显示字段，不写设计数据（见
   :meth:`runtime.elements.RuntimeElement.apply_binding`）。
 * **tag 手填字符串**：DesignerV2 刻意不含 PLC / 点位表，tag 是自由字符串，
-  由外部把同名 key 推给 ``TagBus.update`` 即可对上。
+  外部按同名 key 推给 ``TagBus.update`` / 订阅 ``TagBus.writeRequested`` 即可。
 """
 
 from __future__ import annotations
@@ -62,6 +65,21 @@ APPLY_KINDS: tuple[tuple[str, str], ...] = (
 )
 APPLY_LABELS: dict[str, str] = dict(APPLY_KINDS)
 
+# 读写方向下拉：(内部值, 中文标签)。缺省 "r" 保持存量页面只读语义。
+MODE_KINDS: tuple[tuple[str, str], ...] = (
+    ("r", "只读（画面显示）"),
+    ("rw", "读写（可回写）"),
+    ("w", "只写（仅回写）"),
+)
+MODE_LABELS: dict[str, str] = dict(MODE_KINDS)
+DEFAULT_MODE = "r"
+
+# 只有这些属性在运行时有"用户交互产出值"的入口，可打开反向写：
+#   checked → checkbox 图元点击切换；widgetText/widgetValue → 真实控件编辑。
+# 其余属性即使设成 rw 也不会有写事件（纯显示），面板对它们隐藏方向下拉。
+WRITABLE_FIELDS: frozenset[str] = frozenset(
+    {"checked", "widgetText", "widgetValue"})
+
 
 def bindables_for(type_name: str) -> list[BindableProperty]:
     """某图元类型可绑定的属性列表。"""
@@ -70,16 +88,32 @@ def bindables_for(type_name: str) -> list[BindableProperty]:
 
 
 def normalize_binding(entry: Any, default_apply: str = "text") -> dict[str, str]:
-    """把一条绑定规格规范成 ``{"tag": str, "apply": str}``。"""
+    """把一条绑定规格规范成 ``{"tag", "apply", "mode"}``。
+
+    ``mode`` 缺省 ``"r"``（只读），因此存量页面里没有这个键的绑定行为不变。
+    """
     if isinstance(entry, str):
-        return {"tag": entry, "apply": default_apply}
+        return {"tag": entry, "apply": default_apply, "mode": DEFAULT_MODE}
     if isinstance(entry, dict):
         tag = str(entry.get("tag") or "").strip()
         apply = str(entry.get("apply") or "").strip() or default_apply
         if apply not in APPLY_LABELS:
             apply = default_apply
-        return {"tag": tag, "apply": apply}
-    return {"tag": "", "apply": default_apply}
+        mode = str(entry.get("mode") or "").strip().lower() or DEFAULT_MODE
+        if mode not in MODE_LABELS:
+            mode = DEFAULT_MODE
+        return {"tag": tag, "apply": apply, "mode": mode}
+    return {"tag": "", "apply": default_apply, "mode": DEFAULT_MODE}
+
+
+def is_readable(norm: dict[str, str]) -> bool:
+    """该绑定是否需要"外部推值 → 画面刷新"。"""
+    return norm.get("mode", DEFAULT_MODE) in ("r", "rw")
+
+
+def is_writable(norm: dict[str, str]) -> bool:
+    """该绑定是否需要"用户操作 → 回写 tag"；字段本身还须在 WRITABLE_FIELDS。"""
+    return norm.get("mode", DEFAULT_MODE) in ("w", "rw")
 
 
 def coerce(value: Any, apply: str) -> Any:
